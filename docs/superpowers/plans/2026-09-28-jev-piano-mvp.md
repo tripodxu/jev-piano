@@ -132,16 +132,16 @@ questions = {
 
 **Files:** Create `jev-piano/package.json`, `jev-piano/.gitignore`
 
-- [ ] Step 1: 在 `jev-piano/` 执行 `git init -b main`
-- [ ] Step 2: 写 `package.json`：`{"name":"jev-piano","private":true,"type":"module","scripts":{"test":"node --test test/","dev":"python dev-proxy.py","deploy":"wrangler deploy"},"devDependencies":{"wrangler":"^4.0.0"}}`
-- [ ] Step 3: 写 `.gitignore`：`node_modules/`、`.wrangler/`、`.dev.vars`
-- [ ] Step 4: `git add -A && git commit -m "chore: project skeleton"`
+- [x] Step 1: 在 `jev-piano/` 执行 `git init -b main`
+- [x] Step 2: 写 `package.json`：`{"name":"jev-piano","private":true,"type":"module","scripts":{"test":"node --test test/","dev":"python dev-proxy.py","deploy":"wrangler deploy"},"devDependencies":{"wrangler":"^4.0.0"}}`
+- [x] Step 3: 写 `.gitignore`：`node_modules/`、`.wrangler/`、`.dev.vars`
+- [x] Step 4: `git add -A && git commit -m "chore: project skeleton"`
 
 ### Task 1: 乐理内核测试驱动校验（music.js 已落盘初稿）
 
 **Files:** Test `test/theory.test.mjs`；Modify（如需）`public/js/music.js`
 
-- [ ] Step 1: 写 `test/theory.test.mjs`，完整断言：
+- [x] Step 1: 写 `test/theory.test.mjs`，完整断言：
   - `parseRoman('V7')` → `{rootPc:7, shape:'7'}`；`parseRoman('Imaj7')` → `{rootPc:0,shape:'maj7'}`；`parseRoman('ii m7b5')`（jazz minor 池含空格）→ trim 后 `{rootPc:2,shape:'m7b5'}`；`parseRoman('bVI')` → `{rootPc:8,shape:''}`；`parseRoman('bVII')` → `{rootPc:10,shape:''}`；`parseRoman('vi7')` → `{rootPc:9,shape:'m7'}`；`parseRoman('V 7sus4')` → `{rootPc:7,shape:'7sus4'}`；`parseRoman('i m9')` → `{rootPc:0,shape:'m9'}`
   - `chordMidis(9,'m',60,84)` 全部 pc ∈ {9,0,4}（Am）且 60..84
   - `lhVoicing(9,'m7')`：bass∈36..47 且 pc=9；upper 3 音均在 48..64 且 pc ∈ Am7
@@ -149,10 +149,10 @@ questions = {
   - `nearest(66, [60,62,64,67,69])` → 67
   - **STYLES 完整性**：每个 style 的每条 progs 每个符号 `parseRoman(trim)` 非 null；`bpm[0]<=bpm[1]`；`lh` id 全部存在于 `LH_DEFS`；waltz 的 meters 恰为 `['3/4']` 且其他风格含 `4/4`
   - `keywordPlan('雨夜的城市', rng)` 返回 styleId ∈ STYLES、bpm 为整数且在风格区间、含 title
-- [ ] Step 2: 运行 `npm test` → 预期**部分失败**（如 `ii m7b5` 带空格、`V 7sus4` 带空格）
-- [ ] Step 3: 修 `music.js`：`parseRoman` 入口先 `sym.trim().replace(/\s+/,'')`；其余按失败信息修
-- [ ] Step 4: `npm test` → 全绿
-- [ ] Step 5: `git add -A && git commit -m "feat: theory kernel validated by tests"`
+- [x] Step 2: 运行 `npm test` → 预期**部分失败**（如 `ii m7b5` 带空格、`V 7sus4` 带空格）
+- [x] Step 3: 修 `music.js`：`parseRoman` 入口先 `sym.trim().replace(/\s+/,'')`；其余按失败信息修
+- [x] Step 4: `npm test` → 全绿
+- [x] Step 5: `git add -A && git commit -m "feat: theory kernel validated by tests"`
 
 ### Task 2: Jev 客户端（jev.js）
 
@@ -181,13 +181,13 @@ export async function expandPlan(prompt, hint, llmCfg, fetchImpl=fetch)
 export const PLAN_SYS_PROMPT = `...` // 见下方原文
 ```
 
-- [ ] Step 1: 写测试 `test/jev.test.mjs`（注入假 fetch）：
+- [x] Step 1: 写测试 `test/jev.test.mjs`（注入假 fetch）：
   - 200 → 返回 answers/usage 正确，发送体不含 `_fixture`
   - 先 429 后 200 → 重试成功（假 fetch 计数）
   - `fixtureAnswer`：固定 rng 下确定；权重全 0 的题返回任一 criteria 键
   - `expandPlan`：假 fetch 返回 `choices[0].message.content='{"title":"x"}'` → 解析成功；返回非 JSON → null
-- [ ] Step 2: `npm test` → 预期 FAIL（模块不存在）
-- [ ] Step 3: 实现 `jev.js`。`PLAN_SYS_PROMPT` 原文：
+- [x] Step 2: `npm test` → 预期 FAIL（模块不存在）
+- [x] Step 3: 实现 `jev.js`。`PLAN_SYS_PROMPT` 原文：
 
 ```text
 你是作曲助理，把用户的一句话扩写成钢琴即兴曲的创作计划。只输出一个 JSON 对象，不要任何其他文字或代码块标记。
@@ -196,7 +196,7 @@ export const PLAN_SYS_PROMPT = `...` // 见下方原文
 若 hint.style 给了具体风格则 style 必须服从 hint；bpm/density/brightness 尽量服从 hint.goal 的意图。
 ```
 
-- [ ] Step 4: `npm test` → 全绿；`git commit -m "feat: jev client with 4 channels + llm expansion"`
+- [x] Step 4: `npm test` → 全绿；`git commit -m "feat: jev client with 4 channels + llm expansion"`
 
 ### Task 3: 编曲决策器（composer.js）——核心
 
@@ -246,15 +246,15 @@ export class Composer {
   - LH 音域强制 36..64。
 - **每小节请求**：`askJev({state, questions}, cfg)`；**任何失败（无 key/CORS/断网）→ fixtureAnswer 同构兜底**，decision.fixture=true，播放永不中断。
 
-- [ ] Step 1: 写 `test/composer.test.mjs`（channel:'fixture'，固定 seed）：
+- [x] Step 1: 写 `test/composer.test.mjs`（channel:'fixture'，固定 seed）：
   - 同 seed 两次 `nextBar()` 前几小节 NoteEvent 序列**完全一致**（确定性）
   - 100 小节内：所有 LH 音 36..64、RH 音 58..86（swing 后 startBeats 单调不回退超出 0.4 拍）、vel 0.15..1
   - `is_phrase_end` 小节（index%8==7）的末音 ∈ 当前和弦音
   - `breathe=true` 的小节首 onset ≥ 1 格
   - `buildPlan`（llm disabled）：keyword 路径返回合法 Plan；`styleId:'waltz'` 强制 meterNum=3
   - decision.fixture===true 且 answers 含全部 6 个 qid
-- [ ] Step 2: `npm test` → FAIL；Step 3: 实现；Step 4: `npm test` → 全绿
-- [ ] Step 5: `git commit -m "feat: per-bar composer with fixture decisions"`
+- [x] Step 2: `npm test` → FAIL；Step 3: 实现；Step 4: `npm test` → 全绿
+- [x] Step 5: `git commit -m "feat: per-bar composer with fixture decisions"`
 
 ### Task 4: 音频引擎（audio.js）
 
@@ -274,9 +274,9 @@ export class PianoAudio {
 }
 ```
 
-- [ ] Step 1: 测试 `envFor`：midi 84 比 36 的 decay 短；vel 1 的 cutoff > vel 0.2；peak 单调。`npm test`
-- [ ] Step 2: 实现（合成参数按上面注释逐条落地，混响 IR 用 `ctx.createBuffer` 双通道 `Math.exp(-3t)` 噪声）
-- [ ] Step 3: `npm test` 全绿；`git commit -m "feat: synthesized piano audio engine"`
+- [x] Step 1: 测试 `envFor`：midi 84 比 36 的 decay 短；vel 1 的 cutoff > vel 0.2；peak 单调。`npm test`
+- [x] Step 2: 实现（合成参数按上面注释逐条落地，混响 IR 用 `ctx.createBuffer` 双通道 `Math.exp(-3t)` 噪声）
+- [x] Step 3: `npm test` 全绿；`git commit -m "feat: synthesized piano audio engine"`
 
 ### Task 5: 实时调度器（player.js）
 
@@ -294,16 +294,16 @@ export class Player {
 }
 ```
 
-- [ ] Step 1: 测试（假 now：每次调用 +0.05s；假 audio 记录 play 调用；假 composer 预生成 4 小节）：启动后推进 20 tick → 播放事件按时间序、AHEAD_BARS≤2、stop() 后不再调度、records 长度=音符数
-- [ ] Step 2: `npm test` → FAIL；Step 3: 实现；Step 4: 全绿
-- [ ] Step 5: `git commit -m "feat: lookahead realtime player"`
+- [x] Step 1: 测试（假 now：每次调用 +0.05s；假 audio 记录 play 调用；假 composer 预生成 4 小节）：启动后推进 20 tick → 播放事件按时间序、AHEAD_BARS≤2、stop() 后不再调度、records 长度=音符数
+- [x] Step 2: `npm test` → FAIL；Step 3: 实现；Step 4: 全绿
+- [x] Step 5: `git commit -m "feat: lookahead realtime player"`
 
 ### Task 6: MIDI 导出（midi.js）
 
 **Files:** Create `public/js/midi.js`；Test `test/midi.test.mjs`
 
-- [ ] Step 1: 测试：`exportMidi(records,{bpm:96,meterNum:4})` → 字节以 `MThd` 开头、format=1、ntrks=3、division=480；track0 tempo 事件 `FF 51 03` 值=60000000/96；一条已知音符在 track1/2（hand）VLQ 正确
-- [ ] Step 2: 实现：`vlq(n)`、`trackOf(events)`（note on 0x90/vel、note off 0x80，delta 排序）、header + 3 track 拼接；`git commit -m "feat: smf export"`
+- [x] Step 1: 测试：`exportMidi(records,{bpm:96,meterNum:4})` → 字节以 `MThd` 开头、format=1、ntrks=3、division=480；track0 tempo 事件 `FF 51 03` 值=60000000/96；一条已知音符在 track1/2（hand）VLQ 正确
+- [x] Step 2: 实现：`vlq(n)`、`trackOf(events)`（note on 0x90/vel、note off 0x80，delta 排序）、header + 3 track 拼接；`git commit -m "feat: smf export"`
 
 ### Task 7: 页面结构（index.html + styles.css）
 
@@ -331,23 +331,23 @@ export class Player {
 
 样式：暗色（#0e1116 底、#e8e2d0 字），chips 圆角胶囊，键盘白键 #f5f1e6 黑键 #1a1d22，`.on` 高亮琥珀 #f0b429；下落音符 RH #f0b429 / LH #5cc8c8。移动端 ≤720px 单列。
 
-- [ ] Step 1: 写 `index.html`（按上表完整结构，`<script type="module" src="js/main.js">`）
-- [ ] Step 2: 写 `styles.css`（上述主题逐条落地）
-- [ ] Step 3: `git commit -m "feat: page structure & theme"`
+- [x] Step 1: 写 `index.html`（按上表完整结构，`<script type="module" src="js/main.js">`）
+- [x] Step 2: 写 `styles.css`（上述主题逐条落地）
+- [x] Step 3: `git commit -m "feat: page structure & theme"`
 
 ### Task 8: UI 逻辑（ui.js + main.js）
 
 **Files:** Create `public/js/ui.js`, `public/js/main.js`
 
-- [ ] Step 1: `ui.js`：`renderKeyboard(36,84)`（白键 DOM + 黑键定位函数 `blackOffset(midi)`）；`flashKey(midi, untilSec)`；`class Fall`（raf 循环，push(note{midi,tSec,durSec,vel,hand})，底部对齐键盘）；`addDecision(BarResult)`（中文行，前置插入，上限 60 条）；`renderPlan(Plan)`；`setStatus(...)`
-- [ ] Step 2: `main.js`：设置持久化 localStorage key `jevpiano.settings.v1`（channel/keys/llmCfg，明示"仅存本机"）；启动时 `probeProxy()` 自动推荐渠道（proxy ok→proxy，否则 fixture）；开始流程：`ensure()` → `buildPlan()`（renderPlan）→ `new Player(...)` start；停止/换一版/导出（Blob 下载 `title.mid`）/录音；错误 → toast
-- [ ] Step 3: `git commit -m "feat: ui wiring, visuals, settings"`
+- [x] Step 1: `ui.js`：`renderKeyboard(36,84)`（白键 DOM + 黑键定位函数 `blackOffset(midi)`）；`flashKey(midi, untilSec)`；`class Fall`（raf 循环，push(note{midi,tSec,durSec,vel,hand})，底部对齐键盘）；`addDecision(BarResult)`（中文行，前置插入，上限 60 条）；`renderPlan(Plan)`；`setStatus(...)`
+- [x] Step 2: `main.js`：设置持久化 localStorage key `jevpiano.settings.v1`（channel/keys/llmCfg，明示"仅存本机"）；启动时 `probeProxy()` 自动推荐渠道（proxy ok→proxy，否则 fixture）；开始流程：`ensure()` → `buildPlan()`（renderPlan）→ `new Player(...)` start；停止/换一版/导出（Blob 下载 `title.mid`）/录音；错误 → toast
+- [x] Step 3: `git commit -m "feat: ui wiring, visuals, settings"`
 
 ### Task 9: Worker 与部署（src/worker.js + wrangler.toml + dev-proxy.py）
 
 **Files:** Create `src/worker.js`, `wrangler.toml`, `.dev.vars.example`, `dev-proxy.py`
 
-- [ ] Step 1: `worker.js`（完整逻辑）：
+- [x] Step 1: `worker.js`（完整逻辑）：
 
 ```js
 // GET  /api/probe → { ok:true, jev:'workers-ai'|'key'|null, llm:bool }
@@ -358,23 +358,23 @@ export class Player {
 // 其余 → env.ASSETS.fetch(request)
 ```
 
-- [ ] Step 2: `wrangler.toml`：`main="src/worker.js"`、`compatibility_date="2026-09-01"`、`[assets] directory="./public" binding="ASSETS" run_worker_first=["/api/*"]`、`[ai] binding="AI"`（注释注明：账号无 Workers AI 时删除此两行，改用 secret）
-- [ ] Step 3: `dev-proxy.py`（stdlib only）：`--port 8000`；静态服务 public/；`/api/probe`→`{ok,jev:'mock'|'key',llm}`（有 TYPESAFE_API_KEY 环境变量则真转发 `/api/jev`，否则按 criteria 键均匀采样返回 mock answers）
-- [ ] Step 4: 语法检查：`node --check src/worker.js`（ESM：用 `node --input-type=module --check < src/worker.js`）+ `python -m py_compile dev-proxy.py`
-- [ ] Step 5: `git commit -m "feat: cf worker, wrangler config, dev proxy"`
+- [x] Step 2: `wrangler.toml`：`main="src/worker.js"`、`compatibility_date="2026-09-01"`、`[assets] directory="./public" binding="ASSETS" run_worker_first=["/api/*"]`、`[ai] binding="AI"`（注释注明：账号无 Workers AI 时删除此两行，改用 secret）
+- [x] Step 3: `dev-proxy.py`（stdlib only）：`--port 8000`；静态服务 public/；`/api/probe`→`{ok,jev:'mock'|'key',llm}`（有 TYPESAFE_API_KEY 环境变量则真转发 `/api/jev`，否则按 criteria 键均匀采样返回 mock answers）
+- [x] Step 4: 语法检查：`node --check src/worker.js`（ESM：用 `node --input-type=module --check < src/worker.js`）+ `python -m py_compile dev-proxy.py`
+- [x] Step 5: `git commit -m "feat: cf worker, wrangler config, dev proxy"`
 
 ### Task 10: 端到端验证（浏览器实测）
 
-- [ ] Step 1: `python dev-proxy.py --port 8000` 后台启动
-- [ ] Step 2: 浏览器（browser-use）打开 `http://127.0.0.1:8000`：输入"雨夜的城市，一个人走在霓虹下"、风格"随机" → 开始：断言 **无 console 错误**、`decisionLog` 每 2s 增加行、键盘出现高亮、`nowChord` 变化；截图检查布局
-- [ ] Step 3: 渠道切换测试：settings → proxy 渠道（mock）重播一次正常；typesafe 渠道无 key → toast 报错且不崩溃
-- [ ] Step 4: 导出 MIDI → 下载文件头为 `MThd`；停止 → 无残留 timer
-- [ ] Step 5: 修复发现的问题并 `git commit -m "fix: e2e findings"`
+- [x] Step 1: `python dev-proxy.py --port 8000` 后台启动
+- [x] Step 2: 浏览器（browser-use）打开 `http://127.0.0.1:8000`：输入"雨夜的城市，一个人走在霓虹下"、风格"随机" → 开始：断言 **无 console 错误**、`decisionLog` 每 2s 增加行、键盘出现高亮、`nowChord` 变化；截图检查布局
+- [x] Step 3: 渠道切换测试：settings → proxy 渠道（mock）重播一次正常；typesafe 渠道无 key → toast 报错且不崩溃
+- [x] Step 4: 导出 MIDI → 下载文件头为 `MThd`；停止 → 无残留 timer
+- [x] Step 5: 修复发现的问题并 `git commit -m "fix: e2e findings"`
 
 ### Task 11: README 与收尾
 
-- [ ] Step 1: `README.md`：项目简介、架构图（文字版）、三种 Jev 渠道配置（Workers AI/secret/BYOK）、LLM 扩写配置、本地开发（dev-proxy.py / wrangler dev）、成本估算（~$0.00002/小节，32 小节 ≈ $0.0006）、远期路线图（**乐团版**：多轨=多乐器合成器，Jev 每轨每小节并行决策 + LLM 担任"指挥"做曲式级规划，Jeithoven 式 lane 模型）
-- [ ] Step 2: 最终全量 `npm test` + `git commit -m "docs: readme & roadmap"`
+- [x] Step 1: `README.md`：项目简介、架构图（文字版）、三种 Jev 渠道配置（Workers AI/secret/BYOK）、LLM 扩写配置、本地开发（dev-proxy.py / wrangler dev）、成本估算（~$0.00002/小节，32 小节 ≈ $0.0006）、远期路线图（**乐团版**：多轨=多乐器合成器，Jev 每轨每小节并行决策 + LLM 担任"指挥"做曲式级规划，Jeithoven 式 lane 模型）
+- [x] Step 2: 最终全量 `npm test` + `git commit -m "docs: readme & roadmap"`
 
 ---
 
