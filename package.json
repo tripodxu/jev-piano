@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Jev 即兴钢琴：Jev 每小节实时决策，边作曲边演奏的轻量前端",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test",
     "dev": "python dev-proxy.py",
     "deploy": "wrangler deploy"
   },

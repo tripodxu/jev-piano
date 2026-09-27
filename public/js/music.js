@@ -30,11 +30,13 @@ export const CHORD_SHAPES = {
 };
 
 // 罗马数字 → { rootPc, shape }。规则：大写=大三/属系，小写=小三系；
-// 后缀 7/9/6/maj7/maj9/sus4/add9/o/ø；b/# 变音记号。
-const ROMAN_RE = /^(#|b)?([ivIV]+)(maj7|maj9|m7b5|7sus4|sus4|add9|7|9|6|o|ø)?$/;
+// 后缀 maj9/maj7/m7b5/m9/m7/7sus4/sus4/add9/7/9/6/o/ø；b/# 变音记号。
+// 池子里允许写空格（如 'ii m7b5'、'V 7sus4'），统一去掉再解析。
+const ROMAN_RE = /^(#|b)?([ivIV]+)(maj9|maj7|m7b5|m9|m7|7sus4|sus4|add9|7|9|6|o|ø)?$/;
 const DEGREE_SEMI = { i: 0, ii: 2, iii: 4, iv: 5, v: 7, vi: 9, vii: 11 };
 
-export function parseRoman(sym) {
+export function parseRoman(rawSym) {
+  const sym = String(rawSym).trim().replace(/\s+/g, '');
   const m = ROMAN_RE.exec(sym);
   if (!m) return null;
   const [, acc, roman, suffix = ''] = m;
@@ -48,6 +50,9 @@ export function parseRoman(sym) {
     case 'ø': shape = 'm7b5'; break;
     case 'maj7': shape = 'maj7'; break;
     case 'maj9': shape = 'maj9'; break;
+    case 'm7b5': shape = 'm7b5'; break;
+    case 'm9': shape = 'm9'; break;
+    case 'm7': shape = 'm7'; break;
     case '7sus4': shape = '7sus4'; break;
     case 'sus4': shape = 'sus4'; break;
     case 'add9': shape = 'add9'; break;
@@ -221,7 +226,7 @@ export const STYLES = [
     id: 'oriental', name: '东方 · 五声', desc: '宫/羽五声，四五度叠置，留白如水墨',
     meters: ['4/4'], bpm: [66, 100], modes: ['pentatonic'],
     progs: {
-      pentatonic: [['I', 'bVII', 'I', 'V'], ['i', 'bVI', 'bIII', 'bVII'], ['I', 'vi m', 'IV', 'I'], ['i', 'bVII', 'iv', 'i']],
+      pentatonic: [['I', 'bVII', 'I', 'V'], ['i', 'bVI', 'bIII', 'bVII'], ['I', 'vi', 'IV', 'I'], ['i', 'bVII', 'iv', 'i']],
     },
     lh: ['octave', 'block', 'arp'], density: 0.4, swing: 0, brightness: 0.55,
   },
