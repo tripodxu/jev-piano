@@ -134,7 +134,7 @@ async function start() {
     audio, composer, bpm,
     onBar(bar) {
       els.nowChord.textContent = bar.chord.symbol;
-      els.nowBar.textContent = `第 ${bar.index + 1} 小节 · ${bar.label} · 第 ${bar.loop + 1} 遍 · 强度 ${bar.intensity.toFixed(1)}`;
+      els.nowBar.textContent = `第 ${bar.index + 1} 小节 ${bar.label} · 强度 ${bar.intensity.toFixed(1)}${bar.loop > 0 ? `，第 ${bar.loop + 1} 遍` : ''}`;
       addDecision(els.decisionLog, bar);
       if (!bar.decision.fixture) {
         stats.tokens += bar.decision.inputTokens;
@@ -227,6 +227,8 @@ window.__jevDebug = () => ({
   marks: player?.barMarks.length ?? -1,
   deciding: player?.deciding ?? false,
   recorded: player?.records.length ?? -1,
+  fallNotes: fall.notes.length,
+  fallErrs: globalThis.__fallErrs ?? [],
 });
 (async () => {
   refreshStatus();
