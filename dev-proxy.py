@@ -19,17 +19,24 @@ TYPESAFE_MODEL = "jev-latest"
 
 
 def forward(url, key, payload):
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode(),
-        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
-        method="POST",
-    )
+    """转发到 TypeSafe。优先 requests（部分 Windows 环境 urllib TLS 会挂起），退回 urllib。"""
+    headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json"}
     try:
-        with urllib.request.urlopen(req, timeout=30) as res:
-            return res.status, res.read()
-    except urllib.error.HTTPError as e:
-        return e.code, e.read()
+        import requests
+        try:
+            r = requests.post(url, headers=headers, json=payload, timeout=30)
+            return r.status_code, r.content
+        except Exception as e:  # 网络错误统一 502
+            return 502, json.dumps({"error": f"forward failed: {e}"}).encode()
+    except ImportError:
+        req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=30) as res:
+                return res.status, res.read()
+        except urllib.error.HTTPError as e:
+            return e.code, e.read()
+        except Exception as e:
+            return 502, json.dumps({"error": f"forward failed: {e}"}).encode()
 
 
 def mock_answers(questions):

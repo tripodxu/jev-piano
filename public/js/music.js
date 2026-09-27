@@ -237,18 +237,18 @@ export const STYLES = [
 
 export const STYLE_BY_ID = Object.fromEntries(STYLES.map((s) => [s.id, s]));
 
-/** 从关键词推断风格/调式/弧线的简易映射（LLM 不可用时的兜底） */
+/** 从关键词推断风格/调式/弧线的简易映射（LLM 不可用时的兜底）；word 用于曲名 */
 const KEYWORD_HINTS = [
-  { re: /雨|rain|夜|night|lonely|孤|泪|tear/i, style: 'romantic', mode: 'minor', arc: 'fall', mood: ['rainy', 'melancholy'] },
-  { re: /星|star|梦|dream|云|cloud|仙/i, style: 'newage', mode: 'major', arc: 'arch', mood: ['dreamy', 'floating'] },
-  { re: /咖啡|cafe|慢|slow|懒|lazy|雨窗|黄昏|dusk/i, style: 'lofi', mode: 'major', arc: 'flat', mood: ['cosy', 'hazy'] },
-  { re: /爵士|jazz|蓝调|blues|摇摆|swing|酒吧|bar\b/i, style: 'jazz', mode: 'major', arc: 'arch', mood: ['smoky', 'groovy'] },
-  { re: /战斗|战|燃|epic|英雄|hero|龙|dragon|江湖/i, style: 'oriental', mode: 'pentatonic', arc: 'rise', mood: ['heroic', 'flowing'] },
-  { re: /欢|喜|happy|阳光|sun|春|spring|节|庆典|fest/i, style: 'classical', mode: 'major', arc: 'rise', mood: ['bright', 'playful'] },
-  { re: /海|sea|ocean|溪|stream|林|forest|风|wind/i, style: 'newage', mode: 'pentatonic', arc: 'flat', mood: ['serene', 'wide'] },
-  { re: /雪|snow|冬|winter|月光|moon/i, style: 'romantic', mode: 'minor', arc: 'arch', mood: ['still', 'silver'] },
-  { re: /思念|miss|回忆|memory|故乡|home|farewell|离别/i, style: 'pop', mode: 'minor', arc: 'arch', mood: ['nostalgic', 'tender'] },
-  { re: /童话|fairy|舞|dance|旋转|waltz/i, style: 'waltz', mode: 'major', arc: 'arch', mood: ['whirling', 'graceful'] },
+  { re: /雨|rain|夜|night|lonely|孤|泪|tear/i, style: 'romantic', mode: 'minor', arc: 'fall', mood: ['rainy', 'melancholy'], word: '雨夜' },
+  { re: /星|star|梦|dream|云|cloud|仙/i, style: 'newage', mode: 'major', arc: 'arch', mood: ['dreamy', 'floating'], word: '星辰' },
+  { re: /咖啡|cafe|慢|slow|懒|lazy|雨窗|黄昏|dusk/i, style: 'lofi', mode: 'major', arc: 'flat', mood: ['cosy', 'hazy'], word: '午后' },
+  { re: /爵士|jazz|蓝调|blues|摇摆|swing|酒吧|bar\b/i, style: 'jazz', mode: 'major', arc: 'arch', mood: ['smoky', 'groovy'], word: '蓝调' },
+  { re: /战斗|战|燃|epic|英雄|hero|龙|dragon|江湖/i, style: 'oriental', mode: 'pentatonic', arc: 'rise', mood: ['heroic', 'flowing'], word: '江湖' },
+  { re: /欢|喜|happy|阳光|sun|春|spring|节|庆典|fest/i, style: 'classical', mode: 'major', arc: 'rise', mood: ['bright', 'playful'], word: '春日' },
+  { re: /海|sea|ocean|溪|stream|林|forest|风|wind/i, style: 'newage', mode: 'pentatonic', arc: 'flat', mood: ['serene', 'wide'], word: '山水' },
+  { re: /雪|snow|冬|winter|月光|moon/i, style: 'romantic', mode: 'minor', arc: 'arch', mood: ['still', 'silver'], word: '月色' },
+  { re: /思念|miss|回忆|memory|故乡|home|farewell|离别/i, style: 'pop', mode: 'minor', arc: 'arch', mood: ['nostalgic', 'tender'], word: '旧梦' },
+  { re: /童话|fairy|舞|dance|旋转|waltz/i, style: 'waltz', mode: 'major', arc: 'arch', mood: ['whirling', 'graceful'], word: '旋转' },
 ];
 
 const TITLE_MOODS = ['雨夜', '星光', '微风', '蓝色', '清晨', '午后', '远方', '旧梦', '巷口', '暖冬', '潮汐', '萤火'];
@@ -271,7 +271,7 @@ export function keywordPlan(text, rng) {
     swing: style.swing,
     density: style.density,
     brightness: style.brightness,
-    title: `${TITLE_MOODS[Math.floor(rng() * TITLE_MOODS.length)]}${TITLE_KINDS[Math.floor(rng() * TITLE_KINDS.length)]}`,
+    title: `${hit?.word ?? TITLE_MOODS[Math.floor(rng() * TITLE_MOODS.length)]}${TITLE_KINDS[Math.floor(rng() * TITLE_KINDS.length)]}`,
     notes: '',
     source: 'keyword',
   };

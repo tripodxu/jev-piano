@@ -113,9 +113,11 @@ export async function askJev({ state, questions }, cfg, fetchImpl = fetch) {
     const t0 = Date.now();
     let res;
     try {
-      res = await fetchImpl(ch.endpoint, { method: 'POST', headers, signal: cfg.signal, body: JSON.stringify(payload) });
+      // 实时演奏约束：单次决策不能超过 ~10s，超时按失败处理（composer 会同构兜底）
+      const signal = cfg.signal ?? AbortSignal.timeout(10_000);
+      res = await fetchImpl(ch.endpoint, { method: 'POST', headers, signal, body: JSON.stringify(payload) });
     } catch (e) {
-      if (e?.name === 'AbortError') throw e;
+      if (e?.name === 'AbortError' && cfg.signal) throw e; // 用户主动取消
       lastErr = new Error('网络错误：' + e.message + '（若浏览器跨域受限，请改用「同源代理」渠道）');
       continue;
     }

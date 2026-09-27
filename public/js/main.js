@@ -46,7 +46,9 @@ const refreshStatus = (extraFixture) => {
 for (const input of [els.channelSel, els.typesafeKey, els.openrouterKey, els.llmEnabled, els.llmBaseUrl, els.llmModel, els.llmKey, els.llmProxy]) {
   const prop = input.type === 'checkbox' ? 'checked' : 'value';
   input[prop] = settings[input.id === 'channelSel' ? 'channel' : input.id] ?? '';
-  input.addEventListener('change', () => {
+  // 文本框用 input 事件（程序化填充不触发 change）；select/checkbox 用 change
+  const evName = input.tagName === 'INPUT' && ['text', 'password'].includes(input.type) ? 'input' : 'change';
+  input.addEventListener(evName, () => {
     settings[input.id === 'channelSel' ? 'channel' : input.id] = input[prop];
     settings.touched = true;
     saveSettings();
@@ -217,6 +219,15 @@ els.testLlmBtn.addEventListener('click', async () => {
 });
 
 /* ---------------- 启动 ---------------- */
+window.__jevDebug = () => ({
+  ctxState: audio.ctx?.state ?? 'no-ctx',
+  ctxTime: audio.ctx?.currentTime ?? -1,
+  running: player?.running ?? false,
+  queued: player?.queue.length ?? -1,
+  marks: player?.barMarks.length ?? -1,
+  deciding: player?.deciding ?? false,
+  recorded: player?.records.length ?? -1,
+});
 (async () => {
   refreshStatus();
   const probe = await probeProxy();
