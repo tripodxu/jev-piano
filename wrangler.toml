@@ -1,0 +1,20 @@
+name = "jev-piano"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+# 只有 API 走 Worker，静态文件直接从边缘出
+run_worker_first = ["/api/*"]
+
+# Workers AI 绑定：部署后 Jev 决策零 key 直用 @cf/typesafe/jev。
+# 若你的账号未开通 Workers AI，删除下面两行并改用 secret：
+#   npx wrangler secret put TYPESAFE_API_KEY
+[ai]
+binding = "AI"
+
+# 可选：服务端 LLM 扩写代理（不配则前端 BYOK 直连）
+# [vars]
+# LLM_BASE_URL = "https://api.openai.com/v1"
+# LLM_MODEL = "gpt-4o-mini"
