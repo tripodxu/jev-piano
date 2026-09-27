@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jev 即兴钢琴 · Jev 实时谱曲演奏</title>
+  <meta name="description" content="Jev 每小节实时决策，边作曲边演奏的钢琴。可接 TypeSafe/OpenRouter/Workers AI，也可离线随机。">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Jev 即兴钢琴</h1>
+      <p class="tagline">Jev 每小节实时决策 · 边作曲边演奏</p>
+    </div>
+    <div id="statusBar" class="statusbar" title="Jev 渠道 / 累计 tokens / 累计费用 / 平均延迟">
+      <span class="pill" id="stChannel">离线随机</span>
+      <span class="pill" id="stTokens">0 tok</span>
+      <span class="pill" id="stCost">$0.000000</span>
+      <span class="pill" id="stLatency">— ms</span>
+    </div>
+    <button id="settingsBtn" class="btn ghost" type="button">⚙ 设置</button>
+  </header>
+
+  <main>
+    <section class="panel compose">
+      <label class="lbl" for="prompt">你的灵感（一句话）</label>
+      <textarea id="prompt" rows="2" placeholder="例：雨夜的城市，一个人走在霓虹下"></textarea>
+
+      <label class="lbl">风格</label>
+      <div id="styleChips" class="chips" role="radiogroup">
+        <button class="chip sel" data-style="random" type="button">🎲 随机</button>
+        <button class="chip" data-style="classical" type="button">古典 · 优雅</button>
+        <button class="chip" data-style="romantic" type="button">浪漫 · 抒情</button>
+        <button class="chip" data-style="jazz" type="button">爵士 · 摇摆</button>
+        <button class="chip" data-style="pop" type="button">流行 · 抒情</button>
+        <button class="chip" data-style="lofi" type="button">Lo-Fi · 慢摇</button>
+        <button class="chip" data-style="newage" type="button">新世纪 · 空灵</button>
+        <button class="chip" data-style="waltz" type="button">圆舞曲</button>
+        <button class="chip" data-style="oriental" type="button">东方 · 五声</button>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label class="lbl" for="goal">目标</label>
+          <select id="goal">
+            <option value="随机冒险" selected>随机冒险</option>
+            <option value="放松助眠">放松助眠</option>
+            <option value="专注陪伴">专注陪伴</option>
+            <option value="情绪宣泄">情绪宣泄</option>
+            <option value="欢快庆典">欢快庆典</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl" for="barsSelect">演奏长度</label>
+          <select id="barsSelect">
+            <option value="16">16 小节</option>
+            <option value="32" selected>32 小节</option>
+            <option value="64">64 小节</option>
+          </select>
+        </div>
+        <div class="field grow">
+          <label class="lbl" for="bpmRange">速度 <span id="bpmVal">自动</span></label>
+          <div class="bpm-row">
+            <label class="mini"><input type="checkbox" id="bpmAuto" checked> 跟随计划</label>
+            <input type="range" id="bpmRange" min="50" max="140" value="90" disabled>
+          </div>
+        </div>
+      </div>
+
+      <div class="btns">
+        <button id="playBtn" class="btn primary" type="button">▶ 开始演奏</button>
+        <button id="stopBtn" class="btn" type="button" disabled>■ 停止</button>
+        <button id="newBtn" class="btn" type="button" disabled>🎲 换一版</button>
+        <button id="midiBtn" class="btn" type="button" disabled>导出 MIDI</button>
+        <button id="recBtn" class="btn" type="button" disabled>● 录音</button>
+      </div>
+
+      <div id="planCard" class="plan-card hidden"></div>
+    </section>
+
+    <section class="panel stage-panel">
+      <div class="nowline">
+        <div class="now-chord" id="nowChord">—</div>
+        <div class="now-bar" id="nowBar">准备就绪</div>
+      </div>
+      <canvas id="fallCanvas" height="220"></canvas>
+      <div id="keyboard" class="keyboard" aria-label="钢琴键盘可视化"></div>
+    </section>
+
+    <section class="panel decisions">
+      <h2>Jev 的实时决策 <span class="sub">每个小节一次请求 · 6 问并行</span></h2>
+      <ul id="decisionLog" class="dlog"></ul>
+    </section>
+  </main>
+
+  <aside id="settingsDrawer" class="drawer hidden" aria-label="设置">
+    <div class="drawer-head">
+      <h2>设置</h2>
+      <button id="settingsClose" class="btn ghost" type="button">✕ 关闭</button>
+    </div>
+
+    <h3>Jev 渠道</h3>
+    <label class="lbl" for="channelSel">决策来源</label>
+    <select id="channelSel">
+      <option value="fixture" selected>离线随机（无需 key，本地种子决策）</option>
+      <option value="proxy">同源代理 /api/jev（部署者持 key 或 Workers AI）</option>
+      <option value="typesafe">TypeSafe 官方直连（自带 key）</option>
+      <option value="openrouter">OpenRouter 直连（自带 key）</option>
+    </select>
+    <label class="lbl" for="typesafeKey">TypeSafe API Key（仅存本机 localStorage）</label>
+    <input type="password" id="typesafeKey" placeholder="apikey_..." autocomplete="off">
+    <label class="lbl" for="openrouterKey">OpenRouter API Key（仅存本机）</label>
+    <input type="password" id="openrouterKey" placeholder="sk-or-..." autocomplete="off">
+    <button id="testJevBtn" class="btn" type="button">测试 Jev 渠道</button>
+
+    <h3>LLM 扩写（可选）</h3>
+    <label class="mini"><input type="checkbox" id="llmEnabled"> 启用大模型把我的输入扩写成乐章计划</label>
+    <label class="lbl" for="llmBaseUrl">Base URL（任意 OpenAI 兼容端点）</label>
+    <input type="text" id="llmBaseUrl" placeholder="https://api.openai.com/v1" autocomplete="off">
+    <label class="lbl" for="llmModel">模型</label>
+    <input type="text" id="llmModel" placeholder="gpt-4o-mini / deepseek-chat / ..." autocomplete="off">
+    <label class="lbl" for="llmKey">API Key（仅存本机）</label>
+    <input type="password" id="llmKey" placeholder="sk-..." autocomplete="off">
+    <label class="mini"><input type="checkbox" id="llmProxy"> 走同源代理 /api/llm（部署者已在服务端配置时勾选）</label>
+    <button id="testLlmBtn" class="btn" type="button">测试 LLM</button>
+
+    <p class="hint">密钥只保存在你浏览器的 localStorage，绝不写进代码或上传；本页默认离线可玩。</p>
+  </aside>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <footer class="foot">
+    由 TypeSafe <b>Jev</b>（系统一模型）驱动 · 架构参考 cocktailpeanut/jevthoven · 每小节约 $0.00005
+  </footer>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
