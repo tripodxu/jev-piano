@@ -136,6 +136,9 @@ const R34 = {
   dense: [{ on: [0, 2, 4, 6, 8, 10], tier: 2 }, { on: [0, 1, 2, 4, 6, 7, 8, 10], tier: 2 }, { on: [0, 2, 3, 4, 6, 8, 9, 10], tier: 2 }],
 };
 
+/** 按拍号取节奏池（16 分格 onset 数组） */
+export const RHYTHM_POOLS = { 4: R44, 3: R34 };
+
 export const LH_DEFS = {
   block: 'block chords: sustained chord on beat 1, bass root below',
   ballad: 'ballad: bass root on beat 1, mid chord on beat 3',
