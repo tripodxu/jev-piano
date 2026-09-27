@@ -326,10 +326,14 @@ export class Composer {
     };
   }
 
-  /** 一次真实请求；失败返回 fixture 同构决策（fixture=true） */
+  /** 一次真实请求；失败返回 fixture 同构决策（fixture=true）。
+   *  实时约束：attempts=2 / 8s 超时 → 最坏 ~19s 兜底，避免长静默；下一次小节仍会重试真实渠道（自愈）。 */
   async _decide(state, questions) {
     try {
-      const out = await askJev({ state, questions }, { channel: this.cfg.channel, apiKey: this.cfg.apiKey, signal: this.cfg.signal, rng: this.rng });
+      const out = await askJev({ state, questions }, {
+        channel: this.cfg.channel, apiKey: this.cfg.apiKey, signal: this.cfg.signal, rng: this.rng,
+        attempts: 2, timeoutMs: 8000,
+      });
       return { ...out, provider: this.cfg.channel };
     } catch (e) {
       if (e?.name === 'AbortError') throw e;

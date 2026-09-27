@@ -75,6 +75,16 @@ test('askJev: 429 后重试成功', async () => {
   assert.equal(out.answers.chord.value, 'F');
 });
 
+test('askJev: attempts 选项收紧重试上限（实时场景防长静默）', async () => {
+  let calls = 0;
+  const fakeFetch = async () => { calls++; return new Response('{}', { status: 429 }); };
+  await assert.rejects(
+    () => askJev({ state: {}, questions: Q }, { channel: 'typesafe', apiKey: 'k', attempts: 2, sleep: async () => {} }, fakeFetch),
+    /限流/,
+  );
+  assert.equal(calls, 2);
+});
+
 test('askJev: proxy 渠道不带 Authorization、不带 model', async () => {
   let captured;
   const fakeFetch = async (url, opts) => {

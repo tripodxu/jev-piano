@@ -16,7 +16,7 @@
   /* 文字：象牙与旧纸 */
   --text: #ece4d4;
   --text-dim: #a99e88;
-  --text-faint: #6f6754;
+  --text-faint: #8b8168;
 
   /* 黄铜（唯一强调色） */
   --brass: #d8ab5c;
@@ -38,6 +38,8 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
 body {
   min-height: 100vh;

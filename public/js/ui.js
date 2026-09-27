@@ -59,6 +59,8 @@ export class Fall {
     this.span = high - low;
     this.notes = [];
     this.timer = null;
+    // 移动端省 GPU：shadowBlur 是 canvas 最大的帧率杀手
+    this.lite = globalThis.matchMedia?.('(max-width: 980px)')?.matches ?? false;
     // 用 ResizeObserver 保持位图与布局同步（缩放/窗口/布局变化都不怕）
     this._resize = () => {
       const dpr = globalThis.devicePixelRatio || 1;
@@ -73,6 +75,7 @@ export class Fall {
     this._resize();
   }
   push({ midi, t, dur, vel, hand }) {
+    if (this.notes.length > 500) this.notes.splice(0, this.notes.length - 500);
     this.notes.push({ midi, t, dur, vel: vel ?? 0.7, hand });
   }
   /** 用 setInterval 而非 rAF：标签页被遮挡时 rAF 会被浏览器暂停，画面就此冻结 */
@@ -105,8 +108,7 @@ export class Fall {
       const base = n.hand === 'L' ? [147, 199, 189] : [235, 197, 116];
       const alpha = 0.34 + n.vel * 0.5;
       g.save();
-      g.shadowColor = `rgba(${base[0]},${base[1]},${base[2]},0.6)`;
-      g.shadowBlur = 10;
+      if (!this.lite) { g.shadowColor = `rgba(${base[0]},${base[1]},${base[2]},0.6)`; g.shadowBlur = 10; }
       g.fillStyle = `rgba(${base[0]},${base[1]},${base[2]},${alpha})`;
       g.beginPath();
       if (g.roundRect) g.roundRect(x, yBottom - hPx, wPx, hPx, 3); else g.rect(x, yBottom - hPx, wPx, hPx);
@@ -115,8 +117,7 @@ export class Fall {
       // 命中瞬间：键床上的光斑
       if (n.t <= now && end >= now) {
         g.save();
-        g.shadowColor = `rgba(${base[0]},${base[1]},${base[2]},0.9)`;
-        g.shadowBlur = 14;
+        if (!this.lite) { g.shadowColor = `rgba(${base[0]},${base[1]},${base[2]},0.9)`; g.shadowBlur = 14; }
         g.fillStyle = `rgba(${base[0]},${base[1]},${base[2]},${0.35 + n.vel * 0.3})`;
         g.beginPath();
         if (g.roundRect) g.roundRect(x, Math.min(yBottom, H - 5) - 4, wPx, 4.5, 2); else g.rect(x, Math.min(yBottom, H - 5) - 4, wPx, 4.5);

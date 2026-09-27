@@ -108,16 +108,16 @@
       <div class="stage reveal" style="--d:.15s">
         <div class="chordbox">
           <div class="now-chord" id="nowChord">—</div>
-          <div class="now-bar" id="nowBar">准备就绪</div>
+          <div class="now-bar" id="nowBar" aria-live="polite">准备就绪</div>
         </div>
-        <canvas id="fallCanvas" height="240"></canvas>
+        <canvas id="fallCanvas" height="240" aria-hidden="true"></canvas>
         <div class="piano">
           <div class="fascia">
             <span class="nameplate">JEV</span>
             <span class="nameplate-sub">SYSTEM ONE IMPROVISATION</span>
           </div>
           <div class="felt"></div>
-          <div id="keyboard" class="keyboard" aria-label="钢琴键盘可视化"></div>
+          <div id="keyboard" class="keyboard" aria-hidden="true"></div>
           <div class="piano-base"></div>
         </div>
       </div>
@@ -165,7 +165,7 @@
     <p class="hint">密钥只保存在你浏览器的 localStorage，绝不写入代码或上传。默认离线随机，无需任何账号。</p>
   </aside>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <footer class="foot">
     <span>由 TypeSafe Jev 驱动，每小节约 $0.00005</span>

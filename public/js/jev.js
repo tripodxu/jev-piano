@@ -85,9 +85,10 @@ export function fixtureAnswer(questions, rng) {
 
 /**
  * 一次 Jev 请求。
- * cfg = { channel:'fixture'|'typesafe'|'openrouter'|'proxy', apiKey?, model?, signal?, sleep? }
+ * cfg = { channel, apiKey?, model?, signal?, sleep?, attempts?, timeoutMs?, rng? }
+ * attempts/timeoutMs：实时演奏场景由 composer 收紧（默认 5 次 / 10s）。
  * 返回 { answers(归一化), inputTokens, usd, ms, fixture }；fixture 渠道不产生 tokens。
- * 网络错误与 429/529 指数退避重试（最多 4 次）；其余状态码抛错。
+ * 网络错误与 429/529 指数退避重试；其余状态码抛错。
  */
 export async function askJev({ state, questions }, cfg, fetchImpl = fetch) {
   const sleepFn = cfg.sleep ?? sleep;
@@ -107,14 +108,19 @@ export async function askJev({ state, questions }, cfg, fetchImpl = fetch) {
   const payload = { state, questions: stripPrivate(questions) };
   if (ch.model) payload.model = cfg.model || ch.model;
 
+  // 超时保护始终存在：外部 signal 与超时信号合并（AbortSignal.any 不可用时退化为仅外部 signal）
+  const timeoutSig = AbortSignal.timeout(cfg.timeoutMs ?? 10_000);
+  const signal = cfg.signal
+    ? (AbortSignal.any ? AbortSignal.any([cfg.signal, timeoutSig]) : cfg.signal)
+    : timeoutSig;
+
   let lastErr = null;
-  for (let attempt = 0; attempt < 5; attempt++) {
+  const attempts = cfg.attempts ?? 5;
+  for (let attempt = 0; attempt < attempts; attempt++) {
     if (attempt) await sleepFn(250 * 2 ** attempt * (0.75 + Math.random() / 2));
     const t0 = Date.now();
     let res;
     try {
-      // 实时演奏约束：单次决策不能超过 ~10s，超时按失败处理（composer 会同构兜底）
-      const signal = cfg.signal ?? AbortSignal.timeout(10_000);
       res = await fetchImpl(ch.endpoint, { method: 'POST', headers, signal, body: JSON.stringify(payload) });
     } catch (e) {
       if (e?.name === 'AbortError' && cfg.signal) throw e; // 用户主动取消

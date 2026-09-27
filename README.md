@@ -51,6 +51,8 @@ npx wrangler deploy                 # npm run deploy
 
 LLM 扩写代理（可选）：`wrangler.toml` 里取消 `[vars]` 注释 + `npx wrangler secret put LLM_API_KEY`，或前端设置面板里用户自带 key 直连任意 OpenAI 兼容端点。
 
+Worker 安全边界：`/api/llm` 只转发服务端 env 配置的端点（忽略请求体里的 baseUrl/apiKey，杜绝开放中继）；`/api/jev`、`/api/llm` 共享每 IP 限流（`RATE_LIMIT_PER_MIN`，默认 30 次/分钟，isolate 内存计数，多实例部署时为尽力而为）。
+
 > 注意：TypeSafe 官方 API 不允许浏览器跨域直连（实测 CORS 拦截），所以**直连渠道仅适用于允许 CORS 的端点**；生产环境请走同源代理（本 Worker）。
 
 ## 成本（实测口径）
