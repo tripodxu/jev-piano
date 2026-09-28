@@ -37,7 +37,7 @@
 
 **Files:** Modify `AGENTS.md`（§2 代码地图表 + 表头约定注）；Modify `MEMORY.md:19`
 
-- [ ] **Step 1: 重算总行数（建立单一口径）**
+- [x] **Step 1: 重算总行数（建立单一口径）**
 
 Run（PowerShell，工作目录 = 仓库根）：
 
@@ -47,7 +47,7 @@ Get-ChildItem public\js\*.js | ForEach-Object { "{0}: {1}" -f $_.Name, (Get-Cont
 
 Expected: 输出十行，数字与 F1 的总行数列一致（music.js: 278 / jev.js: 211 / composer.js: 774 / audio.js: 133 / player.js: 116 / midi.js: 56 / ui.js: 187 / main.js: 273 / studio.js: 641 / settings.js: 20）。若某文件数字与 F1 不符，**以实跑值为准**并同步修正本计划后续步骤中的数字。
 
-- [ ] **Step 2: 替换 AGENTS.md 代码地图表**
+- [x] **Step 2: 替换 AGENTS.md 代码地图表**
 
 将 AGENTS.md §2 表格的「行数」列整体替换为总行数口径，删除 `~` 前缀。替换后该表（职责列与高危区列原样保留，此处仅列需改的行）：
 
@@ -64,7 +64,7 @@ Expected: 输出十行，数字与 F1 的总行数列一致（music.js: 278 / je
 | `settings.js` | 20 | localStorage 设置读写 | — |
 ```
 
-- [ ] **Step 3: 在表格后追加口径约定**
+- [x] **Step 3: 在表格后追加口径约定**
 
 在 §2「### 其他」之前插入：
 
@@ -72,11 +72,11 @@ Expected: 输出十行，数字与 F1 的总行数列一致（music.js: 278 / je
 > 行数口径：**总行数**（`wc -l` 或 PowerShell `(Get-Content f).Count`，含空行）。改任何源文件后同步本表——这是 AGENTS.md 维护约定的一部分（见文末）。
 ```
 
-- [ ] **Step 4: 修 MEMORY.md 错别字**
+- [x] **Step 4: 修 MEMORY.md 错别字**
 
 `MEMORY.md:19`：「节奏变典深化」→「节奏变奏深化」。
 
-- [ ] **Step 5: 验证 + 提交**
+- [x] **Step 5: 验证 + 提交**
 
 Run: `git diff --stat` → 预期仅 `AGENTS.md`、`MEMORY.md` 两个文件。
 Run: `npm test` → 预期 46/46 通过（文档任务不碰代码，作为回归确认）。
@@ -92,7 +92,7 @@ git commit -m "docs: unify code-map line-count basis (total lines) and fix MEMOR
 
 **Files:** Modify `docs/superpowers/plans/2026-09-28-jev-piano-mvp.md:3`
 
-- [ ] **Step 1: 在文件头 blockquote 后插入状态横幅**
+- [x] **Step 1: 在文件头 blockquote 后插入状态横幅**
 
 在 plan 第 3 行（`> **For agentic workers:** ...`）之后插入：
 
@@ -101,7 +101,7 @@ git commit -m "docs: unify code-map line-count basis (total lines) and fix MEMOR
 > **状态：已完成并归档（2026-09-28，42/42 项复选框已勾选）。** 本文档是 MVP 的设计契约历史存档；新任务从 [AGENTS.md](../../../AGENTS.md) 与 [MEMORY.md](../../../MEMORY.md) 出发，不要把本文当活动计划执行。
 ```
 
-- [ ] **Step 2: 验证 + 提交**
+- [x] **Step 2: 验证 + 提交**
 
 Run: `grep -c "\[x\]" docs/superpowers/plans/2026-09-28-jev-piano-mvp.md` → 预期 `42`（确认横幅插入未破坏复选框计数）。
 Run: `head -8 docs/superpowers/plans/2026-09-28-jev-piano-mvp.md` → 预期第 4-5 行为新横幅。
@@ -119,7 +119,7 @@ git commit -m "docs: archive completed MVP plan with status banner"
 
 **Files:** Create `LICENSE`
 
-- [ ] **Step 1: 写 LICENSE（标准 MIT 文本）**
+- [x] **Step 1: 写 LICENSE（标准 MIT 文本）**
 
 ```text
 MIT License
@@ -145,7 +145,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-- [ ] **Step 2: 验证 + 提交**
+- [x] **Step 2: 验证 + 提交**
 
 Run: `git add LICENSE && git status --short` → 预期 `A  LICENSE`；`grep -c "MIT License" LICENSE` → `1`。
 
@@ -158,7 +158,7 @@ git commit -m "chore: add MIT LICENSE (README already claims MIT)"
 
 **Files:** Modify `package.json:4-6`
 
-- [ ] **Step 1: 插入 engines 字段**
+- [x] **Step 1: 插入 engines 字段**
 
 将：
 
@@ -181,7 +181,7 @@ git commit -m "chore: add MIT LICENSE (README already claims MIT)"
 
 （依据 F5：计划文档声称 Node ≥ 18 仅用于跑测试；不声明 wrangler 版本，因其只在部署时用。）
 
-- [ ] **Step 2: 验证 + 提交**
+- [x] **Step 2: 验证 + 提交**
 
 Run: `node -e "const p=require('./package.json'); if(!(p.engines&&p.engines.node)) process.exit(1); console.log('engines ok:', p.engines.node)"` → 预期 `engines ok: >=18`。
 Run: `npm test` → 预期 46/46。
@@ -195,7 +195,7 @@ git commit -m "chore: declare engines node >=18 (tests need node:test)"
 
 **Files:** Create `.github/workflows/test.yml`
 
-- [ ] **Step 1: 写 workflow**
+- [x] **Step 1: 写 workflow**
 
 ```yaml
 name: tests
@@ -226,19 +226,19 @@ jobs:
 
 （Node 22 选型理由：engines 声明的下限是 18，22 是覆盖下限与本地开发版 v24 之间的 LTS 折中；若未来测试需要依赖，再补 `npm install` 并提交 lockfile。）
 
-- [ ] **Step 2: 本地预演 CI 的两个命令**
+- [x] **Step 2: 本地预演 CI 的两个命令**
 
 Run: `for f in public/js/*.js src/worker.js scripts/*.mjs test/*.mjs; do node --check "$f" || exit 1; done; echo "syntax ok"` → 预期 `syntax ok`（pwsh 下可用 `Get-ChildItem public\js\*.js, src\worker.js, scripts\*.mjs, test\*.mjs | ForEach-Object { node --check $_.FullName; if ($LASTEXITCODE -ne 0) { exit 1 } }; echo "syntax ok"` 等价执行）。
 Run: `node --test` → 预期 46/46。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add .github/workflows/test.yml
 git commit -m "ci: run syntax check + node --test on push/PR (zero-dependency, no npm install)"
 ```
 
-- [ ] **Step 4: 推送后验证 CI 实际变绿**（在 Task 9 统一推送后执行）
+- [x] **Step 4: 推送后验证 CI 实际变绿**（在 Task 9 统一推送后执行）
 
 Run: `git push origin main` 后打开 `https://github.com/tripodxu/jev-piano/actions` → 预期 `tests` workflow 对最新 commit 显示绿勾；若红，点开日志按报错修复（最常见：某文件 `node --check` 语法错）。
 
@@ -252,7 +252,7 @@ Run: `git push origin main` 后打开 `https://github.com/tripodxu/jev-piano/act
 
 **Files:** Modify `public/js/studio.js`（autosave 区）；Test `test/studio.test.mjs`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 在 `test/studio.test.mjs` 的 import 列表（:2-7）中加入 `savePiece`：
 
@@ -276,11 +276,11 @@ test('savePiece: 存储可用时写入并返回 true；不可用时返回 false 
 });
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `node --test test/studio.test.mjs` → 预期 FAIL：`savePiece is not a function`（或 SyntaxError: does not provide an export named 'savePiece'）。
 
-- [ ] **Step 3: 实现 savePiece 并接入 autosave**
+- [x] **Step 3: 实现 savePiece 并接入 autosave**
 
 在 `public/js/studio.js` 的 `toastify` 定义（:196）之后插入：
 
@@ -318,12 +318,12 @@ export function savePiece(piece, storage) {
 
 （恢复路径 :188-193 的静默 catch **不动**：损坏的旧存档静默弃之、干净起步是刻意选择。）
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `node --test test/studio.test.mjs` → 预期全部 PASS（含新测试）。
 Run: `npm test` → 预期 **47/47**（46 + 新增 1）。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add public/js/studio.js test/studio.test.mjs
@@ -336,12 +336,12 @@ git commit -m "feat(studio): surface autosave storage failures via toast (savePi
 
 **Files:** Modify `public/js/composer.js`（:3-7 import、:216-219）；Modify `test/composer.test.mjs:4`
 
-- [ ] **Step 1: 先证明是死代码（grep 证据）**
+- [x] **Step 1: 先证明是死代码（grep 证据）**
 
 Run: `grep -rn "chordCriteria" --include="*.js" --include="*.mjs" --include="*.html" .` → 预期仅 `public/js/composer.js:217` 定义行一处（无调用方）。
 Run: `grep -n "STYLES\|chordPcs" public/js/composer.js` → 预期仅 :4-5 import 行（无使用）。
 
-- [ ] **Step 2: 删除 chordCriteria 函数**
+- [x] **Step 2: 删除 chordCriteria 函数**
 
 删除 `public/js/composer.js:216-219`：
 
@@ -354,7 +354,7 @@ export function chordCriteria(cands) {
 
 （nextBar 在 :654 已内联同样逻辑；git 历史保留可恢复。）
 
-- [ ] **Step 3: 收紧 import**
+- [x] **Step 3: 收紧 import**
 
 将 composer.js:3-6：
 
@@ -374,7 +374,7 @@ import {
 } from './music.js';
 ```
 
-- [ ] **Step 4: 删测试文件里的未用导入**
+- [x] **Step 4: 删测试文件里的未用导入**
 
 将 `test/composer.test.mjs:4`：
 
@@ -390,7 +390,7 @@ import { buildPlan, Composer, detectLoop, chordCandidates } from '../public/js/c
 
 （`mulberry32` 在测试体内未使用；`test/rng-shim.mjs` 的同名实现供 theory 测试用，二者关系见其文件头注释，不合并。）
 
-- [ ] **Step 5: 验证 + 提交**
+- [x] **Step 5: 验证 + 提交**
 
 Run: `node --check public/js/composer.js && node --check test/composer.test.mjs && echo ok` → 预期 `ok`。
 Run: `npm test` → 预期 47/47。
@@ -409,16 +409,16 @@ git commit -m "refactor(composer): drop dead chordCriteria export and unused imp
 
 **Files:** Modify `README.md`（反重复表）；Create `docs/memory/2026-09-28-real-jev-repetition-baseline.md`；Modify `MEMORY.md`（顶部新条目）
 
-- [ ] **Step 1: 确认 key 可用**
+- [x] **Step 1: 确认 key 可用**
 
 Run: `node -e "const k=process.env.TYPESAFE_API_KEY; console.log(k?'env key ok':'no env key')"` → 有 env key 走 Step 2；否则确认 `.dev.vars` 含 `TYPESAFE_API_KEY=`（脚本 :13-16 会自动回退读取）。
 **若两者都没有：跳过 Step 2–3，只在 MEMORY.md 记一条「真实基线待补（无 key）」，其余步骤全部完成，本任务标记为阻塞待补。**
 
-- [ ] **Step 2: 跑真实 Jev 重复度分析**
+- [x] **Step 2: 跑真实 Jev 重复度分析**
 
 Run: `node scripts/analyze-repetition.mjs 32 2026 random --real` → 预期输出一行 JSON，含 `channel:"typesafe"` 与 13 项指标（`melody_unique_bars`/`melody_adjacent_repeat`/`lh_unique_bars`/`unique_chords`/`interval_entropy`/`leap_ratio` 等；字段定义见脚本 :45-57）。花费 ≈ 32 × $0.00006 ≈ $0.002。
 
-- [ ] **Step 3: 记录基线**
+- [x] **Step 3: 记录基线**
 
 把 Step 2 的 JSON 中六个核心指标追加到 `README.md`「反重复设计（量化验证）」表格之后，作为新行：
 
@@ -428,7 +428,7 @@ Run: `node scripts/analyze-repetition.mjs 32 2026 random --real` → 预期输�
 
 （尖括号用实测值替换；任一指规划级恶化——相邻重复 >0 或和弦种类 <8——先停下在 MEMORY.md 记阻塞，不要继续提交。）
 
-- [ ] **Step 4: 写记忆条目并提交**
+- [x] **Step 4: 写记忆条目并提交**
 
 新建 `docs/memory/2026-09-28-real-jev-repetition-baseline.md`（格式见该目录 README）：记录命令、完整 JSON、与 fixture 口径的差异结论。在 `MEMORY.md` 顶部（最新在上）加压缩条目。
 
@@ -443,22 +443,22 @@ git commit -m "docs: real-Jev repetition baseline (analyze-repetition --real)"
 
 ### Task 9: 全量验证 + 推送 + 记忆闭环
 
-- [ ] **Step 1: 全量测试**
+- [x] **Step 1: 全量测试**
 
 Run: `npm test` → 预期 **47/47** 通过、0 fail。
 
-- [ ] **Step 2: 反模式扫描**
+- [x] **Step 2: 反模式扫描**
 
 Run: `git status --short` → 预期无 `.dev.vars`、无 `node_modules`、无 `__pycache__` 被追踪/暂存。
 Run: `grep -rn "TODO\|FIXME\|TBD" LICENSE .github AGENTS.md MEMORY.md docs/adr docs/CONTEXT.md` → 预期 0 匹配（本计划产物不留占位符）。
 Run: `git log --oneline -8` → 预期本计划 7 个 commit 按序在顶（docs: unify / docs: archive / chore: LICENSE / chore: engines / ci: / feat(studio) / refactor(composer) / docs: real-jev）。
 
-- [ ] **Step 3: 推送并验证 CI**
+- [x] **Step 3: 推送并验证 CI**
 
 Run: `git push origin main` → 预期 `main -> main`。
 Run: 打开 `https://github.com/tripodxu/jev-piano/actions` → 预期最新 commit 的 `tests` 绿勾（Task 5 Step 4 的闭环）。
 
-- [ ] **Step 4: 记忆闭环（AGENTS.md 收尾三件事）**
+- [x] **Step 4: 记忆闭环（AGENTS.md 收尾三件事）**
 
 在 `MEMORY.md` 顶部（最新在上）追加本计划完成条目：做了什么（7 commit 清单）/ 为什么 / 坑（口径混用、--real 已存在、死导出）/ 验证（47/47 + CI 绿 + --real 基线值）/ 下一步（composer 拆分独立计划、P3 待办）。
 

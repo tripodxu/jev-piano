@@ -52,13 +52,13 @@ src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
 |---|---|---|---|
 | `music.js` | 278 | 罗马数字解析、和弦声位、音阶、8 种曲风预设、关键词计划 | `STYLES` 完整性被 `theory.test.mjs` 全量断言，改预设必跑测试 |
 | `jev.js` | 211 | 四渠道客户端（fixture/typesafe/openrouter/proxy）、归一化、429/529 退避重试、fixture 采样、LLM 扩写 | `stripPrivate`：发送前剥离 `_` 前缀字段 |
-| `composer.js` | 774 | **核心**：`buildPlan`、`Composer.nextBar()`（候选集 + 6 问 + 音符渲染 + 反重复六层机制） | 候选集权重、指纹护栏、根音疲劳断路器 |
+| `composer.js` | 769 | **核心**：`buildPlan`、`Composer.nextBar()`（候选集 + 6 问 + 音符渲染 + 反重复六层机制） | 候选集权重、指纹护栏、根音疲劳断路器 |
 | `audio.js` | 133 | 合成钢琴（三角波+泛音+包络+低通+生成式混响）、录音 | `envFor` 纯函数有单测 |
 | `player.js` | 116 | lookahead 调度器（提前 2 小节），`now/setIntervalFn` 可注入 | 时钟注入契约被测试锁定 |
 | `midi.js` | 56 | SMF Type-1 双轨导出 | 字节格式有单测 |
 | `ui.js` | 187 | 键盘 DOM、下落音符 canvas、决策日志、计划卡、toast | — |
 | `main.js` | 273 | 实时即兴接线：设置持久化、渠道探测、开始/停止/导出 | 元素 id 契约见 `index.html` |
-| `studio.js` | 641 | 工作室界面：批量生成 job、钢琴卷帘编辑、Jev 路由的自然语言修改、JSON 导入导出 | 确定性编辑纯函数有单测 |
+| `studio.js` | 653 | 工作室界面：批量生成 job、钢琴卷帘编辑、Jev 路由的自然语言修改、JSON 导入导出 | 确定性编辑纯函数有单测 |
 | `settings.js` | 20 | localStorage 设置读写 | — |
 
 > 行数口径：**总行数**（`wc -l` 或 PowerShell `(Get-Content f).Count`，含空行）。改任何源文件后同步本表——这是 AGENTS.md 维护约定的一部分（见文末）。
@@ -68,7 +68,7 @@ src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
 | 路径 | 职责 |
 |---|---|
 | `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
-| `test/*.test.mjs` | `node --test`，共 46 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
+| `test/*.test.mjs` | `node --test`，共 47 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
 | `scripts/probe-jev.mjs` `scripts/probe-bar.mjs` | 真实 API 冒烟（需 key，计费） |
 | `scripts/analyze-repetition.mjs` | 重复度量化分析（`node scripts/analyze-repetition.mjs 32 <seed> random [--real]`） |
 | `dev-proxy.py` | 本地开发：静态服务 + mock/真实转发（stdlib only） |
@@ -91,7 +91,7 @@ src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
 2. 读 MEMORY.md 顶部 3 条 + 任务相关 memory 条目（最新在最上，先看有没有人踩过坑）
 3. 实现：先改/加测试，再改实现（本项目测试驱动传统，见 docs/adr/0004）
 4. 验证关卡（全部通过才算完成）：
-   a. npm test                        全绿（46 个，只增不减）
+   a. npm test                        全绿（47 个，只增不减）
    b. node --check 改动的新 .js        语法
    c. 涉及真实 API 的：scripts/probe-*.mjs 冒烟（可选，计费）
    d. 涉及听感/反重复的：analyze-repetition.mjs 对比指标不退化
@@ -158,7 +158,7 @@ src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
 ## 6. 常用命令
 
 ```bash
-npm test                                  # 46 个单测（node --test）
+npm test                                  # 47 个单测（node --test）
 python dev-proxy.py --port 8000           # 本地开发（或 npm run dev）→ http://127.0.0.1:8000
 node scripts/analyze-repetition.mjs 32 2026 random   # 重复度指标
 node scripts/probe-jev.mjs                # 真实 API 冒烟（需 TYPESAFE_API_KEY）
