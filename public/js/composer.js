@@ -274,13 +274,18 @@ function buildFromPrev(prev, { dir, invert, chord, scale, meterNum, intensity, i
  *  transpose: 整体移调（音级数，正=上移）；invert: 音程取反；ornament: 加经过音。
  *  强拍与末音仍锚定到当前和弦——「同一想法，新的和声」正是这样成立的。
  */
-function buildFromMotif(motif, { chord, scale, meterNum, intensity, isPhraseEnd, rng, transpose = 0, invert = false, ornament = false }) {
+function buildFromMotif(motif, { chord, scale, meterNum, intensity, isPhraseEnd, rng, transpose = 0, invert = false, ornament = false, breathe = false }) {
   const midis = motif?.midis ?? [];
   if (!midis.length) return null;
   const steps = meterNum * 4;
-  const onsets = motif.onsets?.length === midis.length
+  const base = motif.onsets?.length === midis.length
     ? motif.onsets
     : midis.map((_, i) => Math.round((i * steps) / midis.length));
+  // 「呼吸」不该**取消**承袭，而该让动机**整体延后**——主题延迟进入是真实手法，
+  // 而丢掉首音会破坏动机身份。延后量取动机自身的最小音程间距（从它自己的节奏里来，没有就用半拍）。
+  const gaps = base.slice(1).map((o, i) => o - base[i]).filter((d) => d > 1e-9);
+  const shift = breathe ? Math.max(0.125, Math.min(0.5, ...(gaps.length ? gaps : [0.5]))) : 0;
+  const onsets = base.map((o) => o + shift);
   const pool = chordMidis(chord.rootPc, chord.shape, 58, 86);
   const sgn = invert ? -1 : 1;
   let start = midis[0];
@@ -289,8 +294,11 @@ function buildFromMotif(motif, { chord, scale, meterNum, intensity, isPhraseEnd,
   const notes = midis.map((m, k) => {
     if (k > 0) acc += (m - midis[k - 1]) * sgn;
     let midi = clamp(start + acc, 60, 84);
-    // 强拍锚到和弦音，但**本来就在和弦里的音不动**——没必要为了"合规"改掉动机的轮廓
-    if ((onsets[k] % 4 === 0 || k === midis.length - 1) && !pool.includes(midi)) midi = nearest(midi, pool);
+    // 强拍锚到和弦音，但**本来就在和弦里的音不动**——没必要为了"合规"改掉动机的轮廓。
+    // 末音只在**乐句尾**锚定（第 1 轮的设计如此）：每小节都锚会把动机的最后一个音拽走 7 个半音，
+    // 「呼吸」延后之后尤其明显——那正是"承袭却不像动机"的元凶。
+    const anchor = onsets[k] % 4 === 0 || (isPhraseEnd && k === midis.length - 1);
+    if (anchor && !pool.includes(midi)) midi = nearest(midi, pool);
     return { midi, startBeats: onsets[k], durBeats: 0, vel: velFor(Math.round(onsets[k] * 4), intensity, rng), hand: 'R' };
   });
   notes.forEach((n, k) => {
@@ -703,18 +711,27 @@ export class Composer {
     //  repeat（承袭）必须作用在**动机**上——它承载主题身份；此前它走的是 renderMelody（与 new 同一条路），等于什么都没承袭。
     //  sequence（模进）/ inversion（倒影）字面意思就是「对**刚才那句**做模进/倒影」，作用在 prevMelody 上。
     //  ornament（装饰）同理：作曲里的装饰是装饰**当前乐句**（颤音、邻音围绕），不是把整首主题装饰一遍。
-    const motifReady = !breathe && !!this.motif?.midis?.length;
+    //  「呼吸」不再取消承袭：它只让动机延后进入（breathe 传进 buildFromMotif）。
+    //  此前 `motifReady` 要求 !breathe，导致 develop='repeat' && breathe 的小节走全新渲染——
+    //  实测这占全部「承袭」的 24.2%：四分之一的所谓主题重述什么��重述，而日志/功能轨/动机卡
+    //  仍按「承袭」展示与计数，**归因在撒谎**。
+    const motifReady = !!this.motif?.midis?.length;
     const usePrev = !breathe && !!this.prevMelody && (dev === 'sequence' || dev === 'inversion' || dev === 'ornament');
     let rh = null;
+    let effectiveDev = dev;
     if (motifReady && dev === 'repeat') {
       rh = buildFromMotif(this.motif, {
-        chord, scale, meterNum: plan.meterNum, intensity, isPhraseEnd: pos.isPhraseEnd, rng: this.rng,
+        chord, scale, meterNum: plan.meterNum, intensity, isPhraseEnd: pos.isPhraseEnd, rng: this.rng, breathe,
       });
     } else if (usePrev) {
       rh = buildFromPrev(this.prevMelody, { dir: dev === 'sequence' ? (this.rng() < 0.5 ? 1 : -1) : 0, invert: dev === 'inversion', chord, scale, meterNum: plan.meterNum, intensity, isPhraseEnd: pos.isPhraseEnd, rng: this.rng });
       if (dev === 'ornament') rh = insertPassing(rh, scale, this.rng);
     }
-    if (!rh || !rh.length) rh = fresh();
+    if (!rh || !rh.length) {
+      rh = fresh();
+      // 兜底走了全新渲染 → 归因必须说真话，不能继续记成「承袭」
+      if (dev === 'repeat') { effectiveDev = 'new'; this.developHistory[this.developHistory.length - 1] = 'new'; }
+    }
 
     // 反重复护栏 + 乐句尾锚定。post 交给护栏内部执行：护栏在「锚定之后」的最终形态上判定碰撞，
     // 锚定不再发生在护栏之外——否则会「逃出去又被锚定改回撞车」（词句尾相邻重复的真实根因）。
@@ -762,7 +779,7 @@ export class Composer {
       decision: {
         provider: dec.provider, fixture: !!dec.fixture, ms: dec.ms ?? 0,
         inputTokens: dec.inputTokens ?? 0, usd: dec.usd ?? 0,
-        lh, contour, tier: rhythmEntry.tier ?? 1, breathe, develop: dev, roman: chordSymRaw,
+        lh, contour, tier: rhythmEntry.tier ?? 1, breathe, develop: effectiveDev, roman: chordSymRaw,
         confidence: ans.chord?.confidence ?? ans.chord?.probability ?? null,
         // 归因字段（ADR-0003）：断路器是否锁死、模型答案是否被候选集强制拒绝、功能层结果
         loopLocked, rejected: !picked,
