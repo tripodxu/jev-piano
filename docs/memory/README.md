@@ -7,6 +7,7 @@
 
 | 日期 | 条目 | 一句话 |
 |---|---|---|
+| 2026-09-28 | [real-jev-repetition-baseline](2026-09-28-real-jev-repetition-baseline.md) | 真实 Jev 重复度基线：熔断（和弦种类 6<8，模型选择过集中） |
 | 2026-09-28 | [anti-repetition-overhaul](2026-09-28-anti-repetition-overhaul.md) | 反重复大修：根音疲劳/候选集强制/替换和弦，真实 Jev 验证 |
 | 2026-09-28 | [studio-view](2026-09-28-studio-view.md) | 工作室界面：生成→钢琴卷帘编辑→自然语言修改→导出 |
 | 2026-09-28 | [anti-repetition-kernel](2026-09-28-anti-repetition-kernel.md) | 反重复内核：指纹护栏/发展手法/音区漂移 + jevthoven 对齐 |

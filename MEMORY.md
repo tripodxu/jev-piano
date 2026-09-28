@@ -7,6 +7,15 @@
 
 ---
 
+## [阻塞] 2026-09-28 · 真实 Jev 重复度基线：和弦多样性未达标（已熔断，待加固）
+
+- **目标**：`node scripts/analyze-repetition.mjs 32 2026 random --real` 建立真实 Jev 渠道重复度基线并记入 README 反重复表。
+- **进度**：已实跑（~$0.002，typesafe(jev-1.13) 真实渠道）。**触发熔断**：unique_chords=6 < 8 且前 8 小节字面 Cm-Fm-G 三和弦循环；interval_entropy=1.41 亦低于 fixture 下限 2.4。合格项：相邻字面重复 0、左手唯一 27/32、跳进 10%、旋律唯一 30/32。README 未改、工作树干净。
+- **下一步（接力）**：先排除抽样波动（可再跑 seed 2027，~$0.002，需 owner 批准）；若确认系统性偏差，开新任务调候选集/权重——方向：真实渠道加强根音疲劳（阈值 2.0/衰减 0.93 是为 fixture 分布调的）或进一步压缩模型可复选空间。验收：真实渠道 unique_chords ≥ 8 且相邻重复 = 0，然后补 README 真实渠道行与本条目的完成态。
+- **已知坑**：fixture 口径达标 ≠ 真实渠道达标——两者同构的是候选集与权重，但真实模型选择分布更集中；反重复大修（a085f4f）宣称的 "real-Jev verified" 仅是 probe-bar 3 小节冒烟，未做 32 小节量化，这是本次才发现 gap 的根因。
+- **验收**：README 反重复表追加真实渠道行 + 记忆条目转完成态。
+- **领地**：README.md、docs/memory/2026-09-28-real-jev-repetition-baseline.md、MEMORY.md（纯文档，未动代码）。
+
 ## [完成] 2026-09-28 · 文档与多 agent 记忆体系建立
 
 - **做了什么**：新建 `AGENTS.md`（agent 宪法：阅读地图/代码地图/协作协议/接力协议/红线）；新建 `MEMORY.md` + `docs/memory/`（本体系，最新在上）；新建 `docs/adr/`（4 篇关键决策）；新建 `docs/CONTEXT.md`（领域模型+术语表）；`docs/research/` 收编原先在仓库外的调研笔记；README 增加文档导航并修正测试计数（44→46）；`.gitignore` 此前已扩充（密钥/agent 本地状态/运行产物），本次 `git rm --cached` 了误追踪的 `__pycache__/dev-proxy.cpython-310.pyc`。
