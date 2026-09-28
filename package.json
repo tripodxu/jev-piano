@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "description": "Jev 即兴钢琴：Jev 每小节实时决策，边作曲边演奏的轻量前端",
   "scripts": {
     "test": "node --test",
