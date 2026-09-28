@@ -6,7 +6,7 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast } from './ui.js';
+import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend } from './ui.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { barHarmonyFit, NCT_ZH } from './nct.js';
 import { planTargetSeries } from './candidates.js';
@@ -24,6 +24,8 @@ const els = {
   motifCanvas: $('motifCanvas'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
   settingsBtn: $('settingsBtn'), settingsDrawer: $('settingsDrawer'), settingsClose: $('settingsClose'),
+  legendBtn: $('legendBtn'), legendDrawer: $('legendDrawer'), legendClose: $('legendClose'),
+  legendBody: $('legendBody'), legendMore: $('legendMore'), legendNoHint: $('legendNoHint'),
   tabLive: $('tabLive'), tabStudio: $('tabStudio'), viewLive: $('viewLive'), viewStudio: $('viewStudio'),
   channelSel: $('channelSel'), typesafeKey: $('typesafeKey'), openrouterKey: $('openrouterKey'), testJevBtn: $('testJevBtn'),
   llmEnabled: $('llmEnabled'), llmBaseUrl: $('llmBaseUrl'), llmModel: $('llmModel'), llmKey: $('llmKey'), llmProxy: $('llmProxy'), testLlmBtn: $('testLlmBtn'),
@@ -63,6 +65,28 @@ for (const input of [els.channelSel, els.keySelect, els.typesafeKey, els.openrou
 els.channelSel.value = settings.channel;
 
 els.settingsBtn.addEventListener('click', () => els.settingsDrawer.classList.remove('hidden'));
+
+/* ---------------- 图例：可选、可重开、关闭被记住（impeccable/onboard） ---------------- */
+// 一进来就弹窗 = 一上来倾倒信息。这里只在用户没勾过「不再提示」且从未演奏时轻点一下。
+(function initLegend() {
+  els.legendBody.innerHTML = renderLegend(LEGEND_ITEMS);
+  const open = () => { els.legendDrawer.classList.remove('hidden'); els.legendBtn.setAttribute('aria-expanded', 'true'); };
+  const close = () => { els.legendDrawer.classList.add('hidden'); els.legendBtn.setAttribute('aria-expanded', 'false'); };
+  els.legendBtn.addEventListener('click', () => (els.legendDrawer.classList.contains('hidden') ? open() : close()));
+  els.legendMore.addEventListener('click', open);
+  els.legendClose.addEventListener('click', close);
+  els.legendNoHint.addEventListener('change', () => {
+    settings.legendHintOff = els.legendNoHint.checked;
+    settings.touched = true;
+    saveSettings();
+  });
+  els.legendNoHint.checked = !!settings.legendHintOff;
+  if (!settings.legendHintOff) {
+    // 首用轻提示：只在轨道图例旁，不遮挡任何演奏界面
+    els.legendMore.classList.add('nudge');
+    els.legendMore.addEventListener('click', () => els.legendMore.classList.remove('nudge'), { once: true });
+  }
+})();
 els.settingsClose.addEventListener('click', () => els.settingsDrawer.classList.add('hidden'));
 els.styleChips.addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');

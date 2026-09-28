@@ -587,7 +587,8 @@ function drawRoll() {
   } else {
     g.font = '14px "PingFang SC", "Microsoft YaHei", sans-serif';
     g.fillStyle = 'rgba(139,129,104,0.8)';
-    g.fillText('在左侧写下灵感，点「生成编曲」——每一小节仍由 Jev 逐小节决策', 24, H / 2);
+    g.fillText('点左侧「生成编曲」——每一小节仍由 Jev 逐小节决策。', 24, H / 2 - 16);
+    g.fillText('生成后这里会出现可编辑的整曲：可量化、拖力度、导出 MIDI。', 24, H / 2 + 2);
   }
 }
 

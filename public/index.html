@@ -27,6 +27,9 @@
       <span class="pill" id="stCost">$0.000000</span>
       <span class="pill" id="stLatency">— ms</span>
     </div>
+    <button id="legendBtn" class="iconbtn" type="button" aria-label="标记图例" aria-expanded="false" aria-controls="legendDrawer">
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.6 5.6a3.2 3.2 0 1 1 4.5 4.5c-.7.6-1.1 1.1-1.1 1.9"/><circle cx="8" cy="13.6" r="0.9" fill="currentColor" stroke="none"/></g></svg>
+    </button>
     <button id="settingsBtn" class="iconbtn" type="button" aria-label="设置">
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/><circle cx="10" cy="4" r="1.8" fill="currentColor" stroke="none"/><circle cx="5.5" cy="8" r="1.8" fill="currentColor" stroke="none"/><circle cx="11.5" cy="12" r="1.8" fill="currentColor" stroke="none"/></g></svg>
     </button>
@@ -151,6 +154,8 @@
           <ol id="fnRibbon" class="fn-ribbon" aria-label="和声功能轨：每格一小节，按主/下属/属/色彩着色"></ol>
           <p class="fn-legend" aria-hidden="true">
             <span class="k k-T">主</span><span class="k k-S">下属</span><span class="k k-D">属</span><span class="k k-Tp">色彩</span>
+            <span class="k k-d">承</span><span class="k">模</span><span class="k">倒</span><span class="k">装</span>
+            <button id="legendMore" class="lg-more" type="button">这些标记是什么？</button>
           </p>
         </div>
         <canvas id="fallCanvas" height="240" aria-hidden="true"></canvas>
@@ -231,7 +236,7 @@
           <button id="stLoadBtn" class="btn" type="button" disabled>载 JSON</button>
           <input type="file" id="stLoadJson" accept=".json,application/json" class="hidden">
         </div>
-        <p class="hint">钢琴卷帘：点空白新增音，拖动移动，拖右缘改时长，双击删除，Ctrl+Z 撤销。所有编辑确定性执行、不调用模型；「让 Jev 修改」才会请模型从编辑命令中做选择。</p>
+        <p class="hint">卷帘：点空白新增 · 拖动移动 · 拖右缘改时长 · 双击删除 · Ctrl+Z 撤销。<br>这些编辑都是确定性的，不调用模型；只有「让 Jev 修改」才请模型从编辑命令里挑一个。</p>
       </section>
 
       <section class="right-col">
@@ -272,6 +277,17 @@
       </section>
     </div>
   </main>
+
+  <aside id="legendDrawer" class="drawer hidden" aria-label="标记图例" role="region">
+    <div class="drawer-head">
+      <h2>这些标记是什么</h2>
+      <button id="legendClose" class="iconbtn" type="button" aria-label="关闭图例">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></g></svg>
+      </button>
+    </div>
+    <div id="legendBody" class="legend-body"></div>
+    <label class="mini lg-nodismiss"><input type="checkbox" id="legendNoHint"> 不再自动提示（按钮始终在顶栏）</label>
+  </aside>
 
   <aside id="settingsDrawer" class="drawer hidden" aria-label="设置">
     <div class="drawer-head">

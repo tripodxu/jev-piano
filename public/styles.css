@@ -507,6 +507,40 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .drawer .btn { margin-top: 12px; }
 .hint { color: var(--text-faint); font-size: 12px; margin-top: 18px; line-height: 1.8; }
 
+/* ============================ 图例（可选抽屉 + 轨道行内提示） ============================ */
+.lg-more {
+  background: transparent; border: none; padding: 0; cursor: pointer;
+  color: var(--brass); font: 400 10px/1 var(--sans); letter-spacing: .14em;
+  text-decoration: underline; text-underline-offset: 3px; margin-left: auto;
+}
+.lg-more.nudge { animation: lgNudge 2.2s ease-in-out 2; }
+@keyframes lgNudge { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .lg-more.nudge { animation: none; opacity: 1; } }
+.legend-body { margin-top: 14px; }
+.lg-group { margin-bottom: 18px; }
+.lg-group h3 {
+  margin: 0 0 8px; font-size: 11px; letter-spacing: .2em; font-weight: 600; color: var(--brass);
+  border-top: 1px solid var(--line); padding-top: 12px;
+}
+.lg-group:first-child h3 { border-top: none; padding-top: 0; }
+.lg-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.lg-group li { display: grid; grid-template-columns: 18px 46px 1fr; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.lg-group li b { color: var(--text); font-weight: 600; font-size: 13px; }
+.lg-group li span { color: var(--text-dim); line-height: 1.6; }
+.lg-sw { width: 14px; height: 8px; border-radius: 2px; background: var(--ink-3); align-self: center; }
+.lg-sw.fn-T { background: var(--fn-T); } .lg-sw.fn-S { background: var(--fn-S); }
+.lg-sw.fn-D { background: var(--fn-D); } .lg-sw.fn-Tp { background: var(--fn-Tp); }
+.lg-sw.theme { background: var(--brass-hi); box-shadow: 0 0 0 1px var(--brass-hi); }
+.lg-sw.lock { background: var(--brass-hi); }
+.lg-sw.rej { background: var(--crimson-hi); }
+.lg-sw.sec { background: none; border-top: 2px dashed var(--brass); height: 0; border-radius: 0; }
+.lg-sw.motif { background: none; border-bottom: 2px solid var(--brass); height: 0; border-radius: 0; }
+.lg-sw.ten { background: var(--brass-hi); }
+.lg-sw.fit { background: rgba(216, 171, 92, 0.5); }
+.lg-sw.nct { background: var(--brass); box-shadow: 0 0 0 1.5px var(--brass-hi); }
+.lg-nodismiss { margin-top: 6px; }
+.fn-legend .k-d { color: var(--brass-hi); font-weight: 600; }
+
 /* ============================ toast / footer ============================ */
 .toast {
   position: fixed; left: 50%; bottom: 30px; z-index: 60;

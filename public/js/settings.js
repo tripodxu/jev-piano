@@ -5,6 +5,7 @@ export const DEFAULTS = {
   channel: 'fixture', typesafeKey: '', openrouterKey: '',
   llmEnabled: false, llmBaseUrl: 'https://api.openai.com/v1', llmModel: '', llmKey: '', llmProxy: false,
   styleId: 'random', keySel: 'auto', touched: false,
+  legendHintOff: false,      // 用户勾了「不再自动提示图例」；顶栏的 ? 按钮始终还在
 };
 
 export function loadSettings() {

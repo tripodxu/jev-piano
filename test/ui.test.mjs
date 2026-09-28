@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend } from '../public/js/ui.js';
 
 const bar = (over = {}) => ({
   index: 3,
@@ -102,4 +102,39 @@ test('DEVELOP_ZH: 五种发展手法都有标签（文字通道，不依赖颜�
   assert.equal(DEVELOP_ZH.repeat, '承', '承袭的标记是「承」');
   assert.equal(DEVELOP_ZH.new, '', '新句无标记（它是「没有承袭」）');
   assert.equal(Object.keys(DEVELOP_ZH).length, 5);
+});
+
+/* ---------------- 图例（impeccable/onboard：可选、可记忆、使用现场） ---------------- */
+
+test('LEGEND_ITEMS: 每条都有名字与说明，且覆盖所有真实标记', () => {
+  assert.ok(Array.isArray(LEGEND_ITEMS) && LEGEND_ITEMS.length >= 8, `条目太少：${LEGEND_ITEMS?.length}`);
+  for (const it of LEGEND_ITEMS) {
+    assert.ok(it.label && it.desc, `缺 label/desc：${JSON.stringify(it)}`);
+    assert.ok(it.group, '每条要归组');
+  }
+  // 覆盖面：四功能 + 五手法 + 断路器 + 驳回 + 段落 + 动机 + 张力 + 契合度 + 非和弦
+  const text = LEGEND_ITEMS.map((i) => `${i.label}${i.desc}`).join('');
+  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '段落', '动机', '张力', '契合', '非和弦']) {
+    assert.ok(text.includes(kw), `图例缺少「${kw}」的说明`);
+  }
+});
+
+test('LEGEND_ITEMS: 四个和声功能与五个发展手法都在图例里（与真实标记同源，不能脱节）', () => {
+  const text = LEGEND_ITEMS.map((i) => i.label).join(' ');
+  for (const id of ['T', 'S', 'D', 'Tp']) {
+    assert.ok(text.includes(fnLabel(id)), `图例缺和声功能 ${id}（${fnLabel(id)}）`);
+  }
+  for (const d of ['承', '模', '倒', '装']) assert.ok(text.includes(d), `图例缺发展手法「${d}」`);
+  // 「新句」在功能轨上没有标记（DEVELOP_ZH.new 是空串），图例里要说清楚它为什么没有标记
+  assert.ok(LEGEND_ITEMS.some((i) => i.label === '新句'), '图例应解释「新句」为何无标记');
+});
+
+test('renderLegend: 输出可读结构，且不含未转义的注入面', () => {
+  const out = renderLegend(LEGEND_ITEMS);
+  assert.ok(out.includes('主'), '应含条目文字');
+  assert.ok(!/<script/i.test(out), '不得含 script');
+  const evil = renderLegend([{ group: 'x', label: '<b>hi</b>', desc: '<img onerror=1>' }]);
+  assert.ok(!evil.includes('<img'), 'desc 里的标签必须被转义：' + evil);
+  assert.equal(renderLegend([]), '', '空列表不产出内容');
+  assert.equal(renderLegend(null), '');
 });

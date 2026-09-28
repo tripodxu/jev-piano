@@ -272,9 +272,56 @@ export function planLine(sections) {
 }
 
 /** 发展手法：第 7 问的五种手法，中文全称（供 title 等需要完整语义的场合） */
-export /** 决策日志：节目单式，一行一个小节 */
-const DEV_ZH = { repeat: '承袭', sequence: '模进', inversion: '倒影', ornament: '装饰', new: '新句' };
+export const DEV_ZH = { repeat: '承袭', sequence: '模进', inversion: '倒影', ornament: '装饰', new: '新句' };
+
+/** 和声功能的短标签（功能轨填色、图例、日志徽章共用同一份） */
 const FN_ZH = { T: '主', S: '下属', D: '属', Tp: '色彩' };
+
+/**
+ * 图例条目：界面上**每一个**标记的含义。
+ * 数据驱动，保证与真实标记同源——标记改了而图例没改，比没有图例更糟。
+ * 「?」抽屉是可选的（impeccable/onboard：别一上来倾倒信息），关闭状态被记住，
+ * 但按钮永远在，随时可重开。
+ */
+export const LEGEND_ITEMS = [
+  { group: '和声功能（功能轨的填色）', label: FN_ZH.T, swatch: 'fn-T', desc: '主和弦——稳定的「家」，段落开头常回到这里' },
+  { group: '和声功能（功能轨的填色）', label: FN_ZH.S, swatch: 'fn-S', desc: '下属功能——向外打开，为进行做准备' },
+  { group: '和声功能（功能轨的填色）', label: FN_ZH.D, swatch: 'fn-D', desc: '属功能——制造张力并拉回主和弦' },
+  { group: '和声功能（功能轨的填色）', label: FN_ZH.Tp, swatch: 'fn-Tp', desc: '色彩功能——离调、借用来的颜色' },
+  { group: '发展手法（功能轨上的字）', label: '承', swatch: 'theme', desc: '承袭：动机在新的和声里重新出现（带顶部括线）' },
+  { group: '发展手法（功能轨上的字）', label: '模', swatch: '', desc: '模进：把刚才那句移一个音级' },
+  { group: '发展手法（功能轨上的字）', label: '倒', swatch: '', desc: '倒影：把刚才那句的音程镜像' },
+  { group: '发展手法（功能轨上的字）', label: '装', swatch: '', desc: '装饰：给刚才那句加经过音' },
+  { group: '发展手法（功能轨上的字）', label: '新句', swatch: '', desc: '全新想法——唯一不使用动机的手法，所以没有标记' },
+  { group: '断路器与守卫（功能轨上的形状）', label: '断路', swatch: 'lock', desc: '循环锁死断路器触发：这一小节把在绕圈的根音剔出了候选' },
+  { group: '断路器与守卫（功能轨上的形状）', label: '驳回', swatch: 'rej', desc: '模型答了候选集之外的和弦，已按候选集强制回落' },
+  { group: '结构（各处的虚线与名字）', label: '段落', swatch: 'sec', desc: 'A 陈述 / B 对比 / A′ 再现 / Coda 收束，虚线竖线是段落边界' },
+  { group: '结构（各处的虚线与名字）', label: '动机', swatch: 'motif', desc: '曲子主题的旋律轮廓，右侧计数是它回来的次数' },
+  { group: '分析读数（张力带与卷帘）', label: '张力', swatch: 'ten', desc: '这一小节有多紧：实线是实际，虚线是计划弧线' },
+  { group: '分析读数（张力带与卷帘）', label: '契合度', swatch: 'fit', desc: '旋律里有多少音属于当前和弦——越高越「在调上」' },
+  { group: '分析读数（张力带与卷帘）', label: '非和弦', swatch: 'nct', desc: '带亮边的旋律音：不属于当前和弦，但正是调式的呼吸' },
+];
+
+/** 渲染图例 HTML（label/desc 一律转义——图例是纯文本通道，不是注入面） */
+export function renderLegend(items) {
+  if (!Array.isArray(items) || !items.length) return '';
+  const groups = new Map();
+  for (const it of items) {
+    const g = it.group ?? '其它';
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(it);
+  }
+  let out = '';
+  for (const [g, list] of groups) {
+    out += `<section class="lg-group"><h3>${escapeHtml(g)}</h3><ul>`;
+    for (const it of list) {
+      const sw = it.swatch ? `<i class="lg-sw ${escapeHtml(it.swatch)}"></i>` : '<i class="lg-sw lg-blank"></i>';
+      out += `<li>${sw}<b>${escapeHtml(it.label)}</b><span>${escapeHtml(it.desc)}</span></li>`;
+    }
+    out += '</ul></section>';
+  }
+  return out;
+}
 
 /** 功能轨某一格的可读描述（纯函数，便于单测；无障碍与 title 共用） */
 export function fnLabel(fn) {

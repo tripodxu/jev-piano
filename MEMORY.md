@@ -7,6 +7,16 @@
 
 ---
 
+## [完成] 2026-09-28 · 图例与首用引导（迭代轮次 18 · 前端）
+
+- **做了什么**（详见 [docs/memory/2026-09-28-legend-onboarding.md](docs/memory/2026-09-28-legend-onboarding.md)，计划 [docs/superpowers/plans/2026-09-28-legend-onboarding.md](docs/superpowers/plans/2026-09-28-legend-onboarding.md)）：顶栏加「?」**标记图例抽屉**（数据驱动 `LEGEND_ITEMS`，列出界面上每一个标记的含义）；功能轨行内图例**就地补上**发展手法；工作室空状态补「为什么值得」；收紧提示文案。skill `impeccable/onboard`。测试 118→**121**。
+- **不新增任何可视化**：标记已经够多，缺的是**读法**不是**数量**。再加一个可视化来解释可视化是最容易走的弯路。
+- **skill 的硬约束决定了做法**：**Context Over Ceremony**（现场教，不倾倒）· **NEVER overwhelm with information upfront** · **Don't show same onboarding twice — respect dismissals** · 尊重用户智力。所以**不做**首访弹窗、**不做**教程模式；关闭状态存 localStorage 但**「?」按钮永不消失**。
+- **关键**：`LEGEND_ITEMS` 与真实标记**同源**，并有测试断言覆盖面（四功能 + 五手法 + 断路器 + 驳回 + 段落 + 动机 + 张力 + 契合度 + 非和弦）。**标记改了而图例没改，比没有图例更糟**——凡靠人肉维护的对应关系都该有测试。
+- **验证**：npm test 121/121；`node --check` 全过；元素 id 契约 86/86（新增 6 个）；**决策指标 12 种子逐位不变**。
+- **反思**：① **「不做」比「做」更难**——放个大图例面板很容易、看着也诚意，但恰好违反 `onboard` 每一条；② 又一次在按字符串锚点插入代码时**切断了相邻声明**（`DEV_ZH` 劈成两半、`FN_ZH` 触发 TDZ），两次同款——**插入前先读一眼两侧**；③ 测试又写错一次：`fnLabel` 收的是功能 id，我当成收 bar 对象包了一层。**函数的签名就是它的文档。**
+- **下一步**（迭代轮次 19 · 优化）：待定。
+
 ## [完成] 2026-09-28 · 非和声音分析（迭代轮次 17 · 创意）
 
 - **做了什么**（详见 [docs/memory/2026-09-28-non-chord-tones.md](docs/memory/2026-09-28-non-chord-tones.md)，计划 [docs/superpowers/plans/2026-09-28-non-chord-tones.md](docs/superpowers/plans/2026-09-28-non-chord-tones.md)）：新建分析层 `public/js/nct.js`（53 行）——按 **Kostka-Payne《Tonal Harmony》** 判据把旋律音分成 和弦音/经过音/邻音/倚音（按**进出方式**而非「在不在和弦里」二分）。工作室卷帘头部加**契合度带**（每小节竖条，高度=和弦音占比）、旋律里的非和弦音加**亮边**；实时读数行补「和弦音 xx%」。测试 111→**118**。
