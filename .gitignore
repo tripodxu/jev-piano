@@ -1,4 +1,71 @@
+# ─────────────────────────────────────────────────────────────
+# jev-piano · 忽略规则
+# 原则：密钥、依赖、缓存、Agent 本地状态一律不进仓库；
+#      真相（记忆/规范/计划）只在仓库内的 docs/ 与 MEMORY.md。
+#      详见 AGENTS.md「不可提交的产物」。
+# ─────────────────────────────────────────────────────────────
+
+# 依赖与工具缓存
 node_modules/
 .wrangler/
-.dev.vars
 dist/
+*.tsbuildinfo
+
+# Python（dev-proxy.py 的本地副产物）
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 密钥与本地环境：只提交 .example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+!.env.example
+
+# ── Agent / 工具本地状态 ─────────────────────────────────────
+# 这些目录是各工具自己的记忆/会话缓存，可能含绝对路径与本机信息。
+# 项目的持久记忆在 docs/memory/ 与 MEMORY.md（工具无关，新条目在最上）。
+# 若在本机建了指针文件（如 .workbuddy/MEMORY.md），它同样不进仓库。
+.workbuddy/
+.claude/
+.cursor/
+.agent/
+.github/copilot-instructions.local.md
+AGENTS.local.md
+CLAUDE.local.md
+
+# ── Agent 运行产物 ──────────────────────────────────────────
+# 任务板快照、探针原始响应、接力临时文件等；可重建，一律不提交
+.work/
+.tmp/
+tmp/
+*.agent-state.json
+handoff-*.tmp.md
+
+# 日志
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# 浏览器导出/录音产物（用户下载后误放入仓库时兜底）
+*.webm
+*.mid
+*.midi
+
+# 探针与分析脚本的落盘结果
+probe-*.json
+repetition-*.json
+analyze-*.json
+
+# 编辑器与操作系统
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~

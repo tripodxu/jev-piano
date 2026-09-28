@@ -64,10 +64,23 @@ Worker 安全边界：`/api/llm` 只转发服务端 env 配置的端点（忽略
 ## 测试
 
 ```bash
-npm test          # 44 个单测：乐理内核 / Jev 客户端 / 决策器 / 调度器 / SMF 导出
+npm test          # 46 个单测：乐理内核 / Jev 客户端 / 决策器 / 调度器 / SMF 导出 / 工作室编辑
 node scripts/probe-jev.mjs   # 真实 API 冒烟（需 TYPESAFE_API_KEY，单次 ~$0.00002）
 node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 ```
+
+## 文档导航（人与 agent 共用）
+
+| 想找什么 | 去哪 |
+|---|---|
+| **AI agent 协作入口（第一站）** | [AGENTS.md](AGENTS.md)——阅读地图、协作/接力协议、红线 |
+| 项目记忆（最新在最上） | [MEMORY.md](MEMORY.md) · 详情 [docs/memory/](docs/memory/) |
+| 领域词汇统一语言 | [docs/CONTEXT.md](docs/CONTEXT.md) |
+| 关键决策为什么这样设计 | [docs/adr/](docs/adr/) |
+| 调研笔记（jevthoven / 前端选型） | [docs/research/](docs/research/) |
+| MVP 实施计划（设计契约出处） | [docs/superpowers/plans/2026-09-28-jev-piano-mvp.md](docs/superpowers/plans/2026-09-28-jev-piano-mvp.md) |
+
+> 多 agent 协同约定：一个任务动 1–3 个源文件；并行时文件领地禁止交集；完成任务必须写 MEMORY.md（最新在最上）。完整规范见 [AGENTS.md](AGENTS.md)。
 
 ## 目录
 
@@ -151,4 +164,4 @@ docs/superpowers/plans/   实施计划（本项目的完整设计文档）
 - OpenRouter 的 `v1/systemone` 端点与官方体格式一致（board-games 项目实测口径），但未在本项目实测（无 key）。
 
 ---
-由 TypeSafe **Jev** 驱动 · 调研笔记见 `../research/` · MIT
+由 TypeSafe **Jev** 驱动 · 调研笔记见 [`docs/research/`](docs/research/) · MIT
