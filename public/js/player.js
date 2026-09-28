@@ -43,10 +43,26 @@ export class Player {
   stop() {
     this.running = false;
     if (this._timer != null) { this._clearTimer(this._timer); this._timer = null; }
+    if (this.paused) { this.paused = false; this.audio?.ctx?.resume?.(); }
     this.queue = [];
     this.barMarks = [];
     this.deciding = false;
     this.queuedBars = 0;
+  }
+
+  /** 暂停/继续（jevthoven 的 job pause/resume）：挂起 AudioContext 冻结其时钟，
+   *  拍→秒的映射在恢复后依然成立，调度自动保持对齐；决策管线同时暂停。 */
+  pause(on) {
+    if (!this.running) return;
+    if (on && !this.paused) {
+      this.paused = true;
+      if (this._timer != null) { this._clearTimer(this._timer); this._timer = null; }
+      this.audio?.ctx?.suspend?.();
+    } else if (!on && this.paused) {
+      this.paused = false;
+      this.audio?.ctx?.resume?.();
+      if (!this._timer) this._timer = this._setTimer(() => this._tick(), TICK_MS);
+    }
   }
 
   _tick() {

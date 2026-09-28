@@ -121,6 +121,7 @@ main {
   display: block; margin: 0 0 7px; font-size: 12px; color: var(--text-faint);
   letter-spacing: 0.14em;
 }
+.lbl-sub { font-weight: 400; letter-spacing: 0.04em; font-size: 11px; color: var(--text-faint); text-transform: none; }
 .field-group { margin-bottom: 16px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
@@ -156,7 +157,8 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .mini { font-size: 12px; color: var(--text-dim); display: flex; gap: 7px; align-items: center; cursor: pointer; }
 input[type="checkbox"] { accent-color: var(--brass); width: 14px; height: 14px; }
 input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: pointer; }
-.bpm-row { display: flex; align-items: center; gap: 10px; }
+.bpm-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.bpm-row .mini { white-space: nowrap; flex: none; }
 .bpm-num { font-family: var(--mono); color: var(--brass); letter-spacing: 0; }
 
 /* ============================ 走带按钮 ============================ */

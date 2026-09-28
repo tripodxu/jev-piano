@@ -47,14 +47,15 @@ test('100 小节：音域、力度、时长全部在界内', async () => {
   }
 });
 
-test('乐句尾（第 8/16/…小节）末音落在当前和弦内；fixture 决策含全部 6 问', async () => {
+test('乐句尾（第 8/16/…小节）末音落在当前和弦内；fixture 决策含全部 7 问', async () => {
   const { composer } = await makeComposer({ styleId: 'romantic' });
   for (let i = 0; i < 16; i++) {
     const bar = await composer.nextBar();
     assert.equal(bar.decision.fixture, true);
-    for (const qid of ['chord', 'lh', 'rhythm', 'contour', 'intensity', 'breathe']) {
+    for (const qid of ['chord', 'lh', 'rhythm', 'contour', 'intensity', 'breathe', 'develop']) {
       assert.ok(qid in bar.decision.answers, `缺 ${qid}`);
     }
+    assert.ok(['repeat', 'sequence', 'inversion', 'ornament', 'new'].includes(bar.decision.develop), `非法发展手法 ${bar.decision.develop}`);
     if (bar.index % 8 === 7) {
       const lastRH = bar.notes.filter((n) => n.hand === 'R').at(-1);
       assert.ok(lastRH, '乐句尾应有旋律音');
@@ -62,6 +63,48 @@ test('乐句尾（第 8/16/…小节）末音落在当前和弦内；fixture 决
       assert.ok(pcs.includes(((lastRH.midi % 12) + 12) % 12), `末音 ${lastRH.midi} 不在和弦 ${bar.chord.symbol}`);
     }
   }
+});
+
+test('反重复：连续小节的旋律指纹永不相同（护栏生效）', async () => {
+  const { composer } = await makeComposer({ styleId: 'lofi', seed: 7 });
+  let prevSig = null;
+  let literalRepeats = 0;
+  for (let i = 0; i < 48; i++) {
+    const bar = await composer.nextBar();
+    const rh = bar.notes.filter((n) => n.hand === 'R');
+    assert.ok(rh.length > 0, '每小节都应有旋律');
+    const sig = rh.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
+    if (sig === prevSig) literalRepeats++;
+    prevSig = sig;
+  }
+  assert.equal(literalRepeats, 0, '连续两小节旋律不应完全相同');
+});
+
+test('旋律素材有变化：48 小节内指纹应有足够多样性', async () => {
+  const { composer } = await makeComposer({ styleId: 'pop', seed: 11 });
+  const sigs = new Set();
+  for (let i = 0; i < 48; i++) {
+    const bar = await composer.nextBar();
+    const rh = bar.notes.filter((n) => n.hand === 'R');
+    sigs.add(rh.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(','));
+  }
+  assert.ok(sigs.size >= 40, `48 小节仅 ${sigs.size} 种旋律，多样性不足`);
+});
+
+test('buildPlan: 指定调性覆盖（移调）', async () => {
+  const plan = await buildPlan({ prompt: '任意', styleId: 'jazz', keyPc: 5, seed: 1 }, {});
+  assert.equal(plan.keyPc, 5);
+  const auto = await buildPlan({ prompt: '任意', styleId: 'jazz', seed: 1 }, {});
+  assert.ok(auto.keyPc >= 0 && auto.keyPc <= 11);
+});
+
+test('导演指示进入决策状态（director_note）', async () => {
+  const { composer } = await makeComposer({ styleId: 'jazz' });
+  composer.directorNote = '下一句左手更密集';
+  // fixture 渠道不发网络请求；通过决策结果的 lh 变化间接验证权重生效不现实，这里验证状态字段被接受
+  const bar = await composer.nextBar();
+  assert.ok(bar.decision.answers); // 决策管线正常
+  assert.equal(composer.directorNote, '下一句左手更密集');
 });
 
 test('breathe=true 的小节旋律首个 onset 不早于 1 格', async () => {

@@ -36,6 +36,11 @@
       </div>
 
       <div class="field-group">
+        <label class="lbl" for="directorNote">演奏指示 <span class="lbl-sub">可选，演奏中实时生效</span></label>
+        <textarea id="directorNote" rows="2" placeholder="例：下一句左手更密集，结尾渐弱"></textarea>
+      </div>
+
+      <div class="field-group">
         <label class="lbl">风格</label>
         <div id="styleChips" class="chips" role="radiogroup">
           <button class="chip sel" data-style="random" type="button">随机</button>
@@ -70,11 +75,31 @@
           </select>
         </div>
       </div>
-      <div class="field-group">
-        <label class="lbl" for="bpmRange">速度 <span id="bpmVal" class="bpm-num">自动</span></label>
-        <div class="bpm-row">
-          <label class="mini"><input type="checkbox" id="bpmAuto" checked> 跟随计划</label>
-          <input type="range" id="bpmRange" min="50" max="140" value="90" disabled>
+      <div class="grid-2">
+        <div class="field-group">
+          <label class="lbl" for="keySelect">调性</label>
+          <select id="keySelect">
+            <option value="auto" selected>自动</option>
+            <option value="0">C</option>
+            <option value="1">C# / Db</option>
+            <option value="2">D</option>
+            <option value="3">D# / Eb</option>
+            <option value="4">E</option>
+            <option value="5">F</option>
+            <option value="6">F# / Gb</option>
+            <option value="7">G</option>
+            <option value="8">G# / Ab</option>
+            <option value="9">A</option>
+            <option value="10">A# / Bb</option>
+            <option value="11">B</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="lbl" for="bpmRange">速度 <span id="bpmVal" class="bpm-num">自动</span></label>
+          <div class="bpm-row">
+            <label class="mini"><input type="checkbox" id="bpmAuto" checked> 跟随计划</label>
+            <input type="range" id="bpmRange" min="50" max="140" value="90" disabled>
+          </div>
         </div>
       </div>
 
@@ -82,6 +107,10 @@
         <button id="playBtn" class="btn primary" type="button">
           <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M4.5 2.8v10.4L13 8Z" fill="currentColor"/></svg>
           <span>开始演奏</span>
+        </button>
+        <button id="pauseBtn" class="btn" type="button" disabled>
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><g fill="currentColor"><rect x="4.2" y="3.5" width="2.6" height="9" rx="1"/><rect x="9.2" y="3.5" width="2.6" height="9" rx="1"/></g></svg>
+          <span>暂停</span>
         </button>
         <button id="stopBtn" class="btn" type="button" disabled>
           <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5" fill="currentColor"/></svg>
@@ -123,7 +152,7 @@
       </div>
 
       <section class="programme reveal" style="--d:.25s">
-        <h2 class="programme-title">演奏记录 <span class="programme-sub">每小节一次 Jev 决策，六问并行</span></h2>
+        <h2 class="programme-title">演奏记录 <span class="programme-sub">每小节一次 Jev 决策，七问并行</span></h2>
         <ul id="decisionLog" class="dlog"></ul>
       </section>
     </section>

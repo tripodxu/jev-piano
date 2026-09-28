@@ -50,8 +50,8 @@ const ROOT_ROLE = {
   6: '减和弦，戏剧性', 1: '变化音，意外感',
 };
 
-/** 由关键词/LLM 产出装配出完整合法的 Plan */
-export async function buildPlan({ prompt = '', goal = '随机冒险', styleId = 'random', seed = 1, bars = 32 } = {}, cfg = {}) {
+/** 由关键词/LLM 产出装配出完整合法的 Plan；keyPc 为用户指定的移调（0..11，null = 自动） */
+export async function buildPlan({ prompt = '', goal = '随机冒险', styleId = 'random', seed = 1, bars = 32, keyPc = null } = {}, cfg = {}) {
   const rng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
   const style = styleId !== 'random' && STYLE_BY_ID[styleId] ? STYLE_BY_ID[styleId] : null;
   const hint = { style: style?.name, goal };
@@ -95,6 +95,8 @@ export async function buildPlan({ prompt = '', goal = '随机冒险', styleId = 
   base.arc = gh.arc ?? base.arc;
   base.density = clamp(base.density + (gh.density ?? 0), 0.05, 1);
   base.brightness = clamp(base.brightness + (gh.brightness ?? 0), 0, 1);
+  // 用户移调（jevthoven 的 transpose 命令）：覆盖 LLM/关键词给出的调
+  if (Number.isInteger(keyPc) && keyPc >= 0 && keyPc <= 11) base.keyPc = keyPc;
 
   const st = STYLE_BY_ID[base.styleId];
   const [meterNum, meterDen] = st.meters[0].split('/').map(Number);
@@ -155,13 +157,14 @@ export function chordCriteria(cands) {
   return Object.fromEntries(cands.map((c) => [c.sym, c.desc]));
 }
 
-/** 左手织体候选（按强度微调权重） */
-export function lhCandidates(style, intensity) {
+/** 左手织体候选（按强度微调权重；连续同织体 ≥2 小节后衰减，避免伴奏原地踏步） */
+export function lhCandidates(style, intensity, prevId = null, repeatCount = 0) {
   const out = {};
   for (const id of style.lh) {
     let w = 1.0;
     if (intensity >= 2 && ['octave', 'stride', 'walk'].includes(id)) w += 0.3;
     if (intensity < 1 && ['pad', 'ballad'].includes(id)) w += 0.3;
+    if (prevId && id === prevId && repeatCount >= 2) w *= 0.5;
     out[id] = { w, desc: LH_DEFS[id] };
   }
   return out;
@@ -197,40 +200,149 @@ export function intensityTarget(plan, progress, isPhraseEnd) {
   return clamp(v - (isPhraseEnd ? 0.5 : 0), 0, 3);
 }
 
+/* ------------------------ 发展手法与反重复 ------------------------ */
+
+/** 旋律发展手法（jevthoven 式动机发展）：Jev 每小节与其它问题并行选择，内核负责执行 */
+export const DEVELOP_OPS = {
+  repeat: 'restate the idea against the new harmony; details may drift',
+  sequence: 'transpose the previous idea up or down a scale step',
+  inversion: 'mirror the previous melodic intervals around its first note',
+  ornament: 'keep the idea but add passing/neighbor tones for a busier surface',
+  new: 'start a fresh contrasting idea',
+};
+
+function velFor(onsetGrid, intensity, rng) {
+  return clamp(0.35 + (intensity / 3) * 0.5 + (onsetGrid % 4 === 0 ? 0.08 : 0) + (rng() * 0.08 - 0.04), 0.2, 1);
+}
+
+/** 音阶内上/下一个音 */
+function scaleNext(midi, dir, scale) {
+  if (dir > 0) { for (const m of scale) if (m > midi) return m; return midi; }
+  for (let i = scale.length - 1; i >= 0; i--) if (scale[i] < midi) return scale[i];
+  return midi;
+}
+
+/** 旋律指纹：16 分格 + 绝对音高。连续小节指纹相同 = 字面重复，被护栏禁止 */
+function sigOf(rh) {
+  return rh.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
+}
+
+/** 乐句尾末音锚定到根音/五音 */
+function snapLastToChord(notes, chord) {
+  const last = notes.at(-1);
+  if (!last) return notes;
+  const pool = chordMidis(chord.rootPc, chord.shape, 58, 86);
+  const root = nearest(chord.rootPc + (chord.rootPc + 60 > 84 ? 48 : 60), pool);
+  last.midi = nearest(last.midi, [root, nearest(root + 7, pool)]);
+  return notes;
+}
+
+/** 经过音/邻音装饰：在 ≥0.45 拍且音程 ≥3 半音的缝隙插音，最多 3 个 */
+function insertPassing(notes, scale, rng) {
+  const out = [];
+  for (let i = 0; i < notes.length; i++) {
+    out.push(notes[i]);
+    const a = notes[i], b = notes[i + 1];
+    if (!b) continue;
+    const gap = b.startBeats - a.startBeats;
+    if (gap >= 0.45 && Math.abs(b.midi - a.midi) >= 3 && out.length - notes.length < 3 && rng() < 0.8) {
+      out.push({
+        midi: clamp(nearest(Math.round((a.midi + b.midi) / 2), scale), 60, 84),
+        startBeats: a.startBeats + gap / 2, durBeats: gap * 0.4,
+        vel: Math.max(0.2, a.vel - 0.12), hand: 'R',
+      });
+    }
+  }
+  return out.sort((x, y) => x.startBeats - y.startBeats);
+}
+
+/** 反重复护栏：与最近两小节指纹撞车时，整句上移/下移一个音级或加装饰，直到指纹不同 */
+function mutateMelody(rh, { scale, rng }) {
+  const base = sigOf(rh);
+  const tries = [
+    (ns) => ns.map((n) => ({ ...n, midi: clamp(scaleNext(n.midi, 1, scale), 60, 84) })),
+    (ns) => ns.map((n) => ({ ...n, midi: clamp(scaleNext(n.midi, -1, scale), 60, 84) })),
+    (ns) => insertPassing(ns, scale, rng),
+  ];
+  for (const f of tries) {
+    const cand = f(rh);
+    if (sigOf(cand) !== base) return cand;
+  }
+  return rh;
+}
+
+/** 模进/倒影：以上一小节旋律素材为本，重锚定到当前和弦（jevthoven 的 motif development） */
+function buildFromPrev(prev, { dir, invert, chord, scale, meterNum, intensity, isPhraseEnd, rng }) {
+  const chordPool = chordMidis(chord.rootPc, chord.shape, 58, 86);
+  const steps = meterNum * 4;
+  const onsets = prev.onsets;
+  let start = prev.startMidi ?? nearest(72, chordPool);
+  if (dir) start = scaleNext(start, dir, scale);
+  start = nearest(start, chordPool);
+  const sgn = invert ? -1 : 1;
+  let acc = 0;
+  const notes = onsets.map((o, k) => {
+    if (k > 0) acc += (prev.intervals[k - 1] ?? 0) * sgn;
+    let midi = clamp(start + acc, 60, 84);
+    if (o % 4 === 0 || k === onsets.length - 1) midi = nearest(midi, chordPool);
+    return { midi, startBeats: o, durBeats: 0, vel: velFor(Math.round(o * 4), intensity, rng), hand: 'R' };
+  });
+  notes.forEach((n, k) => {
+    const nextO = k < notes.length - 1 ? onsets[k + 1] : steps;
+    let d = ((nextO - onsets[k]) / 4) * 0.9;
+    if (k === notes.length - 1 && isPhraseEnd) d *= 2;
+    n.durBeats = d;
+  });
+  return notes;
+}
+
+/** 节奏变奏：在基础音型上位移/补弱位/删音，每小节现场变化（jevthoven 的 complete-bar candidates） */
+function varyPattern(pat, rng, meterNum) {
+  const steps = meterNum * 4;
+  const on = [...pat.on];
+  if (rng() < 0.5 && on.length > 1) {
+    const idx = 1 + Math.floor(rng() * (on.length - 1));
+    const moved = on[idx] + (rng() < 0.5 ? -1 : 1);
+    if (moved > 0 && moved < steps && !on.includes(moved)) { on[idx] = moved; on.sort((a, b) => a - b); }
+  }
+  if (rng() < 0.35 && on.length < steps / 2) {
+    const cand = [];
+    for (let g = 1; g < steps; g += 2) if (!on.includes(g)) cand.push(g);
+    if (cand.length) { on.push(cand[Math.floor(rng() * cand.length)]); on.sort((a, b) => a - b); }
+  }
+  if (rng() < 0.25 && on.length > 2) on.splice(1 + Math.floor(rng() * (on.length - 1)), 1);
+  return { on, tier: pat.tier };
+}
+
 /* ---------------------------- 音符渲染 ---------------------------- */
 
 const CONTOURS = CONTOUR_STEPS;
 
-/** 右手旋律：轮廓驱动 + 强拍和弦音锚定 + 摇摆与人味 */
-export function renderMelody({ plan, chord, contourId, pattern, breathe, intensity, isPhraseEnd, lastEndMidi, rng }) {
+/** 右手旋律：轮廓驱动（随机相位）+ 强拍和弦音锚定 + 摇摆与人味；乐句尾锚定与反重复由调用方统一处理 */
+export function renderMelody({ plan, chord, contourId, pattern, breathe, intensity, isPhraseEnd, startHint, rng }) {
   const steps = plan.meterNum * 4;
   let onsets = breathe ? pattern.on.slice(1) : [...pattern.on];
   if (!onsets.length) onsets = [plan.meterNum === 3 ? 6 : 8];
   const scale = scaleMidis(plan.keyPc, plan.melodyScale, 58, 86);
   const chordPool = chordMidis(chord.rootPc, chord.shape, 58, 86);
-  let cur = lastEndMidi ?? nearest(72, chordPool);
+  let cur = startHint ?? nearest(72, chordPool);
   const seq = CONTOURS[contourId] ?? CONTOURS.wave;
+  const off = Math.floor(rng() * seq.length); // 轮廓步进随机相位：同一轮廓也能走出不同的句子
   const notes = [];
   const n = onsets.length;
   for (let k = 0; k < n; k++) {
     const i = onsets[k];
     const strong = i % 4 === 0 || k === n - 1;
-    let target = cur + (seq[k % seq.length]) * 2;
+    let target = cur + seq[(off + k) % seq.length] * 2;
     target = nearest(target, strong ? chordPool : scale);
     target = clamp(target, 60, 84);
-    if (isPhraseEnd && k === n - 1) {
-      const root = nearest(chord.rootPc + 60 > 84 ? chord.rootPc + 48 : chord.rootPc + 60, chordPool);
-      const fifth = nearest(root + 7, chordPool);
-      target = nearest(target, [root, fifth]);
-    }
     let startBeats = i / 4;
     if (i % 4 === 2) startBeats += plan.swing * 1.0;
     else if (i % 2 === 1) startBeats += plan.swing * 0.5;
     const nextOnset = k < n - 1 ? onsets[k + 1] : steps;
     let durBeats = ((nextOnset - i) / 4) * 0.9;
     if (k === n - 1 && isPhraseEnd) durBeats *= 2;
-    const vel = clamp(0.35 + (intensity / 3) * 0.5 + (i % 4 === 0 ? 0.08 : 0) + (rng() * 0.08 - 0.04), 0.2, 1);
-    notes.push({ midi: target, startBeats, durBeats, vel, hand: 'R' });
+    notes.push({ midi: target, startBeats, durBeats, vel: velFor(i, intensity, rng), hand: 'R' });
     cur = target;
   }
   return notes;
@@ -257,12 +369,12 @@ export function renderLH({ plan, chord, patternId, intensity, rng }) {
     case 'ballad':
       push(bass, 0, 2, 0.5); chordHit(0, 2, 0.35); chordHit(2, plan.meterNum - 2, 0.4); break;
     case 'alberti': {
-      const seq = [bass, upper[0], upper[1], upper[0]];
+      const seq = rng() < 0.3 ? [bass, upper[1], upper[0], upper[1]] : [bass, upper[0], upper[1], upper[0]];
       for (let k = 0; k < plan.meterNum * 2; k++) push(seq[k % 4], k * 0.5, 0.45, 0.32 + (k % 4 === 0 ? 0.06 : 0));
       break;
     }
     case 'arp': {
-      const seq = [bass, upper[0], upper[1], upper[2]];
+      const seq = rng() < 0.3 ? [upper[2], upper[1], upper[0], bass] : [bass, upper[0], upper[1], upper[2]];
       for (let k = 0; k < plan.meterNum * 2; k++) push(seq[k % 4], k * 0.5, 0.48, 0.34 + (k % 4 === 0 ? 0.05 : 0));
       break;
     }
@@ -312,6 +424,11 @@ export class Composer {
     this.currentChord = null;
     this.lastEndMidi = null;
     this.intensitySoFar = 1;
+    this.directorNote = '';        // 用户自然语言演奏指示，实时生效
+    this.pitchCenter = 72;         // 音区中心缓慢漂移，避免旋律总绕着同一个音域打转
+    this.lastSigs = [];            // 最近两小节旋律指纹（反重复护栏）
+    this.prevMelody = null;        // 上一小节旋律素材（供模进/倒影）
+    this.developHistory = [];      // 发展手法历史
   }
 
   _position() {
@@ -344,17 +461,44 @@ export class Composer {
   async nextBar() {
     const plan = this.plan;
     const pos = this._position();
-    const intensityCurve = intensityTarget(plan, pos.progress, pos.isPhraseEnd);
+    this.pitchCenter = clamp(this.pitchCenter + (this.rng() * 2 - 1) * 3, 62, 80); // 音区漂移
+    const intensityCurve = clamp(
+      intensityTarget(plan, pos.progress, pos.isPhraseEnd)
+      + (/强|响|climax|louder|爆发/i.test(this.directorNote) ? 0.7 : 0)
+      - (/弱|轻|渐弱|softer|收/i.test(this.directorNote) ? 0.7 : 0),
+      0, 3,
+    );
 
     const cands = chordCandidates(this.style, plan, this.currentChord?.symbol, pos.barInPhrase, pos.isPhraseEnd);
-    const lhs = lhCandidates(this.style, intensityCurve);
+
+    // 左手：连续同织体衰减 + 导演指示偏置
+    const lastLh = this.history.at(-1)?.decision.lh ?? null;
+    let lhRepeat = 0;
+    for (const b of [...this.history].reverse()) { if (b.decision.lh === lastLh) lhRepeat++; else break; }
+    const lhs = lhCandidates(this.style, intensityCurve, lastLh, lhRepeat);
+    if (/左手.*(密|忙|多|busy)|bass.*busy/i.test(this.directorNote)) {
+      for (const id of ['broken', 'stride', 'walk', 'octave']) if (lhs[id]) lhs[id].w += 0.6;
+    }
+    if (/左手.*(疏|少|简|sparse|less)/i.test(this.directorNote)) {
+      for (const id of ['pad', 'ballad', 'block']) if (lhs[id]) lhs[id].w += 0.6;
+    }
+
     const rhythms = rhythmCandidates(plan, this.motif, pos.phrase);
+    if (/主题|动机|motif|再现/i.test(this.directorNote) && rhythms.motif) rhythms.motif.w += 0.8;
     const contours = contourWeights(plan, pos.barInPhrase);
+    if (/主题|动机|motif|再现/i.test(this.directorNote)) contours.stay += 0.3;
 
     // fixture score 权重：距离期望位置越近权重越高
     const scoreW = {};
     for (let l = 0; l < 4; l++) scoreW[String(l)] = 1 / (0.5 + Math.abs(l - intensityCurve));
     const breatheP = pos.isPhraseEnd ? 0.65 : (plan.density < 0.4 ? 0.3 : 0.12);
+
+    // 发展手法 fixture 权重：刚"承袭"过就抑制承袭；乐句头鼓励新句；高密度鼓励装饰
+    const devW = { repeat: 0.5, sequence: 1.1, inversion: 0.5, ornament: 0.9, new: 0.9 };
+    if (pos.barInPhrase <= 1) devW.new += 0.5;
+    if (pos.isPhraseEnd) devW.repeat += 0.4;
+    if (this.developHistory.at(-1) === 'repeat') devW.repeat *= 0.3;
+    if (plan.density > 0.6) devW.ornament += 0.2;
 
     const state = {
       piece: {
@@ -369,11 +513,16 @@ export class Composer {
       last_bar: this.history.length ? {
         lh: this.history.at(-1).decision.lh, contour: this.history.at(-1).decision.contour,
         tier: this.history.at(-1).decision.tier, ended_on: this.lastEndMidi ? midiName(this.lastEndMidi) : null,
+        melody: this.prevMelody ? { first: midiName(this.prevMelody.startMidi), notes: this.prevMelody.onsets.length, intervals: this.prevMelody.intervals } : null,
+        dev: this.developHistory.at(-1) ?? null,
       } : null,
       intensity_so_far: Number(this.intensitySoFar.toFixed(2)),
       motif: this.motif ? `phrase-1 motif: rhythm ${this.motif.rhythmId}, contour ${this.motif.contourId} (reuse or vary it)` : 'the first phrase is being born',
+      recent_developments: this.developHistory.slice(-3),
+      director_note: this.directorNote || undefined,
       user_prompt: plan.prompt,
     };
+    const honorNote = ' Honor `director_note` in state when present.';
     const questions = {
       chord: {
         type: 'choice',
@@ -383,13 +532,13 @@ export class Composer {
       },
       lh: {
         type: 'choice',
-        instructions: `Choose the left-hand accompaniment pattern for the NEXT bar, fitting the chord, intensity and style. Answer ONLY with the Choice question "lh".`,
+        instructions: `Choose the left-hand accompaniment pattern for the NEXT bar, fitting the chord, intensity and style.${honorNote} Answer ONLY with the Choice question "lh".`,
         criteria: Object.fromEntries(Object.entries(lhs).map(([id, v]) => [id, v.desc])),
         _fixture: { weights: Object.fromEntries(Object.entries(lhs).map(([id, v]) => [id, v.w])) },
       },
       rhythm: {
         type: 'choice',
-        instructions: `Choose the right-hand rhythm pattern for the NEXT bar (tier 0=sparse 1=medium 2=dense). Answer ONLY with the Choice question "rhythm".`,
+        instructions: `Choose the right-hand rhythm pattern for the NEXT bar (tier 0=sparse 1=medium 2=dense). It will be varied by the kernel, so choose the character, not the literal grid.${honorNote} Answer ONLY with the Choice question "rhythm".`,
         criteria: Object.fromEntries(Object.entries(rhythms).map(([id, v]) => [id, id === 'motif' ? 'reuse the opening motif' : `tier ${v.tier} pattern`])),
         _fixture: { weights: Object.fromEntries(Object.entries(rhythms).map(([id, v]) => [id, v.w])) },
       },
@@ -401,7 +550,7 @@ export class Composer {
       },
       intensity: {
         type: 'score',
-        instructions: 'Musical intensity for the NEXT bar on 0-3, given arc, phrase position and history.',
+        instructions: `Musical intensity for the NEXT bar on 0-3, given arc, phrase position and history.${honorNote}`,
         criteria: ['very soft, airy', 'gentle', 'confident, fuller texture', 'climactic, full sound'],
         _fixture: { weights: scoreW },
       },
@@ -410,6 +559,12 @@ export class Composer {
         instructions: 'Should the melody breathe (start after a rest) in the NEXT bar?',
         criteria: { true: 'yes, leave space', false: 'no, keep singing' },
         _fixture: { weights: { true: breatheP, false: 1 - breatheP } },
+      },
+      develop: {
+        type: 'choice',
+        instructions: `You are shaping melodic variety. \`last_bar.melody\` describes what was just played; a literal repeat of it would be boring. Choose how the NEXT bar's melody develops.${honorNote} Answer ONLY with the Choice question "develop".`,
+        criteria: { ...DEVELOP_OPS },
+        _fixture: { weights: devW },
       },
     };
 
@@ -425,13 +580,42 @@ export class Composer {
     const contour = CONTOURS[ans.contour?.value] ? ans.contour.value : 'wave';
     const intensity = clamp(Number.isFinite(Number(ans.intensity?.value)) ? Number(ans.intensity.value) : intensityCurve, 0, 3);
     const breathe = ans.breathe?.value == null ? (this.rng() < breatheP) : !!ans.breathe.value;
+    const dev = DEVELOP_OPS[ans.develop?.value] ? ans.develop.value : 'new';
+    this.developHistory.push(dev);
+    if (this.developHistory.length > 8) this.developHistory.shift();
+
+    // 旋律：按发展手法渲染（呼吸小节一律用新素材，避免从上一句继承开头）
+    const scale = scaleMidis(plan.keyPc, plan.melodyScale, 58, 86);
+    const chordPool = chordMidis(chord.rootPc, chord.shape, 58, 86);
+    const startHint = pos.barInPhrase === 0 ? nearest(this.pitchCenter, chordPool) : this.lastEndMidi;
+    const varied = varyPattern(rhythmEntry.pat, this.rng, plan.meterNum);
+    const usePrev = !breathe && !!this.prevMelody && (dev === 'sequence' || dev === 'inversion');
+
+    let rh = usePrev
+      ? buildFromPrev(this.prevMelody, { dir: dev === 'sequence' ? (this.rng() < 0.5 ? 1 : -1) : 0, invert: dev === 'inversion', chord, scale, meterNum: plan.meterNum, intensity, isPhraseEnd: pos.isPhraseEnd, rng: this.rng })
+      : renderMelody({ plan, chord, contourId: contour, pattern: varied, breathe, intensity, isPhraseEnd: pos.isPhraseEnd, startHint, rng: this.rng });
+    if (!usePrev && dev === 'ornament') rh = insertPassing(rh, scale, this.rng);
+
+    // 反重复护栏 + 乐句尾锚定
+    if (pos.isPhraseEnd) snapLastToChord(rh, chord);
+    if (this.lastSigs.includes(sigOf(rh))) {
+      rh = mutateMelody(rh, { scale, rng: this.rng });
+      if (pos.isPhraseEnd) snapLastToChord(rh, chord);
+    }
+    this.lastSigs = [sigOf(rh), ...this.lastSigs].slice(0, 2);
+
+    // 记录本小节旋律素材（供下一小节模进/倒影）
+    this.prevMelody = {
+      startMidi: rh[0]?.midi ?? this.lastEndMidi,
+      onsets: rh.map((n) => n.startBeats),
+      intervals: rh.map((n, i, a) => (i ? n.midi - a[i - 1].midi : 0)).slice(1),
+    };
 
     const notes = [
       ...renderLH({ plan, chord, patternId: lh, intensity, rng: this.rng }),
-      ...renderMelody({ plan, chord, contourId: contour, pattern: rhythmEntry.pat, breathe, intensity, isPhraseEnd: pos.isPhraseEnd, lastEndMidi: this.lastEndMidi, rng: this.rng }),
+      ...rh,
     ];
-    const rhNotes = notes.filter((n) => n.hand === 'R');
-    this.lastEndMidi = rhNotes.length ? rhNotes.at(-1).midi : this.lastEndMidi;
+    this.lastEndMidi = rh.length ? rh.at(-1).midi : this.lastEndMidi;
     this.intensitySoFar = this.intensitySoFar * 0.7 + intensity * 0.3;
     this.currentChord = chord;
 
@@ -445,7 +629,7 @@ export class Composer {
       decision: {
         provider: dec.provider, fixture: !!dec.fixture, ms: dec.ms ?? 0,
         inputTokens: dec.inputTokens ?? 0, usd: dec.usd ?? 0,
-        lh, contour, tier: rhythmEntry.tier ?? 1, breathe,
+        lh, contour, tier: rhythmEntry.tier ?? 1, breathe, develop: dev,
         confidence: ans.chord?.confidence ?? ans.chord?.probability ?? null,
         answers: ans, candidates: Object.keys(questions.chord.criteria),
       },

@@ -131,6 +131,8 @@ export class Fall {
 }
 
 /** 决策日志：节目单式，一行一个小节 */
+const DEV_ZH = { repeat: '承袭', sequence: '模进', inversion: '倒影', ornament: '装饰', new: '新句' };
+
 export function addDecision(ul, bar) {
   const d = bar.decision;
   ul.querySelectorAll('.fresh').forEach((el) => el.classList.remove('fresh'));
@@ -145,6 +147,7 @@ export function addDecision(ul, bar) {
     `<span class="log-detail">` +
     `<span>左手 <b>${escapeHtml(d.lh)}</b></span>` +
     `<span>走向 <span class="q">${escapeHtml(d.contour)}</span></span>` +
+    `<span>手法 <span class="q">${DEV_ZH[d.develop] ?? escapeHtml(d.develop ?? '')}</span></span>` +
     `<span>密度 ${d.tier}</span>` +
     `<span>强度 <b>${bar.intensity.toFixed(1)}</b></span>` +
     `${d.breathe ? '<span class="q">呼吸</span>' : ''}` +

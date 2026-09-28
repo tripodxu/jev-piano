@@ -39,7 +39,7 @@ test('调度顺序：播放事件时间单调不减，管线深度不超过 AHEA
   const h = await makeHarness();
   const p = await makePlayer(h);
   p.start();
-  await h.advance(4);
+  await h.advance(7); // 64 BPM 下一小节约 3.7s，取 7s 保证至少两个小节
   assert.ok(p.running);
   assert.ok(p.records.length > 10, '应有足够音符被调度');
   const times = h.played.map((e) => e.when);
@@ -73,4 +73,21 @@ test('onBar 在小节起点按序触发', async () => {
   assert.equal(idx[0], 0);
   for (let i = 1; i < idx.length; i++) assert.ok(idx[i] === idx[i - 1] + 1, '小节序号必须严格递增');
   p.stop();
+});
+
+test('暂停/继续：暂停时不调度，恢复后继续', async () => {
+  const h = await makeHarness();
+  const p = await makePlayer(h);
+  p.start();
+  await h.advance(1.5);
+  p.pause(true);
+  assert.equal(p.paused, true);
+  const frozen = p.records.length;
+  await h.advance(2); // 定时器已清空，records 不再增长
+  assert.equal(p.records.length, frozen, '暂停期间不应有新音符');
+  p.pause(false);
+  await h.advance(2);
+  assert.ok(p.records.length > frozen, '恢复后应继续调度');
+  p.stop();
+  assert.equal(p.paused, false, 'stop 应解除暂停态');
 });

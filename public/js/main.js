@@ -8,9 +8,10 @@ import { renderKeyboard, Fall, addDecision, renderPlan, setStatus, toast } from 
 
 const $ = (id) => document.getElementById(id);
 const els = {
-  prompt: $('prompt'), styleChips: $('styleChips'), goal: $('goal'), barsSelect: $('barsSelect'),
+  prompt: $('prompt'), directorNote: $('directorNote'), styleChips: $('styleChips'), goal: $('goal'), barsSelect: $('barsSelect'),
+  keySelect: $('keySelect'),
   bpmAuto: $('bpmAuto'), bpmRange: $('bpmRange'), bpmVal: $('bpmVal'),
-  playBtn: $('playBtn'), stopBtn: $('stopBtn'), newBtn: $('newBtn'), midiBtn: $('midiBtn'), recBtn: $('recBtn'),
+  playBtn: $('playBtn'), pauseBtn: $('pauseBtn'), stopBtn: $('stopBtn'), newBtn: $('newBtn'), midiBtn: $('midiBtn'), recBtn: $('recBtn'),
   planCard: $('planCard'), nowChord: $('nowChord'), nowBar: $('nowBar'),
   fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), decisionLog: $('decisionLog'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
@@ -25,7 +26,7 @@ const STORE_KEY = 'jevpiano.settings.v1';
 const DEFAULTS = {
   channel: 'fixture', typesafeKey: '', openrouterKey: '',
   llmEnabled: false, llmBaseUrl: 'https://api.openai.com/v1', llmModel: '', llmKey: '', llmProxy: false,
-  styleId: 'random', touched: false,
+  styleId: 'random', keySel: 'auto', touched: false,
 };
 let settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}') };
 const saveSettings = () => localStorage.setItem(STORE_KEY, JSON.stringify(settings));
@@ -43,13 +44,14 @@ const refreshStatus = (extraFixture) => {
 };
 
 /* ---------------- 控件绑定 ---------------- */
-for (const input of [els.channelSel, els.typesafeKey, els.openrouterKey, els.llmEnabled, els.llmBaseUrl, els.llmModel, els.llmKey, els.llmProxy]) {
+const storeKeyOf = (id) => (id === 'channelSel' ? 'channel' : id === 'keySelect' ? 'keySel' : id);
+for (const input of [els.channelSel, els.keySelect, els.typesafeKey, els.openrouterKey, els.llmEnabled, els.llmBaseUrl, els.llmModel, els.llmKey, els.llmProxy]) {
   const prop = input.type === 'checkbox' ? 'checked' : 'value';
-  input[prop] = settings[input.id === 'channelSel' ? 'channel' : input.id] ?? '';
+  input[prop] = settings[storeKeyOf(input.id)] ?? '';
   // 文本框用 input 事件（程序化填充不触发 change）；select/checkbox 用 change
   const evName = input.tagName === 'INPUT' && ['text', 'password'].includes(input.type) ? 'input' : 'change';
   input.addEventListener(evName, () => {
-    settings[input.id === 'channelSel' ? 'channel' : input.id] = input[prop];
+    settings[storeKeyOf(input.id)] = input[prop];
     settings.touched = true;
     saveSettings();
     refreshStatus();
@@ -87,6 +89,7 @@ let recording = null;
 
 function setButtons(playing) {
   els.playBtn.disabled = playing;
+  els.pauseBtn.disabled = !playing;
   els.stopBtn.disabled = !playing;
   els.newBtn.disabled = playing;
   els.midiBtn.disabled = playing || !player?.records?.length;
@@ -94,6 +97,8 @@ function setButtons(playing) {
   els.prompt.disabled = playing;
   els.goal.disabled = playing;
   els.barsSelect.disabled = playing;
+  els.keySelect.disabled = playing;
+  if (!playing) els.pauseBtn.querySelector('span').textContent = '暂停';
 }
 
 async function start() {
@@ -116,6 +121,7 @@ async function start() {
     styleId: settings.styleId || 'random',
     seed,
     bars: Number(els.barsSelect.value),
+    keyPc: settings.keySel && settings.keySel !== 'auto' ? Number(settings.keySel) : null,
   }, {
     llm: settings.llmEnabled ? {
       enabled: true, baseUrl: settings.llmBaseUrl, model: settings.llmModel,
@@ -129,6 +135,7 @@ async function start() {
     channel: settings.channel,
     apiKey: settings.channel === 'typesafe' ? settings.typesafeKey : settings.openrouterKey,
   });
+  composer.directorNote = els.directorNote.value.trim();
   const bpm = els.bpmAuto.checked ? plan.bpm : Number(els.bpmRange.value);
   player = new Player({
     audio, composer, bpm,
@@ -178,6 +185,15 @@ function download(blob, name) {
 els.playBtn.addEventListener('click', start);
 els.stopBtn.addEventListener('click', stopAll);
 els.newBtn.addEventListener('click', start); // 换一版 = 新 seed 重排并立即演奏
+els.pauseBtn.addEventListener('click', () => {
+  if (!player) return;
+  const on = !player.paused;
+  player.pause(on);
+  els.pauseBtn.querySelector('span').textContent = on ? '继续' : '暂停';
+});
+els.directorNote.addEventListener('input', () => {
+  if (player?.composer) player.composer.directorNote = els.directorNote.value.trim();
+});
 els.midiBtn.addEventListener('click', () => {
   if (!player?.records?.length) return;
   const bytes = exportMidi(player.records, { bpm: plan.bpm, meterNum: plan.meterNum });
