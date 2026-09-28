@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   keywordAction, densifyHand, sparserHand, transposeNotes, scaleVel,
-  chordAt, applyAction, validatePiece, savePiece, barFunction, pieceTension,
+  chordAt, applyAction, validatePiece, savePiece, barFunction, pieceTension, quantizeNotes,
 } from '../public/js/studio.js';
 import { functionOfPc } from '../public/js/music.js';
 
@@ -120,6 +120,47 @@ test('savePiece: 存储可用时写入并返回 true；不可用时返回 false 
   assert.equal(JSON.parse(ok.v).version, 1);
   const boom = { setItem() { throw new Error('QuotaExceededError'); } };
   assert.equal(savePiece({ version: 1, notes: [] }, boom), false);
+});
+
+/* ---------------- 量化（卷帘的第一个时间编辑动作） ---------------- */
+
+test('quantizeNotes: 吸附到网格，strength 控制部分量化，hands 限定手别', () => {
+  const mk = () => ({
+    notes: [
+      { id: 1, midi: 60, startBeats: 0.37, durBeats: 1, vel: 0.5, hand: 'R' },
+      { id: 2, midi: 48, startBeats: 1.62, durBeats: 1, vel: 0.5, hand: 'L' },
+    ],
+  });
+  const p = mk();
+  const moved = quantizeNotes(p, { grid: 0.5, strength: 1 });
+  assert.equal(moved, 2, '两个都应被移动');
+  assert.equal(p.notes[0].startBeats, 0.5, '0.37 → 0.5');
+  assert.equal(p.notes[1].startBeats, 1.5, '1.62 → 1.5');
+
+  const half = mk();
+  quantizeNotes(half, { grid: 0.5, strength: 0.5 });
+  assert.ok(Math.abs(half.notes[0].startBeats - 0.435) < 1e-9, `部分量化只走一半，实际 ${half.notes[0].startBeats}`);
+
+  const onlyR = mk();
+  quantizeNotes(onlyR, { grid: 0.5, strength: 1, hands: ['R'] });
+  assert.equal(onlyR.notes[0].startBeats, 0.5, 'R 被量化');
+  assert.ok(Math.abs(onlyR.notes[1].startBeats - 1.62) < 1e-9, 'L 不受影响');
+});
+
+test('quantizeNotes: 不产生负时间、不动时长与力度、脏输入不崩', () => {
+  const p = { notes: [
+    { id: 1, midi: 60, startBeats: 0.1, durBeats: 0.5, vel: 0.4, hand: 'R' },
+    { id: 2, midi: 60, startBeats: 0, durBeats: 0.5, vel: 0.4, hand: 'R' },
+  ] };
+  quantizeNotes(p, { grid: 0.5, strength: 1 });
+  for (const n of p.notes) assert.ok(n.startBeats >= 0, '不得为负');
+  assert.equal(p.notes[0].durBeats, 0.5, '时长不应被改');
+  assert.equal(p.notes[0].vel, 0.4, '力度不应被改');
+  assert.equal(quantizeNotes({ notes: [] }, { grid: 0.5 }), 0);
+  assert.equal(quantizeNotes(null, { grid: 0.5 }), 0);
+  const p2 = { notes: [{ id: 1, midi: 60, startBeats: 0.37, durBeats: 1, vel: 0.5, hand: 'R' }] };
+  assert.equal(quantizeNotes(p2, { grid: 0.5, strength: 0 }), 0, 'strength=0 是无操作');
+  assert.ok(Math.abs(p2.notes[0].startBeats - 0.37) < 1e-9, 'strength=0 不应改动');
 });
 
 /* ---------------- 时间轴：功能带与张力曲线（卷帘头部） ---------------- */

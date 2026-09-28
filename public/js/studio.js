@@ -11,13 +11,34 @@ import { loadSettings } from './settings.js';
 import { chordMidis, scaleMidis, nearest, NOTE_NAMES, functionOfPc } from './music.js';
 import { barTension } from './tension.js';
 
-const P_LO = 36, P_HI = 95, ROW = 8, ZOOM = 24, SNAP = 0.25;
+const P_LO = 36, P_HI = 95, ROW = 8, ZOOM = 24, SNAP = 0.25, VEL_H = 54;
 // 卷帘头部自上而下：张力曲线 / 功能带 / 和弦名。对齐由共用 ZOOM 保证，无需任何同步代码。
 const H_TENSION = 24, H_FN = 12, H_CHORD = 18, HEADER = H_TENSION + H_FN + H_CHORD;
 const FN_COLOR = { T: '#d8ab5c', S: '#85b8ae', D: '#cf6a58', Tp: '#a8936f' };
 const STORE_KEY = 'jevpiano.studio.v1';
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const snap = (v) => Math.round(v / SNAP) * SNAP;
+
+/**
+ * 把 onset 吸附到网格。strength ∈ [0,1] 支持**部分量化**（DAW 惯例：可以「收一半」而不是二选一）。
+ * 只动 onset —— 时长与力度是另外两个独立的编辑维度，量化不该顺手改它们。返回被移动的音符数。
+ */
+export function quantizeNotes(piece, { grid = 0.25, strength = 1, hands = null } = {}) {
+  if (!piece || !Array.isArray(piece.notes) || !piece.notes.length) return 0;
+  const g = Math.max(1 / 64, Number(grid) || 0.25);
+  const s = clamp(Number.isFinite(strength) ? strength : 1, 0, 1);
+  if (s === 0) return 0;
+  const only = Array.isArray(hands) && hands.length ? new Set(hands) : null;
+  let moved = 0;
+  for (const n of piece.notes) {
+    if (only && !only.has(n.hand)) continue;
+    const target = Math.max(0, Math.round(n.startBeats / g) * g);
+    const next = Math.max(0, n.startBeats + (target - n.startBeats) * s);
+    if (Math.abs(next - n.startBeats) > 1e-9) moved++;
+    n.startBeats = next;
+  }
+  return moved;
+}
 
 /* ==================== 纯函数：确定性编辑变换（可单测，与 DOM 无关） ==================== */
 
@@ -219,13 +240,15 @@ export function ensureStudio() {
     progressWrap: $('stProgressWrap'), progress: $('stProgress'), progressText: $('stProgressText'),
     revise: $('stRevise'), reviseBtn: $('stReviseBtn'),
     midi: $('stMidi'), saveJson: $('stSaveJson'), loadBtn: $('stLoadBtn'), loadJson: $('stLoadJson'),
-    roll: $('stRoll'), rollWrap: $('stRollWrap'), playhead: $('stPlayhead'),
+    roll: $('stRoll'), rollWrap: $('stRollWrap'), playhead: $('stPlayhead'), vel: $('stVel'),
+    quant: $('stQuant'), quantGrid: $('stQuantGrid'),
     play: $('stPlay'), loopBtn: $('stLoop'), muteR: $('stMuteR'), muteL: $('stMuteL'),
     bpm: $('stBpm'), undo: $('stUndo'), redo: $('stRedo'),
     chord: $('stChord'), info: $('stInfo'), keyboard: $('stKeyboard'),
   };
   kb = renderKeyboard(els.keyboard);
   bindRoll();
+  bindVelLane();
   bindControls();
   window.__stDebug = () => ({ inited, hasPiece: !!piece, notes: piece?.notes.length ?? -1, savedVersion: piece?.version ?? null });
   // 恢复上次的工作台
@@ -254,6 +277,7 @@ function setPiece(p) {
   invalidateTension();
   els.bpm.value = p.bpm ?? p.plan.bpm;
   drawRoll();
+  drawVelLane();
   updateInfo();
   autosave();
 }
@@ -301,7 +325,7 @@ async function compose(newSeed) {
       els.progress.style.width = `${Math.round(((i + 1) / bars) * 100)}%`;
       els.progressText.textContent = `第 ${i + 1}/${bars} 小节 · ${bar.chord.symbol}`;
       updateInfo();
-      drawRoll(); // jevthoven 式 complete-bar preview：边生成边可见
+      drawRoll(); drawVelLane(); // jevthoven 式 complete-bar preview：边生成边可见
       await new Promise((r) => setTimeout(r, 0)); // 让出主线程刷新 UI
     }
     undoStack = []; redoStack = [];
@@ -318,6 +342,96 @@ async function compose(newSeed) {
     setTimeout(() => els.progressWrap.classList.add('hidden'), 600);
     updateButtons();
   }
+}
+
+/** 力度轨：每个音符一根竖条，底部对齐、高度 ∝ 力度、颜色随手别（与卷帘一致）。
+ *  与卷帘共用 ZOOM 像素/拍，横轴天然对齐；播放头 top:0/bottom:0 自动覆盖两条轨。 */
+function drawVelLane() {
+  const canvas = els.vel;
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const beats = piece ? piece.totalBars * piece.plan.meterNum : 32;
+  const W = Math.max(720, beats * ZOOM + 4);
+  canvas.style.width = `${W}px`;
+  canvas.style.height = `${VEL_H}px`;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(VEL_H * dpr);
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = '#0d0a08';
+  g.fillRect(0, 0, W, VEL_H);
+  if (!piece) {
+    g.font = '12px "PingFang SC", "Microsoft YaHei", sans-serif';
+    g.fillStyle = 'rgba(139,129,104,0.8)';
+    g.fillText('力度轨——生成后拖动竖条可改力度', 12, VEL_H / 2);
+    return;
+  }
+  // 力度参考线（0.5 拍力度）
+  g.strokeStyle = 'rgba(214,178,110,0.12)';
+  g.lineWidth = 1;
+  g.beginPath();
+  g.moveTo(0, Math.round(VEL_H * (1 - 0.5)) + 0.5);
+  g.lineTo(W, Math.round(VEL_H * (1 - 0.5)) + 0.5);
+  g.stroke();
+  const bw = Math.max(2, Math.min(6, ZOOM / 3));
+  for (const n of piece.notes) {
+    const x = n.startBeats * ZOOM + (n.durBeats * ZOOM - bw) / 2;
+    const h = Math.max(2, n.vel * (VEL_H - 6));
+    const base = n.hand === 'L' ? '92,184,174' : '232,192,106';
+    g.fillStyle = `rgba(${base},0.85)`;
+    g.fillRect(x, VEL_H - h, bw, h);
+    g.fillStyle = `rgba(${base},1)`;
+    g.fillRect(x, VEL_H - h, bw, 2);   // 顶端帽：让"改了没有"一眼可见
+  }
+}
+
+/** 力度轨的指针交互：命中音符 → 拖动改力度 → 走既有 commit（自带 undo + 自动保存） */
+function bindVelLane() {
+  const canvas = els.vel;
+  let drag = null, before = null;
+  const velAt = (clientY) => {
+    const r = canvas.getBoundingClientRect();
+    return clamp(1 - (clientY - r.top) / VEL_H, 0.15, 1);
+  };
+  const pick = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const beat = (e.clientX - r.left) / ZOOM;
+    // 命中窗口：横向 ±半个音符格，纵向整条轨
+    let best = null, bestD = Infinity;
+    for (const n of piece?.notes ?? []) {
+      const d = Math.abs(n.startBeats - beat);
+      if (d < bestD && d <= 0.5) { bestD = d; best = n; }
+    }
+    return best;
+  };
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!piece || playing()) return;
+    const n = pick(e);
+    if (!n) return;
+    before = JSON.stringify(piece.notes);
+    drag = n;
+    n.vel = velAt(e.clientY);
+    canvas.setPointerCapture(e.pointerId);
+    invalidateTension();
+    drawVelLane();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    drag.vel = velAt(e.clientY);
+    invalidateTension();
+    drawVelLane();
+  });
+  const end = () => {
+    if (!drag) return;
+    drag = null;
+    const now = JSON.stringify(piece.notes);
+    if (before !== null && now !== before) { undoStack.push(before); redoStack = []; trimUndo(); }
+    before = null;
+    invalidateTension();
+    drawVelLane(); autosave(); updateInfo(); updateButtons();
+  };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
 }
 
 function chordRoot(c) { return c.rootPc; }
@@ -463,7 +577,7 @@ function bindRoll() {
     if (snapBefore !== null && now !== snapBefore) { undoStack.push(snapBefore); redoStack = []; trimUndo(); }
     snapBefore = null;
     invalidateTension();
-    drawRoll(); autosave(); updateInfo(); updateButtons();
+    drawRoll(); drawVelLane(); autosave(); updateInfo(); updateButtons();
   };
 
   els.roll.addEventListener('pointerdown', (e) => {
@@ -585,14 +699,14 @@ function doUndo() {
   redoStack.push(JSON.stringify(piece.notes));
   piece.notes = JSON.parse(undoStack.pop());
   invalidateTension();
-  drawRoll(); autosave(); updateInfo(); updateButtons();
+  drawRoll(); drawVelLane(); autosave(); updateInfo(); updateButtons();
 }
 function doRedo() {
   if (!piece || !redoStack.length) return;
   undoStack.push(JSON.stringify(piece.notes));
   piece.notes = JSON.parse(redoStack.pop());
   invalidateTension();
-  drawRoll(); autosave(); updateInfo(); updateButtons();
+  drawRoll(); drawVelLane(); autosave(); updateInfo(); updateButtons();
 }
 
 let saveTimer = null;
@@ -623,6 +737,8 @@ function updateButtons() {
   els.variation.disabled = composing || !has;
   els.undo.disabled = !has || !undoStack.length;
   els.redo.disabled = !has || !redoStack.length;
+  els.quant.disabled = !has;
+  els.quantGrid.disabled = !has;
 }
 
 /* ---------------- 自然语言修改（Jev 选择确定性编辑命令） ---------------- */
@@ -669,7 +785,7 @@ async function revise() {
     if (JSON.stringify(piece.notes) !== before) {
       undoStack.push(before); redoStack = []; trimUndo();
       invalidateTension();
-      drawRoll(); autosave(); updateInfo(); updateButtons();
+      drawRoll(); drawVelLane(); autosave(); updateInfo(); updateButtons();
       toastify(`Jev 已执行：${ACTIONS_ZH[action]}`);
     } else {
       toastify(`Jev 选择「${ACTIONS_ZH[action]}」，但没有可调整的地方`);
@@ -688,7 +804,7 @@ function bindControls() {
   els.newBtn.addEventListener('click', () => {
     stopPlay(); piece = null; undoStack = []; redoStack = [];
     localStorage.removeItem(STORE_KEY);
-    drawRoll(); updateInfo(); updateButtons();
+    drawRoll(); drawVelLane(); updateInfo(); updateButtons();
     els.chord.textContent = '—';
     toastify('已清空工作台');
   });
@@ -700,10 +816,20 @@ function bindControls() {
     startPlay();
   });
   els.loopBtn.addEventListener('click', () => { loop = !loop; els.loopBtn.classList.toggle('sel', loop); });
-  els.muteR.addEventListener('change', () => { muted.R = els.muteR.checked; drawRoll(); });
-  els.muteL.addEventListener('change', () => { muted.L = els.muteL.checked; drawRoll(); });
+  els.muteR.addEventListener('change', () => { muted.R = els.muteR.checked; drawRoll(); drawVelLane(); });
+  els.muteL.addEventListener('change', () => { muted.L = els.muteL.checked; drawRoll(); drawVelLane(); });
   els.undo.addEventListener('click', doUndo);
   els.redo.addEventListener('click', doRedo);
+  els.quant.addEventListener('click', () => {
+    if (!piece || playing()) return;
+    const before = JSON.stringify(piece.notes);
+    const moved = quantizeNotes(piece, { grid: Number(els.quantGrid.value) || 0.25, strength: 1 });
+    if (!moved) { toastify('所有音符已经在网格上'); return; }
+    undoStack.push(before); redoStack = []; trimUndo();
+    invalidateTension();
+    drawRoll(); drawVelLane(); autosave(); updateInfo(); updateButtons();
+    toastify(`已量化 ${moved} 个音符到 ${els.quantGrid.selectedOptions[0]?.text ?? ''} 网格`);
+  });
   window.addEventListener('keydown', (e) => {
     if (!document.getElementById('viewStudio').classList.contains('active')) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
@@ -752,3 +878,4 @@ function download(blob, name) {
 export function stopStudio() {
   if (inited && playing()) stopPlay();
 }
+

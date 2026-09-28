@@ -242,6 +242,7 @@
           </div>
           <div id="stRollWrap" class="rollwrap">
             <canvas id="stRoll" aria-hidden="true"></canvas>
+            <canvas id="stVel" height="54" role="img" aria-label="力度轨：每个音符一根竖条，拖动可改力度"></canvas>
             <div id="stPlayhead" class="playhead hidden"></div>
           </div>
           <div class="rolltransport">
@@ -250,6 +251,15 @@
             <label class="mini">右手 <input type="checkbox" id="stMuteR"></label>
             <label class="mini">左手 <input type="checkbox" id="stMuteL"></label>
             <label class="mini">BPM <input type="number" id="stBpm" class="bpmnum" min="40" max="200" value="90" disabled></label>
+            <span class="mini vel-group">
+              量化
+              <select id="stQuantGrid" class="bpmnum" disabled>
+                <option value="1">1/4</option>
+                <option value="0.5" selected>1/8</option>
+                <option value="0.25">1/16</option>
+              </select>
+            </span>
+            <button id="stQuant" class="btn" type="button" disabled>执行</button>
             <button id="stUndo" class="btn" type="button" disabled>撤销</button>
             <button id="stRedo" class="btn" type="button" disabled>重做</button>
           </div>

@@ -545,6 +545,14 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   background: #080605; user-select: none;
 }
 #stRoll { display: block; cursor: crosshair; touch-action: none; }
+/* 力度轨：与卷帘共用同一个像素/拍刻度，横轴天然对齐；播放头 top:0/bottom:0 自动覆盖两条轨 */
+#stVel {
+  display: block; cursor: ns-resize; touch-action: none;
+  background: #0d0a08;
+  border-top: 1px solid var(--line);
+}
+.vel-group { gap: 5px; }
+.vel-group .bpmnum { width: 62px; padding: 3px 6px; }
 .playhead {
   position: absolute; top: 0; bottom: 0; width: 2px;
   background: var(--brass-hi); box-shadow: 0 0 10px rgba(216, 171, 92, 0.8);
