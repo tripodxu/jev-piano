@@ -14,13 +14,14 @@ jev-piano 是一个**零框架、零构建、零运行时依赖**的纯静态前
 核心架构模式（**不可动摇**）：**模型只做选择，代码只做渲染**——Jev 永远在代码生成的有限候选集里挑选，非法和声/非法着法不可表示。完整架构见 README「架构」一节与 [docs/adr/0001](docs/adr/0001-model-chooses-code-writes.md)。
 
 ```text
-public/js/music.js     乐理内核（候选集的来源）
-public/js/composer.js  决策器（候选集构造 + 6 问 + 渲染内核）
-public/js/jev.js       Jev 客户端（4 渠道 + fixture 同构兜底）
-public/js/player.js    lookahead 调度器（提前 2 小节决策）
-public/js/audio.js     合成钢琴
+public/js/music.js       乐理内核（候选集的来源：罗马数字/声位/音阶/曲风）
+public/js/candidates.js  候选集构造（给模型的可选域 + 两条反重复断路器）
+public/js/composer.js    决策器（六问 + 渲染内核 + 动机记忆）
+public/js/jev.js         Jev 客户端（4 渠道 + fixture 同构兜底）
+public/js/player.js      lookahead 调度器（提前 2 小节决策）
+public/js/audio.js       合成钢琴
 public/js/ui.js/main.js/studio.js  三个界面层
-src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
+src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 ```
 
 ---
@@ -29,7 +30,7 @@ src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
 
 | 你的任务 | 必读 | 按需 |
 |---|---|---|
-| 改乐理/曲风/和弦候选 | `public/js/music.js`、`test/theory.test.mjs`、`docs/CONTEXT.md` §和声 | 对应风格预设段 |
+| 改乐理/曲风/和弦候选 | `public/js/music.js`、`public/js/candidates.js`、`test/theory.test.mjs`、`test/candidates.test.mjs` | `docs/CONTEXT.md` §和声 |
 | 改决策器/渲染内核 | `public/js/composer.js`、`test/composer.test.mjs`、`docs/adr/0003` | `docs/superpowers/plans/2026-09-28-jev-piano-mvp.md` §三 |
 | 改 Jev 客户端/渠道 | `public/js/jev.js`、`test/jev.test.mjs`、`src/worker.js` | `docs/research/jevthoven-调研.md` |
 | 改实时播放/调度 | `public/js/player.js`、`test/player.test.mjs` | — |
@@ -37,7 +38,7 @@ src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
 | 改实时界面 | `public/js/ui.js`、`public/js/main.js`、`public/index.html` | `public/styles.css` |
 | 改工作室界面 | `public/js/studio.js`、`test/studio.test.mjs` | `docs/memory/2026-09-28-studio-view.md` |
 | 改 Worker/部署 | `src/worker.js`、`wrangler.toml`、`.dev.vars.example` | README「部署」 |
-| 修重复/听感问题 | `docs/memory/2026-09-28-anti-repetition-overhaul.md`、`scripts/analyze-repetition.mjs` | `composer.js` 渲染内核 |
+| 修重复/听感问题 | `public/js/candidates.js`、`scripts/analyze-repetition.mjs`、`docs/memory/2026-09-28-anti-repetition-overhaul.md` | `composer.js` 渲染内核 |
 | 纯文档任务 | 本文件 + `README.md` + `MEMORY.md` | — |
 
 > **经验法则：一个任务动 1–3 个源文件 + 对应测试，就够了。** 动第三个以上文件时，回读本表确认没有漏掉契约方。
@@ -51,8 +52,9 @@ src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
 | 文件 | 行数 | 职责 | 修改高危区 |
 |---|---|---|---|
 | `music.js` | 278 | 罗马数字解析、和弦声位、音阶、8 种曲风预设、关键词计划 | `STYLES` 完整性被 `theory.test.mjs` 全量断言，改预设必跑测试 |
+| `candidates.js` | 171 | **候选集构造**（= 给模型的可选域）：`detectLoop` 循环锁死检测、`chordCandidates` 两条断路器（根音疲劳 / 循环锁死）、`lhCandidates`/`rhythmCandidates`/`contourWeights`/`intensityTarget` | 兜底判据是「候选够用 ≥3」不是「非空」；两条断路器的取舍顺序（先放疲劳、留锁死）不可调换 |
 | `jev.js` | 211 | 四渠道客户端（fixture/typesafe/openrouter/proxy）、归一化、429/529 退避重试、fixture 采样、LLM 扩写 | `stripPrivate`：发送前剥离 `_` 前缀字段 |
-| `composer.js` | 769 | **核心**：`buildPlan`、`Composer.nextBar()`（候选集 + 6 问 + 音符渲染 + 反重复六层机制） | 候选集权重、指纹护栏、根音疲劳断路器 |
+| `composer.js` | 616 | **核心**：`buildPlan`、`Composer.nextBar()`（六问 + 音符渲染 + 反重复五层机制）、动机记忆、决策归因字段 `loopLocked`/`rejected` | 候选集**不在**本文件（已拆到 `candidates.js`）；指纹护栏、跳进、音区漂移 |
 | `audio.js` | 133 | 合成钢琴（三角波+泛音+包络+低通+生成式混响）、录音 | `envFor` 纯函数有单测 |
 | `player.js` | 116 | lookahead 调度器（提前 2 小节），`now/setIntervalFn` 可注入 | 时钟注入契约被测试锁定 |
 | `midi.js` | 56 | SMF Type-1 双轨导出 | 字节格式有单测 |
@@ -68,9 +70,9 @@ src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
 | 路径 | 职责 |
 |---|---|
 | `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
-| `test/*.test.mjs` | `node --test`，共 47 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
+| `test/*.test.mjs` | `node --test`，共 55 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
 | `scripts/probe-jev.mjs` `scripts/probe-bar.mjs` | 真实 API 冒烟（需 key，计费） |
-| `scripts/analyze-repetition.mjs` | 重复度量化分析（`node scripts/analyze-repetition.mjs 32 <seed> random [--real]`） |
+| `scripts/analyze-repetition.mjs` | 重复度量化分析（`node scripts/analyze-repetition.mjs 32 <seed> random [--real]`）。**单种子噪声大，结论至少取 12 个种子求均值** |
 | `dev-proxy.py` | 本地开发：静态服务 + mock/真实转发（stdlib only） |
 | `docs/superpowers/plans/` | 原始 MVP 实施计划（设计契约的详细出处） |
 
@@ -91,7 +93,7 @@ src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
 2. 读 MEMORY.md 顶部 3 条 + 任务相关 memory 条目（最新在最上，先看有没有人踩过坑）
 3. 实现：先改/加测试，再改实现（本项目测试驱动传统，见 docs/adr/0004）
 4. 验证关卡（全部通过才算完成）：
-   a. npm test                        全绿（47 个，只增不减）
+   a. npm test                        全绿（55 个，只增不减）
    b. node --check 改动的新 .js        语法
    c. 涉及真实 API 的：scripts/probe-*.mjs 冒烟（可选，计费）
    d. 涉及听感/反重复的：analyze-repetition.mjs 对比指标不退化
@@ -158,9 +160,9 @@ src/worker.js          生产 Worker（静态资产 + /api/probe|jev|llm）
 ## 6. 常用命令
 
 ```bash
-npm test                                  # 47 个单测（node --test）
+npm test                                  # 55 个单测（node --test）
 python dev-proxy.py --port 8000           # 本地开发（或 npm run dev）→ http://127.0.0.1:8000
-node scripts/analyze-repetition.mjs 32 2026 random   # 重复度指标
+node scripts/analyze-repetition.mjs 32 2026 random   # 重复度指标（结论至少 12 种子求均值）
 node scripts/probe-jev.mjs                # 真实 API 冒烟（需 TYPESAFE_API_KEY）
 npx wrangler deploy                       # 部署（或 npm run deploy）
 ```

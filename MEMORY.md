@@ -7,6 +7,22 @@
 
 ---
 
+## [完成] 2026-09-28 · 循环锁死断路器接线（迭代轮次 1 · 优化）
+
+- **做了什么**（详见 [docs/memory/2026-09-28-loop-lock-breaker.md](docs/memory/2026-09-28-loop-lock-breaker.md)，计划 [docs/superpowers/plans/2026-09-28-loop-lock-breaker.md](docs/superpowers/plans/2026-09-28-loop-lock-breaker.md)）：发现 `chordCandidates` 的 `recentRoots` 是**死参数**——JSDoc 承诺的「循环锁死剔除」从未实现，`detectLoop().members` 全仓零消费者。已接线（与根音疲劳组成两条断路器，取舍顺序：先放疲劳、留锁死）；顺手修掉兜底判据 `!out.length` 应为 `out.length < 3` 的既有 bug（断路器很凶时只返回 1 个候选）；抽出 `public/js/candidates.js`（171 行），composer.js 769→**616**；加决策归因字段 `loopLocked`/`rejected`（ADR-0003 后果条款）。测试 47→**55**。
+- **为什么**：MEMORY 里挂着的「真实 Jev unique_chords=6」阻塞项，根因不是参数没调好，而是机制没写。接口、JSDoc、调用方、测试全都齐备，只有实现不在。
+- **坑**：① 兜底判据写成"非空"而不是"够用 ≥3"，替换和弦侥幸存活 1 个时会跳过全部兜底；② 测疲劳衰减必须用**未锁死**的 recentRoots，否则断言的其实是锁死断路器；③ 4 个种子的指标差异全是噪声，要 12 个种子才看得出趋势。
+- **验证**：npm test 55/55；TDD 红绿实跑（禁用 respectLoop → 3 条锁死测试立即失败）；fixture 12 种子 A/B 基本无变化（锁死在 fixture 渠道很少触发）；**真实 Jev A/B：开头 7 小节的 `Cm Fm G Cm Fm G Cm` 字面循环（两种子完全相同）被从第 7 小节打断，左手唯一小节 23/26 → 30/29**。计费约 $0.006。
+- **关键发现**：`unique_chords` 停在 6-7 是**曲风词汇上限**（romantic 小调进行池只有 6 个根音），不是断路器失效。要继续提这个数该动 `STYLES` 进行池，不是断路器参数。
+- **下一步**（迭代轮次 2 · 创意）：把 `loopLocked`/`rejected` 做成前端可见的"断路器指示"；并考虑用扩进行池词汇量的方式真正解开 `unique_chords`。
+
+## [已解锁] 2026-09-28 · 真实 Jev 重复度基线（由上一条接线任务结清）
+
+- **原目标**：建立真实 Jev 渠道重复度基线并加固到 unique_chords ≥ 8。
+- **结论**：**部分结清**。循环锁死断路器接线后，真实渠道开头的 `Cm-Fm-G` 字面三和弦循环被打断（见上条），但 `unique_chords` 仍是 6-7——因为 romantic 小调的合法和弦词汇上限就那么大，继续调断路器参数不会有收益。
+- **剩余待办**：若要真正把 `unique_chords` 抬到 8+，需扩 `STYLES[*].progs` 的根音词汇量（属"创意/和声"类改动，需注意 `theory.test.mjs` 对 `STYLES` 的全量断言）。
+- **已知坑**：fixture 口径达标 ≠ 真实渠道达标，两者同构的是候选集与权重，但真实模型选择分布更集中；且**真实渠道非确定性**，同 seed 两次跑结果不同，单次 A/B 只能当定性证据。
+
 ## [完成] 2026-09-28 · 仓库规范加固批次（9 任务，docs:agent-system 之后）
 
 - **做了什么**：按 docs/superpowers/plans/2026-09-28-repo-hardening.md 完成 9 任务——文档一致性（AGENTS.md 行数统一总行数口径、MEMORY 错别字、MVP 计划归档横幅）；仓库规范（LICENSE、engines>=18、CI workflow）；代码小修（studio autosave 失败 toast，TDD 47 测试；composer 死导出/未用 import 清理）；真实 Jev 重复度基线（熔断，见下条阻塞条目）。
@@ -15,14 +31,9 @@
 - **验证**：npm test 47/47；node --check 全过；CI（push 后 GitHub Actions 实测，结果见 Task 9 Step 5）；git 历史 9+ commit 按序。
 - **下一步**：① 阻塞条目——真实渠道和弦多样性加固（调根音疲劳参数，需先排除抽样波动）；② composer.js 769 行逼近 ADR-0004 自设 800 行上限，按计划 §A 独立拆分；③ P3：PR/issue 模板、dev-proxy 测试。
 
-## [阻塞] 2026-09-28 · 真实 Jev 重复度基线：和弦多样性未达标（已熔断，待加固）
+## [已解锁·被上条取代] 2026-09-28 · 真实 Jev 重复度基线：和弦多样性未达标（历史阻塞记录）
 
-- **目标**：`node scripts/analyze-repetition.mjs 32 2026 random --real` 建立真实 Jev 渠道重复度基线并记入 README 反重复表。
-- **进度**：已实跑（~$0.002，typesafe(jev-1.13) 真实渠道）。**触发熔断**：unique_chords=6 < 8 且前 8 小节字面 Cm-Fm-G 三和弦循环；interval_entropy=1.41 亦低于 fixture 下限 2.4。合格项：相邻字面重复 0、左手唯一 27/32、跳进 10%、旋律唯一 30/32。README 未改、工作树干净。
-- **下一步（接力）**：先排除抽样波动（可再跑 seed 2027，~$0.002，需 owner 批准）；若确认系统性偏差，开新任务调候选集/权重——方向：真实渠道加强根音疲劳（阈值 2.0/衰减 0.93 是为 fixture 分布调的）或进一步压缩模型可复选空间。验收：真实渠道 unique_chords ≥ 8 且相邻重复 = 0，然后补 README 真实渠道行与本条目的完成态。
-- **已知坑**：fixture 口径达标 ≠ 真实渠道达标——两者同构的是候选集与权重，但真实模型选择分布更集中；反重复大修（a085f4f）宣称的 "real-Jev verified" 仅是 probe-bar 3 小节冒烟，未做 32 小节量化，这是本次才发现 gap 的根因。
-- **验收**：README 反重复表追加真实渠道行 + 记忆条目转完成态。
-- **领地**：README.md、docs/memory/2026-09-28-real-jev-repetition-baseline.md、MEMORY.md（纯文档，未动代码）。
+- **已被上一条「循环锁死断路器接线」结清并改写**，此处仅保留历史原文，不再作为接力依据。
 
 ## [完成] 2026-09-28 · 文档与多 agent 记忆体系建立
 
@@ -73,7 +84,9 @@
 
 | 状态 | 任务 | 领地 | 验收 |
 |---|---|---|---|
-| 待办 | 和弦显示升/降号美化（C minor 的 Ab 现显示 G#） | `composer.js`/`music.js` + 测试 | 测试全绿 + 试听无回归 |
+| 待办 | **扩 `STYLES[*].progs` 根音词汇量**：这是 `unique_chords` 停在 6-7 的真因（曲风词汇上限），非断路器问题 | `music.js` + `test/theory.test.mjs` | 测试全绿 + 12 种子 `unique_chords` ≥ 8 |
+| 待办 | 前端把 `decision.loopLocked` / `rejected` 做成可见的「断路器指示」 | `ui.js` / `index.html` / `styles.css` | 手工冒烟 + 测试全绿 |
+| 待办 | 和弦显示升/降号美化（C minor 的 Ab 现显示 G#） | `music.js` `chordLabel` + 测试 | 测试全绿 + 试听无回归 |
 | 待办 | 音质升级评估：@tonejs/piano 采样（数 MB，违背轻量，需 ADR） | — | ADR 结论 |
 | 待办 | 钢琴卷帘量化与力度编辑 | `studio.js` + `test/studio.test.mjs` | 测试全绿 |
 

@@ -1,7 +1,7 @@
 // composer.test.mjs — 决策器：确定性、音域、终止式、呼吸、buildPlan、fixture 兜底
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPlan, Composer, detectLoop, chordCandidates } from '../public/js/composer.js';
+import { buildPlan, Composer } from '../public/js/composer.js';
 import { chordPcs, STYLE_BY_ID, STYLES } from '../public/js/music.js';
 
 async function makeComposer(overrides = {}, cfg = { channel: 'fixture' }) {
@@ -146,24 +146,15 @@ test('强度曲线：rise 弧线的强度随进度上升（多种子相关性）
   assert.ok(corr > 0.05, `rise 弧线强度应随进度上升: cov=${corr.toFixed(3)} (${n} 小节)`);
 });
 
-test('detectLoop: 按根音检测，members 为数字（防字符串 Set 回归）', () => {
-  const r = detectLoop([0, 5, 7, 0, 5, 7]);
-  assert.equal(r.locked, true);
-  for (const m of r.members) assert.equal(typeof m, 'number', 'members 必须是数字');
-  assert.ok(r.members.has(0) && r.members.has(5) && r.members.has(7));
-  assert.equal(detectLoop([0, 5, 7, 3]).locked, false, '不足窗口不锁');
-  assert.equal(detectLoop([0, 5, 7, 3, 8, 10]).locked, false, '根音丰富不锁');
-});
-
-test('chordCandidates: 疲劳根音被剔除、替换和弦入场，且不会剔空', () => {
-  const plan = { mode: 'minor', meterNum: 4, barsPerPhrase: 8, density: 0.5, totalBars: 32 };
-  const style = STYLE_BY_ID.romantic;
-  const fatigue = { 0: 3, 5: 3, 7: 3 };
-  const cands = chordCandidates(style, plan, 'i', 3, false, null, [0, 5, 7, 0, 5, 7], fatigue);
-  for (const c of cands) assert.ok(![0, 5, 7].includes(c.rootPc), `疲劳根音 ${c.rootPc} 不应出现在候选`);
-  assert.ok(cands.length >= 3, '剔除后仍有候选');
-  // 疲劳衰减后重新可用
-  const decayed = chordCandidates(style, plan, 'i', 3, false, null, [0, 5, 7, 0, 5, 7], { 0: 0.5, 5: 0.4, 7: 0.3 });
-  assert.ok(decayed.some((c) => c.rootPc === 0), '疲劳衰减后主和弦应回归候选');
+test('决策元信息可归因：loopLocked / rejected 字段存在且 rejected=false（fixture 从不越界）', async () => {
+  const { composer } = await makeComposer({ styleId: 'romantic', seed: 2027 });
+  let sawLock = false;
+  for (let i = 0; i < 32; i++) {
+    const bar = await composer.nextBar();
+    assert.equal(typeof bar.decision.loopLocked, 'boolean', '缺 loopLocked 归因字段');
+    assert.equal(bar.decision.rejected, false, 'fixture 采样恒在候选集内，不应触发回落');
+    if (bar.decision.loopLocked) sawLock = true;
+  }
+  assert.ok(sawLock, '32 小节内应至少有一次循环锁死被记录（否则断路器形同虚设）');
 });
 
