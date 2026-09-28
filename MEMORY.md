@@ -7,6 +7,16 @@
 
 ---
 
+## [完成] 2026-09-28 · 动机发展真正落地（迭代轮次 11 · 创意）
+
+- **做了什么**（详见 [docs/memory/2026-09-28-motif-development.md](docs/memory/2026-09-28-motif-development.md)，计划 [docs/superpowers/plans/2026-09-28-motif-development.md](docs/superpowers/plans/2026-09-28-motif-development.md)）：README 承诺的「动机统一」此前**在渲染层从未实现**——`repeat`（承袭）走的是 `renderMelody`，与「新句」完全同一条路径。现���动机保存旋律素材（`midis`+`onsets`），新增 `buildFromMotif`，五种发展手法各走各的素材来源；`state.motif` 改为向模型描述动机本身。测试 104→**105**。
+- **为什么**：实测承袭小节与动机的**平均音程差 3.76 半音**（约小三度，轮廓毫无关系）、音程完全一致仅 **2.9%**——「承袭」根本没在承袭。根因是一行：`usePrev = ... && (dev === 'sequence' || dev === 'inversion')`，`repeat` 不在其中；且 `this.motif` 只存了节奏、**没有旋律素材**。这是第 1 轮「死参数」那一类缺陷的放大版。
+- **关键设计判断（素材来源分工）**：我第一版把四种手法**全部**改到动机上，隔离实验证明这是过度实现——旋律种类数 23.67 vs 26.92。最终分工：`repeat` 用**动机**（承载主题身份）；`sequence`/`inversion`/`ornament` 用**上一小节**（字面意思就是「对刚才那句」；作曲里的装饰也是装饰当前乐句）。
+- **坑**：① 我把累加器写成数组，`acc[0]` 从未赋值 → `RH NaN`（原 `buildFromPrev` 用的是标量）；② 测试判据错了两次——用「音程完全一致」但和弦锚定本就会改音程；用 4 颗种子的小样本均值被离群小节带偏，而 12 种子聚合完全正常。**群体性质不该由单颗种子决定。**
+- **验证**：npm test 105/105；TDD 红绿实跑（改前承袭 8 次只有 1 次像动机）；**动机相似度：平均音程差 3.76→0.87 半音（−77%）、轮廓接近 60.6%**；决策指标 chords 9.25 / entropy 2.45 / lh 27.83 / melody 30.17 / madj 0 / ladj 0（两个硬门全过）。
+- **取舍**：`melody_unique` 从 ~32 降到 30.17 是可接受代价——主题真的会回来，48 小节里 15% 的重复是主题的定义；相邻重复仍为 0，指纹护栏没被绕过。
+- **下一步**（迭代轮次 12 · 前端）：待定。
+
 ## [完成] 2026-09-28 · 段落边界的和声与动机语义（迭代轮次 10 · 优化）
 
 - **做了什么**（详见 [docs/memory/2026-09-28-section-semantics.md](docs/memory/2026-09-28-section-semantics.md)，计划 [docs/superpowers/plans/2026-09-28-section-semantics.md](docs/superpowers/plans/2026-09-28-section-semantics.md)）：轮次 8 的曲式此前**只约束动态**，对和声与动机毫无影响。现在段落边界有了真正的语义——`developCandidates`（新纯函数，从 composer 提取）让段落首 `repeat += 1.6` / `new *= 0.3`（新段落是「重述主题」不是「另起新句」）；`chordCandidates` 加 `opts` 使段落首主和弦 +1.0、段落末 V/I +0.8；`state` 暴露 `position.section` / `is_section_start` / `is_section_end` 与整份 `state.form`（模型需看到 A→B→A' 全貌才谈得上呼应）。测试 99→**104**。

@@ -238,6 +238,11 @@ function mutateMelody(rh, { scale, rng, avoid = [], post = (x) => x }) {
   return rh.length > 1 ? post(rh.slice(0, -1)) : post(rh);
 }
 
+/** 音高序列 → 相邻音程序列（给模型看的动机描述） */
+function melodyIntervals(midis) {
+  return midis.map((m, k, a) => (k ? m - a[k - 1] : 0)).slice(1);
+}
+
 /** 模进/倒影：以上一小节旋律素材为本，重锚定到当前和弦（jevthoven 的 motif development） */
 function buildFromPrev(prev, { dir, invert, chord, scale, meterNum, intensity, isPhraseEnd, rng }) {
   const chordPool = chordMidis(chord.rootPc, chord.shape, 58, 86);
@@ -261,6 +266,40 @@ function buildFromPrev(prev, { dir, invert, chord, scale, meterNum, intensity, i
     n.durBeats = d;
   });
   return notes;
+}
+
+/**
+ * 从**动机素材**出发构建旋律（承袭/模进/倒影/装饰都走这里）。
+ * 关键区别：素材是「整首曲子的动机」而不是「上一小节」——模进与倒影作用于动机才有意义。
+ *  transpose: 整体移调（音级数，正=上移）；invert: 音程取反；ornament: 加经过音。
+ *  强拍与末音仍锚定到当前和弦——「同一想法，新的和声」正是这样成立的。
+ */
+function buildFromMotif(motif, { chord, scale, meterNum, intensity, isPhraseEnd, rng, transpose = 0, invert = false, ornament = false }) {
+  const midis = motif?.midis ?? [];
+  if (!midis.length) return null;
+  const steps = meterNum * 4;
+  const onsets = motif.onsets?.length === midis.length
+    ? motif.onsets
+    : midis.map((_, i) => Math.round((i * steps) / midis.length));
+  const pool = chordMidis(chord.rootPc, chord.shape, 58, 86);
+  const sgn = invert ? -1 : 1;
+  let start = midis[0];
+  for (let i = 0; i < Math.abs(transpose); i++) start = scaleNext(start, Math.sign(transpose), scale);
+  let acc = 0;                       // 标量累加器：逐音级累积相对起点的位移
+  const notes = midis.map((m, k) => {
+    if (k > 0) acc += (m - midis[k - 1]) * sgn;
+    let midi = clamp(start + acc, 60, 84);
+    // 强拍锚到和弦音，但**本来就在和弦里的音不动**——没必要为了"合规"改掉动机的轮廓
+    if ((onsets[k] % 4 === 0 || k === midis.length - 1) && !pool.includes(midi)) midi = nearest(midi, pool);
+    return { midi, startBeats: onsets[k], durBeats: 0, vel: velFor(Math.round(onsets[k] * 4), intensity, rng), hand: 'R' };
+  });
+  notes.forEach((n, k) => {
+    const nextO = k < notes.length - 1 ? onsets[k + 1] : steps;
+    let d = ((nextO - onsets[k]) / 4) * 0.9;
+    if (k === notes.length - 1 && isPhraseEnd) d *= 2;
+    n.durBeats = d;
+  });
+  return ornament ? insertPassing(notes, scale, rng) : notes;
 }
 
 /** 节奏变奏：在基础音型上位移/补弱位/删音，每小节现场变化（jevthoven 的 complete-bar candidates） */
@@ -556,7 +595,9 @@ export class Composer {
         dev: this.developHistory.at(-1) ?? null,
       } : null,
       intensity_so_far: Number(this.intensitySoFar.toFixed(2)),
-      motif: this.motif ? `phrase-1 motif: rhythm ${this.motif.rhythmId}, contour ${this.motif.contourId} (reuse or vary it)` : 'the first phrase is being born',
+      motif: this.motif?.midis?.length
+        ? `piece motif: ${this.motif.midis.length} notes, intervals [${melodyIntervals(this.motif.midis).join(',')}], rhythm ${this.motif.rhythmId}, contour ${this.motif.contourId} (reuse "repeat"/"sequence"/"inversion"/"ornament" to develop it, or "new" to start fresh)`
+        : 'the piece motif is being born',
       recent_developments: this.developHistory.slice(-3),
       director_note: this.directorNote || undefined,
       user_prompt: plan.prompt,
@@ -607,7 +648,7 @@ export class Composer {
       },
       develop: {
         type: 'choice',
-        instructions: `You are shaping melodic variety. \`last_bar.melody\` describes what was just played; a literal repeat of it would be boring. Choose how the NEXT bar's melody develops.${honorNote} Answer ONLY with the Choice question "develop".`,
+        instructions: `You are shaping melodic variety. \`motif\` describes the piece's opening idea; \`last_bar.melody\` is what was just played. Choose how the NEXT bar relates to the motif: "repeat" restates it in the new harmony, "sequence" transposes it a step, "inversion" mirrors it, "ornament" adds passing tones, "new" starts a fresh idea (the only one that ignores the motif).${honorNote} Answer ONLY with the Choice question "develop".`,
         criteria: { ...DEVELOP_OPS },
         _fixture: { weights: devW },
       },
@@ -657,12 +698,23 @@ export class Composer {
     const chordPool = chordMidis(chord.rootPc, chord.shape, 58, 86);
     const startHint = pos.barInPhrase === 0 ? nearest(this.pitchCenter, chordPool) : this.lastEndMidi;
     const varied = varyPattern(rhythmEntry.pat, this.rng, plan.meterNum);
-    const usePrev = !breathe && !!this.prevMelody && (dev === 'sequence' || dev === 'inversion');
-
-    let rh = usePrev
-      ? buildFromPrev(this.prevMelody, { dir: dev === 'sequence' ? (this.rng() < 0.5 ? 1 : -1) : 0, invert: dev === 'inversion', chord, scale, meterNum: plan.meterNum, intensity, isPhraseEnd: pos.isPhraseEnd, rng: this.rng })
-      : renderMelody({ plan, chord, contourId: contour, pattern: varied, breathe, intensity, isPhraseEnd: pos.isPhraseEnd, startHint, rng: this.rng });
-    if (!usePrev && dev === 'ornament') rh = insertPassing(rh, scale, this.rng);
+    const fresh = () => renderMelody({ plan, chord, contourId: contour, pattern: varied, breathe, intensity, isPhraseEnd: pos.isPhraseEnd, startHint, rng: this.rng });
+    // 发展手法的素材来源是有分工的（隔离实验：全部作用于动机会让 32 小节的旋律种类数从 ~32 掉到 23.7）：
+    //  repeat（承袭）必须作用在**动机**上——它承载主题身份；此前它走的是 renderMelody（与 new 同一条路），等于什么都没承袭。
+    //  sequence（模进）/ inversion（倒影）字面意思就是「对**刚才那句**做模进/倒影」，作用在 prevMelody 上。
+    //  ornament（装饰）同理：作曲里的装饰是装饰**当前乐句**（颤音、邻音围绕），不是把整首主题装饰一遍。
+    const motifReady = !breathe && !!this.motif?.midis?.length;
+    const usePrev = !breathe && !!this.prevMelody && (dev === 'sequence' || dev === 'inversion' || dev === 'ornament');
+    let rh = null;
+    if (motifReady && dev === 'repeat') {
+      rh = buildFromMotif(this.motif, {
+        chord, scale, meterNum: plan.meterNum, intensity, isPhraseEnd: pos.isPhraseEnd, rng: this.rng,
+      });
+    } else if (usePrev) {
+      rh = buildFromPrev(this.prevMelody, { dir: dev === 'sequence' ? (this.rng() < 0.5 ? 1 : -1) : 0, invert: dev === 'inversion', chord, scale, meterNum: plan.meterNum, intensity, isPhraseEnd: pos.isPhraseEnd, rng: this.rng });
+      if (dev === 'ornament') rh = insertPassing(rh, scale, this.rng);
+    }
+    if (!rh || !rh.length) rh = fresh();
 
     // 反重复护栏 + 乐句尾锚定。post 交给护栏内部执行：护栏在「锚定之后」的最终形态上判定碰撞，
     // 锚定不再发生在护栏之外——否则会「逃出去又被锚定改回撞车」（词句尾相邻重复的真实根因）。
@@ -694,7 +746,13 @@ export class Composer {
     this.intensitySoFar = this.intensitySoFar * 0.7 + intensity * 0.3;
     this.currentChord = chord;
 
-    if (!this.motif && pos.bar === 1) this.motif = { rhythmId: ans.rhythm?.value ?? 'r0', contourId: contour, pattern: rhythmEntry.pat };
+    if (!this.motif && pos.bar === 1) {
+      this.motif = {
+        rhythmId: ans.rhythm?.value ?? 'r0', contourId: contour, pattern: rhythmEntry.pat,
+        midis: rh.map((n) => n.midi),        // 旋律素材：承袭/模进/倒影/装饰的原料
+        onsets: rh.map((n) => n.startBeats), // 节奏素材
+      };
+    }
 
     const bar = {
       index: pos.bar, loop: pos.loop,
@@ -719,3 +777,5 @@ export class Composer {
     return bar;
   }
 }
+
+
