@@ -1,7 +1,9 @@
 // main.js — 接线：事件、设置(localStorage)、渠道探测、开始/停止/导出。
 import { buildPlan, Composer } from './composer.js';
 import { Player } from './player.js';
-import { PianoAudio } from './audio.js';
+import { getAudio } from './audio.js';
+import { loadSettings, saveSettings as persistSettings } from './settings.js';
+import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
 import { renderKeyboard, Fall, addDecision, renderPlan, setStatus, toast } from './ui.js';
@@ -16,20 +18,15 @@ const els = {
   fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), decisionLog: $('decisionLog'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
   settingsBtn: $('settingsBtn'), settingsDrawer: $('settingsDrawer'), settingsClose: $('settingsClose'),
+  tabLive: $('tabLive'), tabStudio: $('tabStudio'), viewLive: $('viewLive'), viewStudio: $('viewStudio'),
   channelSel: $('channelSel'), typesafeKey: $('typesafeKey'), openrouterKey: $('openrouterKey'), testJevBtn: $('testJevBtn'),
   llmEnabled: $('llmEnabled'), llmBaseUrl: $('llmBaseUrl'), llmModel: $('llmModel'), llmKey: $('llmKey'), llmProxy: $('llmProxy'), testLlmBtn: $('testLlmBtn'),
   toast: $('toast'),
 };
 
 /* ---------------- 设置持久化 ---------------- */
-const STORE_KEY = 'jevpiano.settings.v1';
-const DEFAULTS = {
-  channel: 'fixture', typesafeKey: '', openrouterKey: '',
-  llmEnabled: false, llmBaseUrl: 'https://api.openai.com/v1', llmModel: '', llmKey: '', llmProxy: false,
-  styleId: 'random', keySel: 'auto', touched: false,
-};
-let settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}') };
-const saveSettings = () => localStorage.setItem(STORE_KEY, JSON.stringify(settings));
+let settings = loadSettings();
+const saveSettings = () => persistSettings(settings);
 
 const CHANNEL_LABEL = { fixture: '离线随机', proxy: '同源代理', typesafe: 'TypeSafe', openrouter: 'OpenRouter' };
 const stats = { tokens: 0, usd: 0, latencySum: 0, latencyN: 0 };
@@ -78,7 +75,7 @@ els.bpmAuto.addEventListener('change', () => {
 els.bpmRange.addEventListener('input', () => { if (!els.bpmAuto.checked) els.bpmVal.textContent = `${els.bpmRange.value}`; });
 
 /* ---------------- 音频与可视化 ---------------- */
-const audio = new PianoAudio();
+const audio = getAudio();
 const kb = renderKeyboard(els.keyboard);
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);
 
@@ -233,6 +230,21 @@ els.testLlmBtn.addEventListener('click', async () => {
   });
   toast(els.toast, out ? `LLM 连通 ✓ 返回了字段：${Object.keys(out).join(', ')}` : 'LLM 未连通：请检查 Base URL / 模型 / Key');
 });
+
+/* ---------------- 视图切换 ---------------- */
+function showView(v) {
+  // .view 基类 display:none，.active 才显示；hidden 只是保险
+  els.viewLive.classList.toggle('active', v === 'live');
+  els.viewStudio.classList.toggle('active', v === 'studio');
+  els.viewLive.classList.toggle('hidden', v !== 'live');
+  els.viewStudio.classList.toggle('hidden', v !== 'studio');
+  els.tabLive.classList.toggle('sel', v === 'live');
+  els.tabStudio.classList.toggle('sel', v === 'studio');
+  if (v === 'studio') { stopAll(); ensureStudio(); }
+  else stopStudio();
+}
+els.tabLive.addEventListener('click', () => showView('live'));
+els.tabStudio.addEventListener('click', () => showView('studio'));
 
 /* ---------------- 启动 ---------------- */
 window.__jevDebug = () => ({

@@ -124,3 +124,10 @@ export class PianoAudio {
     return { stop: () => { this.recorder?.stop(); return done; } };
   }
 }
+
+/** 共享单例：实时即兴与工作室两个界面共用同一个 AudioContext */
+let _shared = null;
+export function getAudio() {
+  if (!_shared) _shared = new PianoAudio();
+  return _shared;
+}

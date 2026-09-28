@@ -64,7 +64,7 @@ Worker 安全边界：`/api/llm` 只转发服务端 env 配置的端点（忽略
 ## 测试
 
 ```bash
-npm test          # 36 个单测：乐理内核 / Jev 客户端 / 决策器 / 调度器 / SMF 导出
+npm test          # 44 个单测：乐理内核 / Jev 客户端 / 决策器 / 调度器 / SMF 导出
 node scripts/probe-jev.mjs   # 真实 API 冒烟（需 TYPESAFE_API_KEY，单次 ~$0.00002）
 node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 ```
@@ -84,6 +84,16 @@ src/worker.js      CF Worker：静态资产 + /api/probe|jev|llm
 dev-proxy.py       本地开发：静态服务 + 模拟/真实转发
 docs/superpowers/plans/   实施计划（本项目的完整设计文档）
 ```
+
+## 两个界面
+
+- **实时即兴**（默认）：边决策边演奏，不可预知，见下文全部说明。
+- **工作室**（顶栏切换）：jevthoven 式"生成 → 编辑"工作流——输入灵感批量生成整曲（每小节仍由 Jev 逐小节决策，带进度条与取消，生成中即可预览已完成小节），然后在**钢琴卷帘**里编辑：
+  - 点空白新增音 / 拖动移动 / 拖右缘改时长 / 双击删除 / Ctrl+Z·Ctrl+Y 撤销重做——全部**确定性编辑，不调用模型**（jevthoven 的 deterministic edits）
+  - 回放支持循环、左右手分轨静音、BPM 调整、播放头跟随滚动
+  - **让 Jev 修改**：自然语言（"左手更密集""整体轻一点"）由 Jev 从有限的确定性编辑命令中选择执行（加密/稀疏/移调/力度），对应 jevthoven 的 revisions routed through Jev；离线渠道用关键词匹配
+  - 导出 MIDI 与项目 JSON，导入经校验（validated JSON import）；工作台自动存 localStorage，重开浏览器可恢复
+  - 换一版 = 同一灵感新 seed 整曲变奏（jevthoven 的 whole-piece variation）
 
 ## 演奏中的控制（jevthoven 功能对齐）
 

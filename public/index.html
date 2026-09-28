@@ -17,6 +17,10 @@
       <span class="brand-cn">即兴钢琴</span>
       <span class="brand-tag">每小节实时决策，边作曲边演奏</span>
     </div>
+    <nav class="tabs" aria-label="视图">
+      <button id="tabLive" class="tab sel" type="button">实时即兴</button>
+      <button id="tabStudio" class="tab" type="button">工作室</button>
+    </nav>
     <div id="statusBar" class="statusbar" title="Jev 渠道 / 累计 tokens / 累计费用 / 平均延迟">
       <span class="pill" id="stChannel">离线随机</span>
       <span class="pill" id="stTokens">0 tok</span>
@@ -29,6 +33,7 @@
   </header>
 
   <main>
+    <div id="viewLive" class="view active">
     <section class="console reveal" style="--d:.05s">
       <div class="field-group">
         <label class="lbl" for="prompt">你的灵感</label>
@@ -156,6 +161,89 @@
         <ul id="decisionLog" class="dlog"></ul>
       </section>
     </section>
+    </div>
+
+    <div id="viewStudio" class="view hidden">
+      <section class="console">
+        <div class="field-group">
+          <label class="lbl" for="stPrompt">灵感</label>
+          <textarea id="stPrompt" rows="3" placeholder="例：午后的咖啡馆，慵懒的摇摆"></textarea>
+        </div>
+        <div class="grid-2">
+          <div class="field-group">
+            <label class="lbl" for="stStyle">风格</label>
+            <select id="stStyle">
+              <option value="random" selected>随机</option>
+              <option value="classical">古典</option>
+              <option value="romantic">浪漫</option>
+              <option value="jazz">爵士</option>
+              <option value="pop">流行</option>
+              <option value="lofi">Lo-Fi</option>
+              <option value="newage">新世纪</option>
+              <option value="waltz">圆舞曲</option>
+              <option value="oriental">东方五声</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="lbl" for="stBars">长度</label>
+            <select id="stBars">
+              <option value="16">16 小节</option>
+              <option value="32" selected>32 小节</option>
+              <option value="64">64 小节</option>
+            </select>
+          </div>
+        </div>
+        <div class="transport">
+          <button id="stCompose" class="btn primary" type="button"><span>生成编曲</span></button>
+          <button id="stCancel" class="btn hidden" type="button">取消</button>
+          <button id="stVariation" class="btn" type="button" disabled>换一版</button>
+          <button id="stNew" class="btn" type="button">新建</button>
+        </div>
+        <div id="stProgressWrap" class="progress hidden">
+          <div id="stProgress" class="progress-bar"></div>
+          <span id="stProgressText" class="progress-text"></span>
+        </div>
+        <div class="field-group">
+          <label class="lbl" for="stRevise">让 Jev 修改 <span class="lbl-sub">自然语言，确定性执行</span></label>
+          <textarea id="stRevise" rows="2" placeholder="例：左手更密集一些，整体轻一点"></textarea>
+        </div>
+        <button id="stReviseBtn" class="btn wfull" type="button" disabled>应用修改</button>
+        <div class="transport">
+          <button id="stMidi" class="btn" type="button" disabled>MIDI</button>
+          <button id="stSaveJson" class="btn" type="button" disabled>存 JSON</button>
+          <button id="stLoadBtn" class="btn" type="button" disabled>载 JSON</button>
+          <input type="file" id="stLoadJson" accept=".json,application/json" class="hidden">
+        </div>
+        <p class="hint">钢琴卷帘：点空白新增音，拖动移动，拖右缘改时长，双击删除，Ctrl+Z 撤销。所有编辑确定性执行、不调用模型；「让 Jev 修改」才会请模型从编辑命令中做选择。</p>
+      </section>
+
+      <section class="right-col">
+        <div class="stage reveal" style="--d:.15s">
+          <div class="chordbox">
+            <div class="now-chord" id="stChord">—</div>
+            <div class="now-bar" id="stInfo" aria-live="polite">先生成一段编曲</div>
+          </div>
+          <div id="stRollWrap" class="rollwrap">
+            <canvas id="stRoll" aria-hidden="true"></canvas>
+            <div id="stPlayhead" class="playhead hidden"></div>
+          </div>
+          <div class="rolltransport">
+            <button id="stPlay" class="btn primary" type="button" disabled><span>播放</span></button>
+            <button id="stLoop" class="btn sel" type="button" disabled>循环</button>
+            <label class="mini">右手 <input type="checkbox" id="stMuteR"></label>
+            <label class="mini">左手 <input type="checkbox" id="stMuteL"></label>
+            <label class="mini">BPM <input type="number" id="stBpm" class="bpmnum" min="40" max="200" value="90" disabled></label>
+            <button id="stUndo" class="btn" type="button" disabled>撤销</button>
+            <button id="stRedo" class="btn" type="button" disabled>重做</button>
+          </div>
+        </div>
+        <div class="piano">
+          <div class="felt"></div>
+          <div id="stKeyboard" class="keyboard" aria-hidden="true"></div>
+          <div class="piano-base"></div>
+        </div>
+      </section>
+    </div>
   </main>
 
   <aside id="settingsDrawer" class="drawer hidden" aria-label="设置">

@@ -1,0 +1,641 @@
+// studio.js — 第二界面「工作室」：jevthoven 式 生成 → 钢琴卷帘编辑 → 自然语言修改 → 导出。
+// 与实时即兴共享同一决策内核（composer/jev）与音频引擎（audio 单例），但工作流不同：
+// 先整曲批量生成（jevthoven 的 compose job，带进度与取消），再做**确定性编辑**（永不调用模型）；
+// 自然语言修改由 Jev 从有限的确定性编辑命令中选择一个执行（jevthoven 的 revisions routed through Jev）。
+import { buildPlan, Composer } from './composer.js';
+import { askJev } from './jev.js';
+import { getAudio } from './audio.js';
+import { exportMidi } from './midi.js';
+import { renderKeyboard, toast } from './ui.js';
+import { loadSettings } from './settings.js';
+import { chordMidis, scaleMidis, nearest, NOTE_NAMES } from './music.js';
+
+const P_LO = 36, P_HI = 95, ROW = 8, HEADER = 16, ZOOM = 24, SNAP = 0.25;
+const STORE_KEY = 'jevpiano.studio.v1';
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const snap = (v) => Math.round(v / SNAP) * SNAP;
+
+/* ==================== 纯函数：确定性编辑变换（可单测，与 DOM 无关） ==================== */
+
+/** 找到某拍所在小节的和弦 */
+export function chordAt(barChords, beat) {
+  let c = null;
+  for (const b of barChords) { if (b.startBeat <= beat + 1e-9) c = b; else break; }
+  return c;
+}
+
+/** 织体加密：先在 ≥1 拍的 onset 缝隙中点插和弦音；若无隙可插（织体已密）则对长音做八度加厚 */
+export function densifyHand(piece, hand, limit = 10) {
+  const list = piece.notes.filter((n) => n.hand === hand).sort((a, b) => a.startBeats - b.startBeats);
+  const scaleP = scaleMidis(piece.plan.keyPc, piece.plan.melodyScale, 40, 92);
+  let added = 0;
+  for (let i = 1; i < list.length && added < limit; i++) {
+    const a = list[i - 1], b = list[i];
+    const gap = b.startBeats - a.startBeats;
+    if (gap < 1) continue;
+    const beat = snap(a.startBeats + gap / 2);
+    const chord = chordAt(piece.barChords, beat);
+    const pool = chord ? chordMidis(chord.rootPc, chord.shape, 40, 92) : scaleP;
+    piece.notes.push({ id: piece.nid++, midi: nearest(a.midi, pool), startBeats: beat, durBeats: Math.min(gap / 2, 1), vel: clamp(a.vel * 0.9, 0.15, 1), hand });
+    added++;
+  }
+  if (added === 0) {
+    // 第二阶段：八度加厚——把长音叠一个高八度短音
+    const chordPoolAt = (beat) => {
+      const chord = chordAt(piece.barChords, beat);
+      return chord ? chordMidis(chord.rootPc, chord.shape, 40, 92) : scaleP;
+    };
+    let doubled = 0;
+    for (const n of list) {
+      if (doubled >= 6) break;
+      if (n.durBeats < 0.5) continue;
+      const oct = nearest(n.midi + 12, chordPoolAt(n.startBeats));
+      if (oct === n.midi || oct > P_HI) continue;
+      piece.notes.push({ id: piece.nid++, midi: oct, startBeats: n.startBeats, durBeats: n.durBeats * 0.5, vel: clamp(n.vel * 0.8, 0.15, 1), hand });
+      doubled++;
+    }
+    added = doubled;
+  }
+  return added;
+}
+
+/** 织体稀疏化：先删非整拍弱位，不够再删非强拍；每小节至少保留一个音 */
+export function sparserHand(piece, hand, limit = 12) {
+  const meter = piece.plan.meterNum;
+  const perBar = new Map();
+  for (const n of piece.notes) if (n.hand === hand) {
+    const bar = Math.floor(n.startBeats / meter);
+    perBar.set(bar, (perBar.get(bar) ?? 0) + 1);
+  }
+  let removed = 0;
+  for (const pass of [0, 1]) {
+    for (let i = piece.notes.length - 1; i >= 0 && removed < limit; i--) {
+      const n = piece.notes[i];
+      if (n.hand !== hand) continue;
+      const weak = pass === 0 ? n.startBeats % 1 !== 0 : n.startBeats % 2 !== 0;
+      if (!weak) continue;
+      const bar = Math.floor(n.startBeats / meter);
+      if ((perBar.get(bar) ?? 0) <= 1) continue;
+      piece.notes.splice(i, 1);
+      perBar.set(bar, perBar.get(bar) - 1);
+      removed++;
+    }
+    if (removed) break;
+  }
+  return removed;
+}
+
+/** 移调：±maxSemi 半音后吸附到调内音 */
+export function transposeNotes(piece, hand, dir, maxSemi = 2) {
+  const scaleP = scaleMidis(piece.plan.keyPc, piece.plan.melodyScale, P_LO, P_HI);
+  for (const n of piece.notes) {
+    if (hand && n.hand !== hand) continue;
+    n.midi = clamp(nearest(n.midi + dir * maxSemi, scaleP), P_LO, P_HI);
+  }
+}
+
+/** 力度缩放 */
+export function scaleVel(piece, hand, factor) {
+  for (const n of piece.notes) {
+    if (hand && n.hand !== hand) continue;
+    n.vel = clamp(n.vel * factor, 0.15, 1);
+  }
+}
+
+/** 自然语言 → 编辑命令（fixture 渠道与真实请求失败的兜底） */
+export function keywordAction(text) {
+  const t = String(text ?? '');
+  if (/左手.*(密|忙|多|busy)/i.test(t)) return 'lh_busier';
+  if (/左手.*(疏|稀|少|简|sparse|less)/i.test(t)) return 'lh_sparser';
+  if (/(右手|旋律).*(密|忙|多|busy)/i.test(t)) return 'rh_busier';
+  if (/(右手|旋律).*(疏|稀|少|简|sparse)/i.test(t)) return 'rh_sparser';
+  if (/升|高|上移|up\b/i.test(t)) return 'transpose_up';
+  if (/降|低|下移|down\b/i.test(t)) return 'transpose_down';
+  if (/轻|弱|渐弱|柔|soft/i.test(t)) return 'soften';
+  if (/亮|强|响|bright/i.test(t)) return 'brighten';
+  return 'none';
+}
+
+export const ACTIONS = {
+  lh_busier: 'densify the left hand', lh_sparser: 'thin the left hand',
+  rh_busier: 'densify the melody', rh_sparser: 'thin the melody',
+  transpose_up: 'transpose up a step', transpose_down: 'transpose down a step',
+  soften: 'soften velocities', brighten: 'brighten velocities', none: 'no change needed',
+};
+export const ACTIONS_ZH = {
+  lh_busier: '左手加密', lh_sparser: '左手稀疏', rh_busier: '旋律加密', rh_sparser: '旋律稀疏',
+  transpose_up: '整体上移', transpose_down: '整体下移', soften: '力度收柔', brighten: '力度提亮', none: '无需修改',
+};
+
+/** 应用一个编辑命令，返回变更的音符数 */
+export function applyAction(piece, action) {
+  switch (action) {
+    case 'lh_busier': return densifyHand(piece, 'L');
+    case 'lh_sparser': return sparserHand(piece, 'L');
+    case 'rh_busier': return densifyHand(piece, 'R');
+    case 'rh_sparser': return sparserHand(piece, 'R');
+    case 'transpose_up': return transposeNotes(piece, null, 1);
+    case 'transpose_down': return transposeNotes(piece, null, -1);
+    case 'soften': return scaleVel(piece, null, 0.82);
+    case 'brighten': return scaleVel(piece, null, 1.18);
+    default: return 0;
+  }
+}
+
+/** 项目 JSON 校验（jevthoven 的 validated JSON import） */
+export function validatePiece(data) {
+  if (!data || data.version !== 1 || !data.plan || !Array.isArray(data.notes) || !Array.isArray(data.barChords)) return null;
+  if (!Number.isFinite(data.totalBars) || !Number.isFinite(data.plan.keyPc)) return null;
+  const ok = data.notes.every((n) => n && Number.isFinite(n.midi) && Number.isFinite(n.startBeats)
+    && Number.isFinite(n.durBeats) && Number.isFinite(n.vel) && (n.hand === 'R' || n.hand === 'L'));
+  if (!ok) return null;
+  data.nid = data.nid ?? Math.max(0, ...data.notes.map((n) => n.id ?? 0)) + 1;
+  return data;
+}
+
+/* ==================== 工作室界面（DOM 逻辑，惰性初始化） ==================== */
+
+let inited = false;
+let els = null;
+let kb = null;
+let piece = null;            // { version:1, plan, notes, barChords, totalBars, nid }
+let undoStack = [], redoStack = [];
+let composing = false, cancelFlag = false;
+let muted = { R: false, L: false };
+let loop = true;
+let playheadTimer = null;
+let rp = null;               // 回放状态
+
+export function ensureStudio() {
+  if (inited) return;
+  inited = true;
+  const $ = (id) => document.getElementById(id);
+  els = {
+    prompt: $('stPrompt'), style: $('stStyle'), bars: $('stBars'),
+    compose: $('stCompose'), cancel: $('stCancel'), variation: $('stVariation'), newBtn: $('stNew'),
+    progressWrap: $('stProgressWrap'), progress: $('stProgress'), progressText: $('stProgressText'),
+    revise: $('stRevise'), reviseBtn: $('stReviseBtn'),
+    midi: $('stMidi'), saveJson: $('stSaveJson'), loadBtn: $('stLoadBtn'), loadJson: $('stLoadJson'),
+    roll: $('stRoll'), rollWrap: $('stRollWrap'), playhead: $('stPlayhead'),
+    play: $('stPlay'), loopBtn: $('stLoop'), muteR: $('stMuteR'), muteL: $('stMuteL'),
+    bpm: $('stBpm'), undo: $('stUndo'), redo: $('stRedo'),
+    chord: $('stChord'), info: $('stInfo'), keyboard: $('stKeyboard'),
+  };
+  kb = renderKeyboard(els.keyboard);
+  bindRoll();
+  bindControls();
+  window.__stDebug = () => ({ inited, hasPiece: !!piece, notes: piece?.notes.length ?? -1, savedVersion: piece?.version ?? null });
+  // 恢复上次的工作台
+  try {
+    const saved = validatePiece(JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null'));
+    if (saved) { setPiece(saved); toastify('已恢复上次的工作台'); }
+  } catch { /* ignore */ }
+  updateButtons();
+}
+
+function toastify(msg) { toast(document.getElementById('toast'), msg); }
+
+function setPiece(p) {
+  piece = p;
+  undoStack = []; redoStack = [];
+  els.bpm.value = p.bpm ?? p.plan.bpm;
+  drawRoll();
+  updateInfo();
+  autosave();
+}
+
+/* ---------------- 生成任务（compose job） ---------------- */
+
+async function compose(newSeed) {
+  if (composing) return;
+  const s = loadSettings();
+  const seed = newSeed ?? Math.floor(Math.random() * 2 ** 31);
+  const bars = Number(els.bars.value);
+  composing = true; cancelFlag = false;
+  els.compose.disabled = true;
+  els.compose.querySelector('span').textContent = '生成中…';
+  els.cancel.classList.remove('hidden');
+  els.progressWrap.classList.remove('hidden');
+  els.variation.disabled = true;
+
+  try {
+    const plan = await buildPlan({
+      prompt: els.prompt.value.trim() || '一段安静的即兴',
+      goal: '随机冒险',
+      styleId: els.style.value,
+      seed, bars,
+      keyPc: loadSettings().keySel && loadSettings().keySel !== 'auto' ? Number(loadSettings().keySel) : null,
+    }, {
+      llm: s.llmEnabled ? { enabled: true, baseUrl: s.llmBaseUrl, model: s.llmModel, apiKey: s.llmKey, proxy: s.llmProxy } : { enabled: false },
+    });
+    const composer = new Composer(plan, {
+      channel: s.channel,
+      apiKey: s.channel === 'typesafe' ? s.typesafeKey : s.openrouterKey,
+    });
+    const p = {
+      version: 1, plan, totalBars: bars, nid: 1,
+      notes: [], barChords: [], bpm: plan.bpm,
+    };
+    piece = p;
+    for (let i = 0; i < bars; i++) {
+      if (cancelFlag) { toastify('已取消，保留已生成部分'); break; }
+      const bar = await composer.nextBar();
+      const off = i * plan.meterNum;
+      for (const n of bar.notes) p.notes.push({ id: p.nid++, midi: n.midi, startBeats: off + n.startBeats, durBeats: n.durBeats, vel: n.vel, hand: n.hand });
+      p.barChords.push({ startBeat: off, symbol: bar.chord.symbol, rootPc: chordRoot(bar.chord), shape: bar.chord.shape });
+      els.progress.style.width = `${Math.round(((i + 1) / bars) * 100)}%`;
+      els.progressText.textContent = `第 ${i + 1}/${bars} 小节 · ${bar.chord.symbol}`;
+      updateInfo();
+      drawRoll(); // jevthoven 式 complete-bar preview：边生成边可见
+      await new Promise((r) => setTimeout(r, 0)); // 让出主线程刷新 UI
+    }
+    undoStack = []; redoStack = [];
+    els.bpm.value = plan.bpm;
+    autosave();
+    if (!cancelFlag) toastify('编曲完成，可直接编辑或播放');
+  } catch (e) {
+    toastify('生成失败：' + (e?.message ?? e));
+  } finally {
+    composing = false;
+    els.compose.disabled = false;
+    els.compose.querySelector('span').textContent = '生成编曲';
+    els.cancel.classList.add('hidden');
+    setTimeout(() => els.progressWrap.classList.add('hidden'), 600);
+    updateButtons();
+  }
+}
+
+function chordRoot(c) { return c.rootPc; }
+
+/* ---------------- 钢琴卷帘 ---------------- */
+
+function drawRoll() {
+  const canvas = els.roll;
+  const dpr = window.devicePixelRatio || 1;
+  const beats = piece ? piece.totalBars * piece.plan.meterNum : 32;
+  const W = Math.max(720, beats * ZOOM + 4);
+  const H = HEADER + (P_HI - P_LO + 1) * ROW;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.width = `${W}px`;
+  canvas.style.height = `${H}px`;
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // 键床底色：黑键行更深
+  g.fillStyle = '#0b0907';
+  g.fillRect(0, 0, W, H);
+  for (let m = P_LO; m <= P_HI; m++) {
+    const pc = ((m % 12) + 12) % 12;
+    if ([1, 3, 6, 8, 10].includes(pc)) {
+      g.fillStyle = '#110d0a';
+      g.fillRect(0, HEADER + (P_HI - m) * ROW, W, ROW);
+    }
+  }
+  // 乐句分块（每 8 小节交替微着色）
+  if (piece) {
+    const ph = piece.plan.barsPerPhrase * piece.plan.meterNum * ZOOM;
+    for (let x = 0, i = 0; x < W; x += ph, i++) {
+      if (i % 2 === 1) { g.fillStyle = 'rgba(216,171,92,0.045)'; g.fillRect(x, 0, ph, H); }
+    }
+  }
+  // 纵向网格：小节强线 + 拍弱线
+  if (piece) {
+    const meter = piece.plan.meterNum;
+    for (let b = 0; b <= piece.totalBars * meter; b++) {
+      const x = Math.round(b * ZOOM) + 0.5;
+      g.strokeStyle = b % meter === 0 ? 'rgba(214,178,110,0.4)' : 'rgba(214,178,110,0.1)';
+      g.beginPath(); g.moveTo(x, HEADER); g.lineTo(x, H); g.stroke();
+    }
+    // 和弦名（卷帘头部）
+    g.font = '600 10px Georgia, serif';
+    g.fillStyle = 'rgba(240,205,138,0.85)';
+    for (const bc of piece.barChords) g.fillText(bc.symbol, bc.startBeat * ZOOM + 4, 11.5);
+    // 音符
+    for (const n of piece.notes) {
+      const x = n.startBeats * ZOOM, w = Math.max(4, n.durBeats * ZOOM - 1.5);
+      const y = HEADER + (P_HI - n.midi) * ROW;
+      const base = n.hand === 'L' ? '92,184,174' : '232,192,106';
+      const dim = muted[n.hand] ? 0.35 : 1;
+      g.fillStyle = `rgba(${base},${(0.35 + n.vel * 0.5) * dim})`;
+      g.strokeStyle = `rgba(${base},${0.9 * dim})`;
+      g.lineWidth = 1;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(x + 0.5, y + 1, w, ROW - 2, 2); else g.rect(x + 0.5, y + 1, w, ROW - 2);
+      g.fill(); g.stroke();
+    }
+  } else {
+    g.font = '14px "PingFang SC", "Microsoft YaHei", sans-serif';
+    g.fillStyle = 'rgba(139,129,104,0.8)';
+    g.fillText('在左侧写下灵感，点「生成编曲」——每一小节仍由 Jev 逐小节决策', 24, H / 2);
+  }
+}
+
+function rollPos(e) {
+  const rect = els.roll.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  return { beat: px / ZOOM, pitch: P_HI - Math.floor((py - HEADER) / ROW), px };
+}
+
+function noteAt(beat, pitch) {
+  if (!piece) return null;
+  for (let i = piece.notes.length - 1; i >= 0; i--) {
+    const n = piece.notes[i];
+    if (n.midi === pitch && beat >= n.startBeats && beat <= n.startBeats + n.durBeats) return n;
+  }
+  return null;
+}
+
+function bindRoll() {
+  let drag = null;
+  let snapBefore = null;
+
+  const commit = () => {
+    const now = JSON.stringify(piece.notes);
+    if (snapBefore !== null && now !== snapBefore) { undoStack.push(snapBefore); redoStack = []; trimUndo(); }
+    snapBefore = null;
+    drawRoll(); autosave(); updateInfo(); updateButtons();
+  };
+
+  els.roll.addEventListener('pointerdown', (e) => {
+    if (!piece || playing()) return;
+    const { beat, pitch, px } = rollPos(e);
+    if (pitch < P_LO || pitch > P_HI) return;
+    snapBefore = JSON.stringify(piece.notes);
+    const hit = noteAt(beat, pitch);
+    if (hit) {
+      const edge = (hit.startBeats + hit.durBeats) * ZOOM;
+      drag = Math.abs(px - edge) < 7
+        ? { mode: 'resize', note: hit }
+        : { mode: 'move', note: hit, grab: beat - hit.startBeats };
+    } else {
+      const note = { id: piece.nid++, midi: pitch, startBeats: clamp(snap(Math.max(0, beat - 0.5)), 0, piece.totalBars * piece.plan.meterNum), durBeats: 1, vel: 0.75, hand: pitch >= 60 ? 'R' : 'L' };
+      piece.notes.push(note);
+      drag = { mode: 'resize', note };
+    }
+    els.roll.setPointerCapture(e.pointerId);
+  });
+  els.roll.addEventListener('pointermove', (e) => {
+    if (!drag || !piece) return;
+    const { beat, pitch } = rollPos(e);
+    const n = drag.note;
+    if (drag.mode === 'move') {
+      n.startBeats = clamp(snap(beat - drag.grab), 0, piece.totalBars * piece.plan.meterNum - n.durBeats);
+      n.midi = clamp(pitch, P_LO, P_HI);
+    } else {
+      n.durBeats = clamp(snap(beat - n.startBeats), 0.25, 8);
+    }
+    drawRoll();
+  });
+  els.roll.addEventListener('pointerup', () => { if (drag) { drag = null; commit(); } });
+  els.roll.addEventListener('dblclick', (e) => {
+    if (!piece || playing()) return;
+    const { beat, pitch } = rollPos(e);
+    const hit = noteAt(beat, pitch);
+    if (!hit) return;
+    snapBefore = JSON.stringify(piece.notes);
+    piece.notes.splice(piece.notes.indexOf(hit), 1);
+    commit();
+  });
+}
+
+/* ---------------- 回放（固定音符的 lookahead 调度器 + 循环） ---------------- */
+
+function playing() { return !!rp?.playing; }
+
+function startPlay() {
+  if (!piece?.notes.length) return;
+  const audio = getAudio();
+  rp = {
+    playing: true,
+    audio,
+    notes: [...piece.notes].sort((a, b) => a.startBeats - b.startBeats),
+    bpm: clamp(Number(els.bpm.value) || piece.plan.bpm, 40, 200),
+    totalBeats: piece.totalBars * piece.plan.meterNum,
+    ptr: 0, iter: 0, endFired: false,
+  };
+  rp.beatDur = 60 / rp.bpm;
+  rp.t0 = audio.ctx.currentTime + 0.25;
+  rp.timer = setInterval(() => tickPlay(), 30);
+  playheadTimer = setInterval(() => drawPlayhead(), 33);
+  els.play.querySelector('span').textContent = '停止';
+}
+
+function tickPlay() {
+  const now = rp.audio.ctx.currentTime;
+  const horizon = now + 0.15;
+  for (;;) {
+    if (rp.ptr >= rp.notes.length) {
+      if (loop && rp.totalBeats > 0) { rp.iter++; rp.ptr = 0; continue; }
+      stopPlay();
+      return;
+    }
+    const n = rp.notes[rp.ptr];
+    const t = rp.t0 + (n.startBeats + rp.iter * rp.totalBeats) * rp.beatDur;
+    if (t > horizon) break;
+    if (t > now - 0.05 && !muted[n.hand]) {
+      rp.audio.play(n.midi, t, Math.max(0.1, n.durBeats * rp.beatDur), n.vel);
+      const delay = Math.max(0, (t - rp.audio.ctx.currentTime) * 1000);
+      setTimeout(() => kb.flash(n.midi, Math.max(80, n.durBeats * rp.beatDur * 1000)), delay);
+    }
+    rp.ptr++;
+  }
+}
+
+function drawPlayhead() {
+  if (!rp?.playing) return;
+  const beat = (rp.audio.ctx.currentTime - rp.t0) / rp.beatDur;
+  if (beat < 0) return;
+  const disp = loop ? beat % rp.totalBeats : Math.min(beat, rp.totalBeats);
+  const x = disp * ZOOM;
+  els.playhead.style.left = `${x}px`;
+  els.playhead.classList.remove('hidden');
+  const chord = piece ? chordAt(piece.barChords, disp) : null;
+  if (chord) els.chord.textContent = chord.symbol;
+  // 播放头跟随滚动
+  const view = els.rollWrap.clientWidth;
+  if (x < els.rollWrap.scrollLeft || x > els.rollWrap.scrollLeft + view - 60) {
+    els.rollWrap.scrollLeft = Math.max(0, x - view * 0.4);
+  }
+}
+
+function stopPlay() {
+  if (rp) { clearInterval(rp.timer); rp.playing = false; }
+  if (playheadTimer) { clearInterval(playheadTimer); playheadTimer = null; }
+  els.play.querySelector('span').textContent = '播放';
+  els.playhead.classList.add('hidden');
+  rp = null;
+}
+
+/* ---------------- 撤销 / 重做 / 自动保存 ---------------- */
+
+function trimUndo() { while (undoStack.length > 50) undoStack.shift(); }
+
+function doUndo() {
+  if (!piece || !undoStack.length) return;
+  redoStack.push(JSON.stringify(piece.notes));
+  piece.notes = JSON.parse(undoStack.pop());
+  drawRoll(); autosave(); updateInfo(); updateButtons();
+}
+function doRedo() {
+  if (!piece || !redoStack.length) return;
+  undoStack.push(JSON.stringify(piece.notes));
+  piece.notes = JSON.parse(redoStack.pop());
+  drawRoll(); autosave(); updateInfo(); updateButtons();
+}
+
+let saveTimer = null;
+function autosave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    if (!piece) return;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ ...piece, bpm: Number(els.bpm.value) })); } catch { /* */ }
+  }, 500);
+}
+
+function updateInfo() {
+  if (!piece) { els.info.textContent = '先生成一段编曲'; return; }
+  els.info.textContent = `${piece.totalBars} 小节 · ${piece.notes.length} 音 · ${NOTE_NAMES[piece.plan.keyPc]} ${piece.plan.mode}`;
+}
+
+function updateButtons() {
+  const has = !!piece && !composing;
+  els.play.disabled = !has || !piece.notes.length;
+  els.loopBtn.disabled = !has;
+  els.bpm.disabled = !has;
+  els.midi.disabled = !has || !piece.notes.length;
+  els.saveJson.disabled = !has;
+  els.loadBtn.disabled = composing;
+  els.reviseBtn.disabled = !has;
+  els.variation.disabled = composing || !has;
+  els.undo.disabled = !has || !undoStack.length;
+  els.redo.disabled = !has || !redoStack.length;
+}
+
+/* ---------------- 自然语言修改（Jev 选择确定性编辑命令） ---------------- */
+
+async function revise() {
+  if (!piece) return;
+  const request = els.revise.value.trim();
+  if (!request) { toastify('先写下你想怎么改'); return; }
+  els.reviseBtn.disabled = true;
+  try {
+    const s = loadSettings();
+    let action;
+    if (s.channel === 'fixture') {
+      action = keywordAction(request);
+    } else {
+      const perBar = (hand) => piece.notes.filter((n) => n.hand === hand).length / piece.totalBars;
+      const avgVel = piece.notes.reduce((s2, n) => s2 + n.vel, 0) / Math.max(1, piece.notes.length);
+      try {
+        const out = await askJev({
+          state: {
+            request,
+            piece: {
+              style: piece.plan.styleName, key: `${NOTE_NAMES[piece.plan.keyPc]} ${piece.plan.mode}`,
+              bpm: Number(els.bpm.value), bars: piece.totalBars,
+              lh_notes_per_bar: Number(perBar('L').toFixed(1)), rh_notes_per_bar: Number(perBar('R').toFixed(1)),
+              avg_velocity: Number(avgVel.toFixed(2)),
+            },
+          },
+          questions: {
+            action: {
+              type: 'choice',
+              instructions: 'You are directing edits to a finished piano composition. Based on the user request and the piece summary, pick the single best deterministic edit command. Answer ONLY with the Choice question "action".',
+              criteria: { ...ACTIONS },
+            },
+          },
+        }, { channel: s.channel, apiKey: s.channel === 'typesafe' ? s.typesafeKey : s.openrouterKey, attempts: 2, timeoutMs: 8000 });
+        action = ACTIONS[out.answers.action?.value] ? out.answers.action.value : keywordAction(request);
+      } catch {
+        action = keywordAction(request);
+      }
+    }
+    const before = JSON.stringify(piece.notes);
+    applyAction(piece, action);
+    if (JSON.stringify(piece.notes) !== before) {
+      undoStack.push(before); redoStack = []; trimUndo();
+      drawRoll(); autosave(); updateInfo(); updateButtons();
+      toastify(`Jev 已执行：${ACTIONS_ZH[action]}`);
+    } else {
+      toastify(`Jev 选择「${ACTIONS_ZH[action]}」，但没有可调整的地方`);
+    }
+  } finally {
+    els.reviseBtn.disabled = !piece;
+  }
+}
+
+/* ---------------- 控件绑定 ---------------- */
+
+function bindControls() {
+  els.compose.addEventListener('click', () => compose(null));
+  els.cancel.addEventListener('click', () => { cancelFlag = true; });
+  els.variation.addEventListener('click', () => compose(null)); // 新 seed、同一灵感
+  els.newBtn.addEventListener('click', () => {
+    stopPlay(); piece = null; undoStack = []; redoStack = [];
+    localStorage.removeItem(STORE_KEY);
+    drawRoll(); updateInfo(); updateButtons();
+    els.chord.textContent = '—';
+    toastify('已清空工作台');
+  });
+
+  els.play.addEventListener('click', async () => {
+    if (playing()) { stopPlay(); return; }
+    if (!piece?.notes.length) return;
+    try { await getAudio().ensure(); } catch (e) { toastify('无法启动音频：' + e.message); return; }
+    startPlay();
+  });
+  els.loopBtn.addEventListener('click', () => { loop = !loop; els.loopBtn.classList.toggle('sel', loop); });
+  els.muteR.addEventListener('change', () => { muted.R = els.muteR.checked; drawRoll(); });
+  els.muteL.addEventListener('change', () => { muted.L = els.muteL.checked; drawRoll(); });
+  els.undo.addEventListener('click', doUndo);
+  els.redo.addEventListener('click', doRedo);
+  window.addEventListener('keydown', (e) => {
+    if (!document.getElementById('viewStudio').classList.contains('active')) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); doRedo(); }
+  });
+
+  els.reviseBtn.addEventListener('click', revise);
+
+  els.midi.addEventListener('click', () => {
+    if (!piece) return;
+    const bytes = exportMidi(piece.notes, { bpm: Number(els.bpm.value), meterNum: piece.plan.meterNum });
+    const blob = new Blob([bytes], { type: 'audio/midi' });
+    download(blob, `${piece.plan.title}.mid`);
+  });
+  els.saveJson.addEventListener('click', () => {
+    if (!piece) return;
+    const data = { ...piece, version: 1, bpm: Number(els.bpm.value) };
+    download(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), `${piece.plan.title}.jevpiano.json`);
+  });
+  els.loadBtn.addEventListener('click', () => els.loadJson.click());
+  els.loadJson.addEventListener('change', async () => {
+    const file = els.loadJson.files?.[0];
+    if (!file) return;
+    try {
+      const p = validatePiece(JSON.parse(await file.text()));
+      if (!p) { toastify('JSON 校验失败：不是有效的 jev-piano 项目'); return; }
+      stopPlay(); setPiece(p); updateInfo(); updateButtons();
+      toastify(`已载入「${p.plan.title}」`);
+    } catch (e) {
+      toastify('载入失败：' + e.message);
+    } finally {
+      els.loadJson.value = '';
+    }
+  });
+}
+
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/** 切回实时即兴时由 main 调用：停掉工作室回放 */
+export function stopStudio() {
+  if (inited && playing()) stopPlay();
+}
