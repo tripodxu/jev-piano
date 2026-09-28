@@ -37,7 +37,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | 改实时播放/调度 | `public/js/player.js`、`test/player.test.mjs` | — |
 | 改音频/音色 | `public/js/audio.js`、`test/audio.test.mjs` | — |
 | 改实时界面 | `public/js/ui.js`、`public/js/main.js`、`public/index.html` | `public/styles.css` |
-| 改工作室界面 | `public/js/studio.js`、`test/studio.test.mjs` | `docs/memory/2026-09-28-studio-view.md` |
+| 改工作室界面 | `public/js/studio.js`、`test/studio.test.mjs`、`docs/memory/2026-09-28-studio-view.md` | `public/js/tension.js`（张力）、`public/js/music.js`（`functionOfPc`） |
 | 改 Worker/部署 | `src/worker.js`、`wrangler.toml`、`.dev.vars.example` | README「部署」 |
 | 修重复/听感问题 | `public/js/candidates.js`、`scripts/analyze-repetition.mjs`、`docs/memory/2026-09-28-anti-repetition-overhaul.md` | `composer.js` 渲染内核 |
 | 加"看得见"的音乐分析 | `public/js/tension.js`、`test/tension.test.mjs` | `ui.js` 渲染、`main.js` 喂数 |
@@ -53,7 +53,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 
 | 文件 | 行数 | 职责 | 修改高危区 |
 |---|---|---|---|
-| `music.js` | 353 | 罗马数字解析、和弦声位、音阶、8 种曲风预设、关键词计划、**和声功能分类 + 调式全色板**（`functionOf`/`modePalette`）、**和声拼写约定**（`PREFERRED_NAME`） | `STYLES` 完整性被 `theory.test.mjs` 全量断言，改预设必跑测试；`PALETTE_QUALITY` 决定色板的"质"，改它等于改全项目词汇；`PREFERRED_NAME` 是和弦显示的唯一真相源——**但 `midiName` 必须保持升号**（它标的是琴键的物理键名，钢琴上没有 Ab 键） |
+| `music.js` | 357 | 罗马数字解析、和弦声位、音阶、8 种曲风预设、关键词计划、**和声功能分类 + 调式全色板**（`functionOf`/`functionOfPc`/`modePalette`）、**和声拼写约定**（`PREFERRED_NAME`） | `STYLES` 完整性被 `theory.test.mjs` 全量断言，改预设必跑测试；`PALETTE_QUALITY` 决定色板的"质"，改它等于改全项目词汇；`PREFERRED_NAME` 是和弦显示的唯一真相源——**但 `midiName` 必须保持升号**（它标的是琴键的物理键名，钢琴上没有 Ab 键） |
 | `candidates.js` | 231 | **候选集构造**（= 给模型的可选域）：`detectLoop` 循环锁死检测、`chordCandidates` 两条断路器（根音疲劳 / 循环锁死）+ 声部进行加权（共同音/五度圈）、`functionCandidates` 功能转移矩阵 | 兜底判据是「候选够用 ≥3」不是「非空」；`W_SMOOTH` 锁在 0.5（调低会让旋律指纹护栏失效）；断路器取舍先放疲劳、留锁死 |
 | `jev.js` | 211 | 四渠道客户端（fixture/typesafe/openrouter/proxy）、归一化、429/529 退避重试、fixture 采样、LLM 扩写 | `stripPrivate`：发送前剥离 `_` 前缀字段 |
 | `composer.js` | 668 | **核心**：`buildPlan`、`Composer.nextBar()`（七问 + 音符渲染 + 反重复机制）、动机记忆、归因字段 `loopLocked`/`rejected`/`fn`/`chordFn` | 候选集**不在**本文件（在 `candidates.js`）；旋律护栏必须在乐句尾锚定**之后**判定碰撞 |
@@ -62,7 +62,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | `midi.js` | 56 | SMF Type-1 双轨导出 | 字节格式有单测 |
 | `ui.js` | 320 | 键盘 DOM、下落音符 canvas、**和声功能轨**（`pushFnSegment`/`fnSegClass`）、**张力对照带**（`TensionGraph`）、决策日志、计划卡、toast | 功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；canvas 渲染用 setInterval 而非 rAF（标签页遮挡时 rAF 会被暂停） |
 | `main.js` | 295 | 实时即兴接线：设置持久化、渠道探测、开始/停止/导出、张力/功能轨喂数 | 元素 id 契约见 `index.html` |
-| `studio.js` | 653 | 工作室界面：批量生成 job、钢琴卷帘编辑、Jev 路由的自然语言修改、JSON 导入导出 | 确定性编辑纯函数有单测 |
+| `studio.js` | 738 | 工作室界面：批量生成 job、钢琴卷帘编辑（**头部含张力曲线 + 功能带**）、Jev 路由的自然语言修改、JSON 导入导出 | 确定性编辑纯函数有单测；卷帘头部三段（张力/功能/和弦名）与音符区**共用 `ZOOM`**——改 `ZOOM` 三者自动同步；张力缓存 `tensionCache` 必须在每次音符改动后 `invalidateTension()` |
 | `settings.js` | 20 | localStorage 设置读写 | — |
 
 ### 分析层
@@ -78,7 +78,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | 路径 | 职责 |
 |---|---|
 | `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
-| `test/*.test.mjs` | `node --test`，共 83 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
+| `test/*.test.mjs` | `node --test`，共 86 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
 | `scripts/probe-jev.mjs` `scripts/probe-bar.mjs` | 真实 API 冒烟（需 key，计费） |
 | `scripts/analyze-repetition.mjs` | 重复度量化分析（`node scripts/analyze-repetition.mjs 32 <seed> random [--real]`）。**单种子噪声大，结论至少取 12 个种子求均值** |
 | `dev-proxy.py` | 本地开发：静态服务 + mock/真实转发（stdlib only） |
@@ -101,7 +101,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 2. 读 MEMORY.md 顶部 3 条 + 任务相关 memory 条目（最新在最上，先看有没有人踩过坑）
 3. 实现：先改/加测试，再改实现（本项目测试驱动传统，见 docs/adr/0004）
 4. 验证关卡（全部通过才算完成）：
-   a. npm test                        全绿（83 个，只增不减）
+   a. npm test                        全绿（86 个，只增不减）
    b. node --check 改动的新 .js        语法
    c. 涉及真实 API 的：scripts/probe-*.mjs 冒烟（可选，计费）
    d. 涉及听感/反重复的：analyze-repetition.mjs 对比指标不退化
@@ -168,7 +168,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 ## 6. 常用命令
 
 ```bash
-npm test                                  # 83 个单测（node --test）
+npm test                                  # 86 个单测（node --test）
 python dev-proxy.py --port 8000           # 本地开发（或 npm run dev）→ http://127.0.0.1:8000
 node scripts/analyze-repetition.mjs 32 2026 random   # 重复度指标（结论至少 12 种子求均值）
 node scripts/probe-jev.mjs                # 真实 API 冒烟（需 TYPESAFE_API_KEY）

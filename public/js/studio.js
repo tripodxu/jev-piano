@@ -8,9 +8,13 @@ import { getAudio } from './audio.js';
 import { exportMidi } from './midi.js';
 import { renderKeyboard, toast } from './ui.js';
 import { loadSettings } from './settings.js';
-import { chordMidis, scaleMidis, nearest, NOTE_NAMES } from './music.js';
+import { chordMidis, scaleMidis, nearest, NOTE_NAMES, functionOfPc } from './music.js';
+import { barTension } from './tension.js';
 
-const P_LO = 36, P_HI = 95, ROW = 8, HEADER = 16, ZOOM = 24, SNAP = 0.25;
+const P_LO = 36, P_HI = 95, ROW = 8, ZOOM = 24, SNAP = 0.25;
+// 卷帘头部自上而下：张力曲线 / 功能带 / 和弦名。对齐由共用 ZOOM 保证，无需任何同步代码。
+const H_TENSION = 24, H_FN = 12, H_CHORD = 18, HEADER = H_TENSION + H_FN + H_CHORD;
+const FN_COLOR = { T: '#d8ab5c', S: '#85b8ae', D: '#cf6a58', Tp: '#a8936f' };
 const STORE_KEY = 'jevpiano.studio.v1';
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const snap = (v) => Math.round(v / SNAP) * SNAP;
@@ -153,6 +157,45 @@ export function validatePiece(data) {
   return data;
 }
 
+/* ==================== 纯函数：时间轴分析（与 DOM 无关，可单测） ==================== */
+
+/** 某小节的和声功能：优先用 composer 记下的决策归因，旧项目 JSON 没有则由根音回推 */
+export function barFunction(bc, mode = 'major') {
+  if (!bc) return 'T';
+  if (bc.fn && FN_COLOR[bc.fn]) return bc.fn;
+  return functionOfPc(bc.rootPc ?? 0, mode) ?? 'T';
+}
+
+/**
+ * 整曲张力序列：把 piece 还原成一组"可交给 barTension 的小节"再逐小节计算。
+ * note 按 startBeats 归入小节；旧项目 JSON 没有 intensity 时用 1.5 作为中性值。
+ */
+export function pieceTension(piece) {
+  if (!piece || !Array.isArray(piece.barChords) || !piece.barChords.length) return [];
+  const meter = piece.plan?.meterNum || 4;
+  const mode = piece.plan?.mode || 'major';
+  const byBar = piece.barChords.map(() => []);
+  for (const n of (piece.notes ?? [])) {
+    const i = Math.floor(n.startBeats / meter);
+    if (i >= 0 && i < byBar.length) byBar[i].push(n);
+  }
+  return piece.barChords.map((bc, i) => barTension({
+    chord: { rootPc: bc.rootPc ?? 0, shape: bc.shape ?? '' },
+    intensity: Number.isFinite(bc.intensity) ? bc.intensity : 1.5,
+    decision: { chordFn: barFunction(bc, mode) },
+    notes: byBar[i],
+  }));
+}
+
+let tensionCache = null;
+/** 张力受音符编辑影响（密度/音域分量），任何改动后必须作废 */
+function invalidateTension() { tensionCache = null; }
+function tensionOf(piece) {
+  if (!piece) return [];
+  if (!tensionCache) tensionCache = pieceTension(piece);
+  return tensionCache;
+}
+
 /* ==================== 工作室界面（DOM 逻辑，惰性初始化） ==================== */
 
 let inited = false;
@@ -208,6 +251,7 @@ export function savePiece(piece, storage) {
 function setPiece(p) {
   piece = p;
   undoStack = []; redoStack = [];
+  invalidateTension();
   els.bpm.value = p.bpm ?? p.plan.bpm;
   drawRoll();
   updateInfo();
@@ -247,12 +291,13 @@ async function compose(newSeed) {
       notes: [], barChords: [], bpm: plan.bpm,
     };
     piece = p;
+    invalidateTension();
     for (let i = 0; i < bars; i++) {
       if (cancelFlag) { toastify('已取消，保留已生成部分'); break; }
       const bar = await composer.nextBar();
       const off = i * plan.meterNum;
       for (const n of bar.notes) p.notes.push({ id: p.nid++, midi: n.midi, startBeats: off + n.startBeats, durBeats: n.durBeats, vel: n.vel, hand: n.hand });
-      p.barChords.push({ startBeat: off, symbol: bar.chord.symbol, rootPc: chordRoot(bar.chord), shape: bar.chord.shape });
+      p.barChords.push({ startBeat: off, symbol: bar.chord.symbol, rootPc: chordRoot(bar.chord), shape: bar.chord.shape, fn: bar.decision.chordFn, intensity: bar.intensity });
       els.progress.style.width = `${Math.round(((i + 1) / bars) * 100)}%`;
       els.progressText.textContent = `第 ${i + 1}/${bars} 小节 · ${bar.chord.symbol}`;
       updateInfo();
@@ -276,6 +321,41 @@ async function compose(newSeed) {
 }
 
 function chordRoot(c) { return c.rootPc; }
+
+/** 画时间轴：张力面积（顶）+ 功能带（中）。与卷帘共用 ZOOM，横轴天然对齐。 */
+function drawTimeline(g, W, piece) {
+  if (!piece) return;
+  const meter = piece.plan.meterNum;
+  const mode = piece.plan.mode;
+  const xOf = (i) => piece.barChords[i].startBeat * ZOOM + (meter * ZOOM) / 2;
+
+  // 1) 张力：面积 + 折线
+  const t = tensionOf(piece);
+  if (t.length) {
+    g.save();
+    g.beginPath();
+    g.moveTo(0, H_TENSION);
+    t.forEach((v, i) => g.lineTo(xOf(i), H_TENSION - v * H_TENSION));
+    g.lineTo(W, H_TENSION);
+    g.closePath();
+    g.fillStyle = 'rgba(216,171,92,0.14)';
+    g.fill();
+    g.beginPath();
+    t.forEach((v, i) => (i ? g.lineTo(xOf(i), H_TENSION - v * H_TENSION) : g.moveTo(xOf(i), H_TENSION - v * H_TENSION)));
+    g.strokeStyle = 'rgba(240,205,138,0.72)';
+    g.lineWidth = 1.2;
+    g.lineJoin = 'round';
+    g.stroke();
+    g.restore();
+  }
+
+  // 2) 功能带：每小节一段，颜色即功能
+  for (let i = 0; i < piece.barChords.length; i++) {
+    const bc = piece.barChords[i];
+    g.fillStyle = `${FN_COLOR[barFunction(bc, mode)]}d0`;
+    g.fillRect(bc.startBeat * ZOOM, H_TENSION, Math.max(1, meter * ZOOM - 1), H_FN);
+  }
+}
 
 /* ---------------- 钢琴卷帘 ---------------- */
 
@@ -317,10 +397,11 @@ function drawRoll() {
       g.strokeStyle = b % meter === 0 ? 'rgba(214,178,110,0.4)' : 'rgba(214,178,110,0.1)';
       g.beginPath(); g.moveTo(x, HEADER); g.lineTo(x, H); g.stroke();
     }
-    // 和弦名（卷帘头部）
+    // 和弦名（卷帘头部）+ 与之对齐的功能带与张力曲线
     g.font = '600 10px Georgia, serif';
     g.fillStyle = 'rgba(240,205,138,0.85)';
-    for (const bc of piece.barChords) g.fillText(bc.symbol, bc.startBeat * ZOOM + 4, 11.5);
+    for (const bc of piece.barChords) g.fillText(bc.symbol, bc.startBeat * ZOOM + 4, H_TENSION + H_FN + 13);
+    drawTimeline(g, W, piece);
     // 音符
     for (const n of piece.notes) {
       const x = n.startBeats * ZOOM, w = Math.max(4, n.durBeats * ZOOM - 1.5);
@@ -365,6 +446,7 @@ function bindRoll() {
     const now = JSON.stringify(piece.notes);
     if (snapBefore !== null && now !== snapBefore) { undoStack.push(snapBefore); redoStack = []; trimUndo(); }
     snapBefore = null;
+    invalidateTension();
     drawRoll(); autosave(); updateInfo(); updateButtons();
   };
 
@@ -486,12 +568,14 @@ function doUndo() {
   if (!piece || !undoStack.length) return;
   redoStack.push(JSON.stringify(piece.notes));
   piece.notes = JSON.parse(undoStack.pop());
+  invalidateTension();
   drawRoll(); autosave(); updateInfo(); updateButtons();
 }
 function doRedo() {
   if (!piece || !redoStack.length) return;
   undoStack.push(JSON.stringify(piece.notes));
   piece.notes = JSON.parse(redoStack.pop());
+  invalidateTension();
   drawRoll(); autosave(); updateInfo(); updateButtons();
 }
 
@@ -568,6 +652,7 @@ async function revise() {
     applyAction(piece, action);
     if (JSON.stringify(piece.notes) !== before) {
       undoStack.push(before); redoStack = []; trimUndo();
+      invalidateTension();
       drawRoll(); autosave(); updateInfo(); updateButtons();
       toastify(`Jev 已执行：${ACTIONS_ZH[action]}`);
     } else {

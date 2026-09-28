@@ -141,9 +141,13 @@ const FN_MINOR = { 0: 'T', 3: 'S', 5: 'S', 2: 'S', 7: 'D', 8: 'Tp', 10: 'Tp', 4:
 /** 罗马数字 → 和声功能；不可解析返回 null。小调族（minor/dorian/mixolydian/五声）共用小调功能表。 */
 export function functionOf(romanSym, mode = 'major') {
   const p = parseRoman(romanSym);
-  if (!p) return null;
+  return p ? functionOfPc(p.rootPc, mode) : null;
+}
+
+/** 根音 → 和声功能。只知道 rootPc 时用这个（工作室导入旧项目 JSON 时没有罗马数字可解析）。 */
+export function functionOfPc(rootPc, mode = 'major') {
   const table = (mode === 'major' || mode === 'lydian') ? FN_MAJOR : FN_MINOR;
-  return table[p.rootPc] ?? 'Tp';
+  return table[((rootPc % 12) + 12) % 12] ?? 'Tp';
 }
 
 /**

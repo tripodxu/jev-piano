@@ -3,8 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   keywordAction, densifyHand, sparserHand, transposeNotes, scaleVel,
-  chordAt, applyAction, validatePiece, savePiece,
+  chordAt, applyAction, validatePiece, savePiece, barFunction, pieceTension,
 } from '../public/js/studio.js';
+import { functionOfPc } from '../public/js/music.js';
 
 function mkPiece() {
   return {
@@ -119,4 +120,54 @@ test('savePiece: 存储可用时写入并返回 true；不可用时返回 false 
   assert.equal(JSON.parse(ok.v).version, 1);
   const boom = { setItem() { throw new Error('QuotaExceededError'); } };
   assert.equal(savePiece({ version: 1, notes: [] }, boom), false);
+});
+
+/* ---------------- 时间轴：功能带与张力曲线（卷帘头部） ---------------- */
+
+test('barFunction: 优先用决策归因，缺失时由根音回推（兼容旧项目 JSON）', () => {
+  assert.equal(barFunction({ fn: 'D', rootPc: 0 }, 'minor'), 'D', '有 fn 就用 fn');
+  assert.equal(barFunction({ rootPc: 0 }, 'major'), 'T', '无 fn 时 C 在大调是主功能');
+  assert.equal(barFunction({ rootPc: 7 }, 'major'), 'D');
+  assert.equal(barFunction({ rootPc: 8 }, 'minor'), functionOfPc(8, 'minor'), '与 music.js 的回推一致');
+  assert.equal(barFunction({ fn: '乱写', rootPc: 0 }, 'major'), 'T', '非法 fn 必须回退');
+  assert.equal(barFunction(null), 'T', 'null 输入不崩');
+  assert.equal(barFunction({}), 'T', '空对象不崩');
+});
+
+test('pieceTension: 逐小节对应、取值有界，且音符归属正确', () => {
+  const piece = {
+    plan: { meterNum: 4, mode: 'minor', keyPc: 0 },
+    barChords: [
+      { startBeat: 0, symbol: 'Cm', rootPc: 0, shape: 'm', fn: 'T', intensity: 1 },
+      { startBeat: 4, symbol: 'Dm7b5', rootPc: 2, shape: 'm7b5', fn: 'S', intensity: 3 },
+      { startBeat: 8, symbol: 'G', rootPc: 7, shape: '', fn: 'D', intensity: 2 },
+    ],
+    notes: [
+      { id: 1, midi: 48, startBeats: 0, durBeats: 2, vel: 0.5, hand: 'L' },
+      { id: 2, midi: 72, startBeats: 0, durBeats: 1, vel: 0.6, hand: 'R' },
+      { id: 3, midi: 38, startBeats: 4, durBeats: 2, vel: 0.5, hand: 'L' },
+      { id: 4, midi: 62, startBeats: 4, durBeats: 1, vel: 0.7, hand: 'R' },
+      { id: 5, midi: 43, startBeats: 9, durBeats: 1, vel: 0.5, hand: 'L' },
+    ],
+  };
+  const t = pieceTension(piece);
+  assert.equal(t.length, 3, '每小节一个值');
+  for (const v of t) assert.ok(v >= 0 && v <= 1, `${v} 越界`);
+  assert.ok(t[1] > t[0], '半减七 + 属功能那小节应比主功能紧');
+  assert.ok(t[2] > t[0], '属功能小节应比主功能紧');
+});
+
+test('pieceTension: 旧项目 JSON（无 fn / 无 intensity）与空输入都不崩', () => {
+  const legacy = {
+    plan: { meterNum: 4, mode: 'major' },
+    barChords: [{ startBeat: 0, symbol: 'C', rootPc: 0, shape: '' }, { startBeat: 4, symbol: 'G7', rootPc: 7, shape: '7' }],
+    notes: [{ id: 1, midi: 60, startBeats: 0, durBeats: 1, vel: 0.5, hand: 'R' }],
+  };
+  const t = pieceTension(legacy);
+  assert.equal(t.length, 2);
+  assert.ok(t.every((v) => Number.isFinite(v) && v >= 0 && v <= 1), '旧格式仍应产出合法张力');
+  assert.deepEqual(pieceTension(null), []);
+  assert.deepEqual(pieceTension({}), []);
+  assert.deepEqual(pieceTension({ barChords: [], notes: [] }), []);
+  assert.equal(pieceTension({ plan: {}, barChords: [{}], notes: [] })[0], 0, '空小节张力为 0');
 });
