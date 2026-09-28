@@ -79,7 +79,7 @@ export function detectLoop(recentRoots, window = 6, maxDistinct = 3) {
 /** 下一和弦候选：风格进行池全集 + 进行延续/乐句位置加权 + 替换和弦（副属/借用/悬挂）
  *  recentRoots 用于循环锁死断路器：最近若干根音绕成环时，循环成员直接从候选中剔除（代码策划候选集）。
  *  与根音疲劳互补——疲劳是"用得太多"（阈值 2.0，衰减 0.93，攒得慢），锁死是"结构上正在绕圈"（当小节即生效）。 */
-export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEnd, lastPhraseFirst = null, recentRoots = [], fatigue = {}) {
+export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEnd, lastPhraseFirst = null, recentRoots = [], fatigue = {}, opts = {}) {
   const pools = style.progs[plan.mode] ?? Object.values(style.progs)[0];
   const norm = (s) => String(s).replace(/\s+/g, '');
   const cand = new Map();
@@ -146,6 +146,9 @@ export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEn
       let weight = w;
       if (barInPhrase === 0 && p.rootPc === 0) weight += 0.6;
       if (isPhraseEnd && (p.rootPc === 7 || p.rootPc === 0)) weight += 1.0;
+      // 段落边界比乐句边界更强：新段落重新立足（T），段落收束用更确定的终止式
+      if (opts.sectionStart && p.rootPc === 0) weight += 1.0;
+      if (opts.sectionEnd && (p.rootPc === 7 || p.rootPc === 0)) weight += 0.8;
       if (currentSym && norm(currentSym) === sym) weight -= 1.2 * pools; // 连续同和弦：按池数放大罚分
       if (barInPhrase === 0 && lastPhraseFirst && sym !== norm(lastPhraseFirst) && [0, 5, 9].includes(p.rootPc)) {
         weight += 0.5; // 乐句开头换进行：换个起点，别每段都一样开场
@@ -273,6 +276,22 @@ export function intensityTarget(plan, progress, isPhraseEnd, barsPerPhrase = 8) 
     v = (ARC_CURVES[plan?.arc] ?? ARC_CURVES.arch)(progress);
   }
   return Math.min(3, Math.max(0, v - (isPhraseEnd ? 0.5 : 0)));
+}
+
+/**
+ * 发展手法（第 7 问）权重。**段落边界有特殊语义**：
+ *  段落首大幅偏向 repeat（承袭）——A→A' 的听觉关联正是靠「同一动机在新段落里再出现一次」建立的；
+ *  没有这一步，两段只是并置而不是呼应。同时压制 new——新段落不是「另起新句」，是「重述」。
+ */
+export function developCandidates(plan, { barInPhrase = 0, isPhraseEnd = false, lastDevelop = null, sectionStart = false, sectionEnd = false } = {}) {
+  const w = { repeat: 0.5, sequence: 1.1, inversion: 0.5, ornament: 0.9, new: 0.9 };
+  if (barInPhrase <= 1) w.new += 0.5;
+  if (isPhraseEnd) w.repeat += 0.4;
+  if (lastDevelop === 'repeat') w.repeat *= 0.3;
+  if ((plan?.density ?? 0.5) > 0.6) w.ornament += 0.2;
+  if (sectionStart) { w.repeat += 1.6; w.new *= 0.3; }
+  if (sectionEnd) { w.repeat += 0.8; w.inversion += 0.4; }
+  return w;
 }
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));

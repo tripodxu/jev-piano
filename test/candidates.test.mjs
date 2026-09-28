@@ -2,7 +2,7 @@
 // 这些纯函数决定了"模型能选什么"，因此这里锁住的是"不可选"的不变量，而不只是"可选"。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, commonTones, fifthsDist, functionCandidates, deriveSections, sectionAt } from '../public/js/candidates.js';
+import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, commonTones, fifthsDist, functionCandidates, deriveSections, sectionAt, developCandidates } from '../public/js/candidates.js';
 import { parseRoman, STYLE_BY_ID, HARMONIC_FUNCTIONS } from '../public/js/music.js';
 
 const MINOR_PLAN = { mode: 'minor', meterNum: 4, barsPerPhrase: 8, density: 0.5, totalBars: 32, arc: 'arch' };
@@ -170,6 +170,46 @@ test('sectionAt: 越界与非法输入安全降级', () => {
   assert.equal(sectionAt([], 0), null);
   assert.equal(sectionAt(null, 0), null);
   assert.equal(sectionAt(undefined, 3), null);
+});
+
+/* ---------------- 段落边界的动机与和声语义 ---------------- */
+
+test('developCandidates: 段落首显著偏向「承袭」（A 到 A-prime 的再现关系靠它建立）', () => {
+  const base = developCandidates({ arc: 'arch' }, { barInPhrase: 3, lastDevelop: 'new' });
+  const atSec = developCandidates({ arc: 'arch' }, { barInPhrase: 0, lastDevelop: 'new', sectionStart: true });
+  assert.ok(atSec.repeat > base.repeat * 1.8, `段落首 repeat ${atSec.repeat.toFixed(2)} 应远高于平时 ${base.repeat.toFixed(2)}`);
+  assert.ok(atSec.new < base.new, '段落首应是「重述主题」而不是「另起新句」');
+  for (const k of ['sequence', 'inversion', 'ornament', 'new']) {
+    assert.ok(atSec[k] > 0, `段落首 ${k} 权重被压成 0，模型失去选择`);
+  }
+});
+
+test('developCandidates: 刚承袭过就抑制再次承袭（既有逻辑不回归）', () => {
+  const a = developCandidates({}, { barInPhrase: 0, lastDevelop: 'new' }).repeat;
+  const b = developCandidates({}, { barInPhrase: 0, lastDevelop: 'repeat' }).repeat;
+  assert.ok(b < a, '连续承袭应被抑制');
+});
+
+test('developCandidates: 乐句头仍偏向新句、乐句尾仍偏向承袭（原有语义不回归）', () => {
+  const head = developCandidates({}, { barInPhrase: 0, lastDevelop: 'new' });
+  const mid = developCandidates({}, { barInPhrase: 3, lastDevelop: 'new' });
+  const tail = developCandidates({}, { barInPhrase: 7, isPhraseEnd: true, lastDevelop: 'new' });
+  assert.ok(head.new > mid.new, '乐句头应偏向新句');
+  assert.ok(tail.repeat > mid.repeat, '乐句尾应偏向承袭');
+  assert.deepEqual(Object.keys(mid).sort(), ['inversion', 'new', 'ornament', 'repeat', 'sequence']);
+});
+
+test('chordCandidates: 段落首更偏向主和弦、段落末更偏向 V/I', () => {
+  const plan = { mode: 'minor', meterNum: 4, barsPerPhrase: 8, density: 0.5, totalBars: 32, arc: 'arch' };
+  const style = STYLE_BY_ID.romantic;
+  const w = (opts) => chordCandidates(style, plan, 'iv', opts.bi, opts.be, null, [], {}, opts);
+  const plain = w({ bi: 3, be: false });
+  const secStart = w({ bi: 0, be: false, sectionStart: true });
+  const secEnd = w({ bi: 7, be: true, sectionEnd: true });
+  const g = (c, pc) => c.find((x) => x.rootPc === pc)?.weight ?? -Infinity;
+  assert.ok(g(secStart, 0) > g(plain, 0), `段落首主和弦 ${g(secStart, 0)} 应高于普通小节 ${g(plain, 0)}`);
+  const cad = (c) => g(c, 0) + g(c, 7);
+  assert.ok(cad(secEnd) > cad(plain), `段落末终止式 ${cad(secEnd)} 应强于普通小节 ${cad(plain)}`);
 });
 
 /* ---------------- 其余候选构造 ---------------- */

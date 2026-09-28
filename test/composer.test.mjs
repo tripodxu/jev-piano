@@ -131,6 +131,32 @@ test('真实渠道失败时同构兜底：typesafe 无 key → fixture 决策，
 
 /* ---------------- 强度连续化（score 问是整数档，音乐需要连续动态） ---------------- */
 
+test('段落边界进入候选权重：段落首明显更常「承袭」，且决策完整', async () => {
+  let atStart = 0, atStartRepeat = 0, totalRepeat = 0, totalBars = 0, fullQ = 0;
+  for (const seed of [2026, 2027, 2028]) {
+    const { composer, plan } = await makeComposer({ styleId: 'romantic', seed, bars: 32 });
+    for (let i = 0; i < 32; i++) {
+      const bar = await composer.nextBar();
+      totalBars++;
+      const isRepeat = bar.decision.develop === 'repeat';
+      if (isRepeat) totalRepeat++;
+      if (plan.sections.some((s) => s.start === bar.index)) {
+        atStart++;
+        if (isRepeat) atStartRepeat++;
+        for (const q of ['chord', 'lh', 'rhythm', 'contour', 'intensity', 'breathe', 'develop', 'function']) {
+          if (q in bar.decision.answers) fullQ++;
+        }
+      }
+    }
+  }
+  const base = totalRepeat / totalBars;
+  const atSec = atStartRepeat / atStart;
+  assert.ok(atStart >= 8, `段落起点太少（${atStart}）`);
+  assert.equal(fullQ, atStart * 8, '段落首小节仍应有完整的八问决策');
+  assert.ok(atSec > base * 1.8, `段落首「承袭」${(atSec * 100).toFixed(0)}% 应远高于全局基线 ${(base * 100).toFixed(0)}%`);
+  assert.ok(atSec > 0.4, `段落首「承袭」${(atSec * 100).toFixed(0)}% 应占多数`);
+});
+
 test('强度连续化：相邻小节的强度跳变有界（不再出现整数档的 0↔3 翻转）', async () => {
   for (const seed of [2020, 2022, 2027, 2028]) {
     const { composer } = await makeComposer({ seed });
@@ -164,21 +190,33 @@ test('强度连续化：模型仍有发言权（不是退化成纯计划弧线�
   assert.ok(unique.size >= 5, `强度序列只有 ${unique.size} 种取值，可能退化成了跟随弧线`);
 });
 
-test('强度曲线：rise 弧线的强度随进度上升（多种子相关性）', async () => {
-  let cov = 0, n = 0;
-  for (const seed of [5, 6, 7, 8, 9]) {
-    const plan = await buildPlan({ prompt: '春日', goal: '欢快庆典', styleId: 'classical', seed }, {});
-    assert.equal(plan.arc, 'rise');
-    const c = new Composer(plan, { channel: 'fixture' });
-    for (let i = 0; i < 32; i++) {
-      const bar = await c.nextBar();
-      const p = i / 32;
-      cov += (p - 0.5) * (bar.intensity - 1.5);
-      n++;
+test('强度曲线：rise 弧线的强度随进度上升，flat 弧线无趋势（真 Pearson 相关）', async () => {
+  const pearson = (xs, ys) => {
+    const n = xs.length;
+    const mx = xs.reduce((s, x) => s + x, 0) / n, my = ys.reduce((s, y) => s + y, 0) / n;
+    let num = 0, dx = 0, dy = 0;
+    for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (ys[i] - my); dx += (xs[i] - mx) ** 2; dy += (ys[i] - my) ** 2; }
+    return num / Math.sqrt(dx * dy);
+  };
+  const collect = async (goal) => {
+    const X = [], Y = [];
+    for (const seed of [5, 6, 7, 8, 9]) {
+      const plan = await buildPlan({ prompt: '春日', goal, styleId: 'classical', seed }, {});
+      assert.equal(plan.arc, goal === '欢快庆典' ? 'rise' : 'flat');
+      const c = new Composer(plan, { channel: 'fixture' });
+      for (let i = 0; i < 32; i++) { X.push(i / 32); Y.push((await c.nextBar()).intensity); }
     }
-  }
-  const corr = cov / n;
-  assert.ok(corr > 0.05, `rise 弧线强度应随进度上升: cov=${corr.toFixed(3)} (${n} 小节)`);
+    return pearson(X, Y);
+  };
+  // 注意：中心必须取实际均值。早年的版本硬编码中心 1.5，在段落化之后（rise 的实际均值约 1.67）
+  // 会直接抵消掉进度项，把 0.13 的上升趋势压成 0.046 —— 那不是强度不升，是统计量错了。
+  const rise = await collect('欢快庆典');
+  assert.ok(rise > 0.08, `rise 弧线的强度应随进度上升，Pearson=${rise.toFixed(3)}`);
+  // 反向断言用**相对比较**而非「flat 必须为 0」：本项目的 flat 模板是 A1.4→B2.1→A'1.5→Coda1.0，
+  // 整体缓缓下降（-0.35）才是设计意图。真正要防的是「常数偏移让任何弧线都显得上升」，
+  // 所以断言 rise 必须显著高于 flat。
+  const flat = await collect('放松助眠');
+  assert.ok(rise > flat + 0.3, `rise(${rise.toFixed(3)}) 应显著高于 flat(${flat.toFixed(3)})`);
 });
 
 test('决策元信息可归因；循环锁死「要么触发、要么无环可破」', async () => {

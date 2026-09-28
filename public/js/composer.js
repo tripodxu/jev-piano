@@ -5,7 +5,7 @@ import {
   chordLabel, chordMidis, scaleMidis, nearest, lhVoicing, midiName, keywordPlan, functionOf,
 } from './music.js';
 import { askJev, fixtureAnswer, expandPlan } from './jev.js';
-import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, functionCandidates, deriveSections } from './candidates.js';
+import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, functionCandidates, deriveSections, sectionAt, developCandidates } from './candidates.js';
 
 /**
  * 校验 LLM 给的段落：数量 2..5、arc 合法、level ∈ [0,3]，长度不超剩余。
@@ -498,7 +498,11 @@ export class Composer {
 
     const recentRoots = this.history.slice(-6).map((b) => b.chord.rootPc);
     const loopLocked = detectLoop(recentRoots).locked;
-    const cands = chordCandidates(this.style, plan, this.currentSymRoman, pos.barInPhrase, pos.isPhraseEnd, this.lastPhraseFirst, recentRoots, this.rootFatigue);
+    // 段落边界标志：曲式在和声与动机上的语义（段落比乐句更强）
+    const secHere = sectionAt(plan.sections, this.index);
+    const sectionStart = !!secHere && secHere.start === this.index;
+    const sectionEnd = !!secHere && secHere.start + secHere.bars - 1 === this.index;
+    const cands = chordCandidates(this.style, plan, this.currentSymRoman, pos.barInPhrase, pos.isPhraseEnd, this.lastPhraseFirst, recentRoots, this.rootFatigue, { sectionStart, sectionEnd });
     // 第 7 问「和声功能」：模型先说下一小节要往哪个功能走（语义先于音名），
     // 和弦仍在候选集内选——功能**不做硬过滤**（同一请求里无法先问功能再问和弦，
     // 硬过滤会让模型自己的合法作答被前置问题判死）。它的三个用途：语义语境、
@@ -529,11 +533,7 @@ export class Composer {
     const breatheP = pos.isPhraseEnd ? 0.65 : (plan.density < 0.4 ? 0.3 : 0.12);
 
     // 发展手法 fixture 权重：刚"承袭"过就抑制承袭；乐句头鼓励新句；高密度鼓励装饰
-    const devW = { repeat: 0.5, sequence: 1.1, inversion: 0.5, ornament: 0.9, new: 0.9 };
-    if (pos.barInPhrase <= 1) devW.new += 0.5;
-    if (pos.isPhraseEnd) devW.repeat += 0.4;
-    if (this.developHistory.at(-1) === 'repeat') devW.repeat *= 0.3;
-    if (plan.density > 0.6) devW.ornament += 0.2;
+    const devW = developCandidates(plan, { barInPhrase: pos.barInPhrase, isPhraseEnd: pos.isPhraseEnd, lastDevelop: this.developHistory.at(-1) ?? null, sectionStart, sectionEnd });
 
     const state = {
       piece: {
@@ -543,7 +543,11 @@ export class Composer {
       position: {
         bar: pos.bar, bar_in_phrase: pos.barInPhrase + 1, phrase: pos.phrase + 1,
         is_phrase_end: pos.isPhraseEnd, progress: Number(pos.progress.toFixed(2)),
+        section: secHere?.id ?? null, is_section_start: sectionStart, is_section_end: sectionEnd,
       },
+      // 曲式全貌：模型需要看到 A→B→A' 的整体才谈得上「呼应」，
+      // 孤立告知当前段落 id 等于没告知（它不知道下一个段落是再现还是对比）
+      form: (plan.sections ?? []).map((s) => `${s.id}:${s.arc}@${s.level}`).join(' '),
       harmony: { current: this.currentChord?.symbol ?? null, current_roman: this.currentSymRoman, current_function: curFn, recent: this.history.slice(-4).map((b) => b.chord.symbol), loop_locked: loopLocked },
       last_bar: this.history.length ? {
         lh: this.history.at(-1).decision.lh, contour: this.history.at(-1).decision.contour,
