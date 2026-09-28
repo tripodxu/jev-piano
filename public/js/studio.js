@@ -195,6 +195,16 @@ export function ensureStudio() {
 
 function toastify(msg) { toast(document.getElementById('toast'), msg); }
 
+/** 自动保存写入：存储不可用（隐私模式/配额满）时返回 false，由调用方提示用户 */
+export function savePiece(piece, storage) {
+  try {
+    storage.setItem(STORE_KEY, JSON.stringify(piece));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function setPiece(p) {
   piece = p;
   undoStack = []; redoStack = [];
@@ -490,7 +500,9 @@ function autosave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     if (!piece) return;
-    try { localStorage.setItem(STORE_KEY, JSON.stringify({ ...piece, bpm: Number(els.bpm.value) })); } catch { /* */ }
+    if (!savePiece({ ...piece, bpm: Number(els.bpm.value) }, localStorage)) {
+      toastify('自动保存失败：浏览器存储不可用（隐私模式或空间已满），请及时导出 JSON 备份');
+    }
   }, 500);
 }
 

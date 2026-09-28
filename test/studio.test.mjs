@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   keywordAction, densifyHand, sparserHand, transposeNotes, scaleVel,
-  chordAt, applyAction, validatePiece,
+  chordAt, applyAction, validatePiece, savePiece,
 } from '../public/js/studio.js';
 
 function mkPiece() {
@@ -110,4 +110,13 @@ test('validatePiece: 版本/结构/音符字段校验', () => {
   assert.equal(validatePiece(null), null);
   const bad = { ...JSON.parse(JSON.stringify({ ...mkPiece(), version: 1 })), notes: [{ midi: 'x', startBeats: 0 }] };
   assert.equal(validatePiece(bad), null);
+});
+
+test('savePiece: 存储可用时写入并返回 true；不可用时返回 false 不抛错', () => {
+  const ok = { setItem(k, v) { this.k = k; this.v = v; } };
+  assert.equal(savePiece({ version: 1, notes: [] }, ok), true);
+  assert.equal(ok.k, 'jevpiano.studio.v1');
+  assert.equal(JSON.parse(ok.v).version, 1);
+  const boom = { setItem() { throw new Error('QuotaExceededError'); } };
+  assert.equal(savePiece({ version: 1, notes: [] }, boom), false);
 });
