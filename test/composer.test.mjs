@@ -1,7 +1,7 @@
 // composer.test.mjs — 决策器：确定性、音域、终止式、呼吸、buildPlan、fixture 兜底
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPlan, Composer, mulberry32, detectLoop, chordCandidates } from '../public/js/composer.js';
+import { buildPlan, Composer, detectLoop, chordCandidates } from '../public/js/composer.js';
 import { chordPcs, STYLE_BY_ID, STYLES } from '../public/js/music.js';
 
 async function makeComposer(overrides = {}, cfg = { channel: 'fixture' }) {

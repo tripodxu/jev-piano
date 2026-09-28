@@ -1,8 +1,8 @@
 // composer.js — 编曲决策器：Jev 每小节一次请求（6 问并行），代码把选择渲染成音符。
 // 真实 Jev 不可用时（无 key/CORS/断网），fixture 采样器用同一候选集与权重同构兜底，播放永不中断。
 import {
-  STYLES, STYLE_BY_ID, LH_DEFS, RHYTHM_POOLS, NOTE_NAMES,
-  parseRoman, chordLabel, chordPcs, chordMidis, scaleMidis, nearest, lhVoicing, midiName, keywordPlan,
+  STYLE_BY_ID, LH_DEFS, RHYTHM_POOLS, NOTE_NAMES,
+  parseRoman, chordLabel, chordMidis, scaleMidis, nearest, lhVoicing, midiName, keywordPlan,
 } from './music.js';
 import { askJev, fixtureAnswer, expandPlan } from './jev.js';
 
@@ -211,11 +211,6 @@ export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEn
     return [...merged, ...rest];
   }
   return merged;
-}
-
-/** 和弦音功能描述（Jev criteria / fixture 共用） */
-export function chordCriteria(cands) {
-  return Object.fromEntries(cands.map((c) => [c.sym, c.desc]));
 }
 
 /** 左手织体候选（按强度微调权重；连续同织体 ≥2 小节后衰减，避免伴奏原地踏步） */
