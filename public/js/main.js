@@ -7,7 +7,8 @@ import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
 import { renderKeyboard, Fall, TensionGraph, addDecision, pushFnSegment, renderPlan, setStatus, toast } from './ui.js';
-import { barTension, targetSeries, smooth, tensionStats } from './tension.js';
+import { barTension, smooth, tensionStats } from './tension.js';
+import { planTargetSeries } from './candidates.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -137,7 +138,7 @@ async function start() {
   renderPlan(els.planCard, plan);
   if (!settings.llmEnabled) els.planCard.querySelector('.badge')?.classList.add('dim');
   // 张力对照带：计划弧线在演奏前就位，实际张力随小节逐条长出来
-  tensionGraph.setTarget(smooth(targetSeries(plan, plan.barsPerPhrase), 3));
+  tensionGraph.setTarget(smooth(planTargetSeries(plan, plan.barsPerPhrase), 3));
   tensionGraph.reset();
 
   const composer = new Composer(plan, {

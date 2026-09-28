@@ -2,7 +2,8 @@
 // 锁住的核心是"它测的是张力不是强度"——若哪天相关性趋近 1，这层就失去存在意义。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shapeTension, barTension, tensionSeries, targetSeries, smooth, tensionStats, FUNCTION_TENSION } from '../public/js/tension.js';
+import { shapeTension, barTension, tensionSeries, smooth, tensionStats, FUNCTION_TENSION } from '../public/js/tension.js';
+import { planTargetSeries, deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
   chord: { rootPc: 0, shape: '', symbol: 'C' },
@@ -77,18 +78,21 @@ test('tensionSeries / tensionStats: 逐小节对应，统计量自洽', () => {
   assert.deepEqual(tensionStats([]), { mean: 0, max: 0, min: 0, span: 0 }, '空序列不应崩');
 });
 
-test('targetSeries: 与计划弧线同形且归一到 0..1', () => {
-  const rise = targetSeries({ arc: 'rise', totalBars: 32 });
-  const fall = targetSeries({ arc: 'fall', totalBars: 32 });
-  assert.equal(rise.length, 32);
-  assert.ok(rise[31] > rise[0], 'rise 弧线应上升');
-  assert.ok(fall[31] < fall[0], 'fall 弧线应下降');
-  for (const arc of ['flat', 'rise', 'arch', 'fall']) {
-    for (const v of targetSeries({ arc, totalBars: 16 })) assert.ok(v >= 0 && v <= 1, `${arc} => ${v} 越界`);
-  }
-  // 乐句尾的减强度会形成周期性凹陷
-  const arch = targetSeries({ arc: 'arch', totalBars: 32 });
-  assert.ok(arch[7] < arch[6], '乐句尾（第 8 小节）应比前一小节低');
+test('planTargetSeries: 段落感知且归一到 0..1（张力带的幽灵线必须与音乐同源）', () => {
+  const plan = { arc: 'arch', totalBars: 32, barsPerPhrase: 8, sections: deriveSections('arch', 32) };
+  const s = planTargetSeries(plan, 8);
+  assert.equal(s.length, 32);
+  for (const v of s) assert.ok(v >= 0 && v <= 1, `${v} 越界`);
+  // B 段（8..15）应明显高于 Coda（24..31）
+  const bMax = Math.max(...s.slice(8, 16));
+  const codaMax = Math.max(...s.slice(24, 32));
+  assert.ok(bMax > codaMax, `B 段 ${bMax.toFixed(2)} 应高于 Coda ${codaMax.toFixed(2)}`);
+  // 乐句尾有下陷
+  assert.ok(s[7] < s[6], '第 8 小节（乐句尾）应比前一小节低');
+  // 无 sections 的旧计划仍能工作
+  const legacy = planTargetSeries({ arc: 'fall', totalBars: 16 }, 8);
+  assert.equal(legacy.length, 16);
+  assert.ok(legacy.every((v) => v >= 0 && v <= 1));
 });
 
 test('smooth: 端点不丢数据、长度不变、确实降噪', () => {

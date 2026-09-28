@@ -2,7 +2,7 @@
 // 这些纯函数决定了"模型能选什么"，因此这里锁住的是"不可选"的不变量，而不只是"可选"。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, commonTones, fifthsDist, functionCandidates } from '../public/js/candidates.js';
+import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, commonTones, fifthsDist, functionCandidates, deriveSections, sectionAt } from '../public/js/candidates.js';
 import { parseRoman, STYLE_BY_ID, HARMONIC_FUNCTIONS } from '../public/js/music.js';
 
 const MINOR_PLAN = { mode: 'minor', meterNum: 4, barsPerPhrase: 8, density: 0.5, totalBars: 32, arc: 'arch' };
@@ -89,6 +89,87 @@ test('chordCandidates: 功能转移加分（属之后主和弦加分，主之后
   const w = (cands, pc) => cands.find((c) => c.rootPc === pc)?.weight ?? -Infinity;
   assert.ok(w(afterD, 0) > w(afterD, 5), `属之后主(${w(afterD, 0)}) 应高于下属(${w(afterD, 5)})`);
   assert.ok(w(afterT, 5) > w(afterT, 0), `主之后下属(${w(afterT, 5)}) 应高于主(${w(afterT, 0)})`);
+});
+
+/* ---------------- 曲式：段落结构 ---------------- */
+
+test('deriveSections: 段数与长度合理，边界与乐句对齐', () => {
+  for (const bars of [16, 32, 64]) {
+    const secs = deriveSections('arch', bars);
+    assert.equal(secs.length, bars >= 24 ? 4 : 2, `bars=${bars} 段数不对`);
+    let cover = 0;
+    for (const s of secs) {
+      assert.ok(s.bars > 0, `bars=${bars} 段 ${s.id} 长度非正`);
+      assert.ok(s.level >= 0 && s.level <= 3, `bars=${bars} 段 ${s.id} level 越界`);
+      assert.ok(['flat', 'rise', 'arch', 'fall'].includes(s.arc), `非法 arc ${s.arc}`);
+      cover += s.bars;
+    }
+    assert.equal(cover, bars, `段落长度之和应等于总小节数`);
+    assert.equal(secs[0].start, 0);
+    for (let i = 1; i < secs.length; i++) {
+      assert.equal(secs[i].start, secs[i - 1].start + secs[i - 1].bars, '段落必须首尾相接');
+    }
+    for (const s of secs) assert.equal(s.bars % 8, 0, `段落长度 ${s.bars} 未对齐 8 小节乐句`);
+  }
+});
+
+test("deriveSections: Coda 恒为最安静的收束段，峰值位置随曲式而变（B/再现段/开场）", () => {
+  // arch 形式：A–B–A'–Coda，峰值在 B（对比段）
+  const arch = deriveSections('arch', 32);
+  assert.equal(arch.length, 4);
+  assert.equal(arch[0].id, 'A');
+  assert.ok(arch[2].id.startsWith('A'), `第三段应是 A'，实际 ${arch[2].id}`);
+  assert.equal(arch.reduce((a, b) => (b.level > a.level ? b : a)).id, 'B', 'arch 的峰值在 B');
+  // 四种弧线的普遍规律：必有 B 对比段、必有 Coda，且 Coda 恒低于该曲式的峰值段（收束的性质）
+  for (const arc of ['arch', 'rise', 'fall', 'flat']) {
+    const s = deriveSections(arc, 32);
+    assert.equal(s.length, 4, `${arc} 应有 4 段`);
+    assert.ok(s.some((x) => x.id === 'B'), `${arc} 缺少 B 对比段`);
+    const coda = s.at(-1);
+    const peak = Math.max(...s.map((x) => x.level));
+    assert.ok(coda.level < peak, `${arc} 的 Coda(${coda.level}) 应低于峰值(${peak})`);
+    assert.ok(['fall', 'flat'].includes(coda.arc), `${arc} 的收束段应以衰减/静止收尾，实际 ${coda.arc}`);
+  }
+  // 峰值位置确实随曲式而变：rise 的峰值在再现段，fall 的峰值在开场
+  assert.equal(deriveSections('rise', 32).reduce((a, b) => (b.level > a.level ? b : a)).id.startsWith('A'), true, 'rise 的峰值在再现段');
+  assert.equal(deriveSections('fall', 32).reduce((a, b) => (b.level > a.level ? b : a)).id, 'A', 'fall 的峰值在开场');
+  // Coda 是"收束"不是"归零"：上升曲式的尾声仍应比开场响（庆典收得比开场轻是反直觉的）
+  const rise = deriveSections('rise', 32);
+  assert.ok(rise.at(-1).level > rise[0].level, `rise 的 Coda(${rise.at(-1).level}) 不应低于 A(${rise[0].level})`);
+  // 但下降曲式的尾声就该一路收到底
+  const fall = deriveSections('fall', 32);
+  assert.ok(fall.at(-1).level < fall[0].level, 'fall 的 Coda 应低于 A');
+  // 下降曲式的 Coda 恒为最安静段
+  assert.equal(fall.reduce((a, b) => (b.level < a.level ? b : a)).id, 'Coda');
+});
+
+test('intensityTarget: 段落感知——B 段峰值高于 A 段，Coda 低于 A 段', () => {
+  const plan = { arc: 'arch', totalBars: 32, barsPerPhrase: 8, sections: deriveSections('arch', 32) };
+  const at = (bar) => intensityTarget(plan, bar / 32, false);
+  const peakOf = (a, b) => Math.max(...Array.from({ length: b - a }, (_, i) => at(a + i)));
+  const aPeak = peakOf(0, 8), bPeak = peakOf(8, 16), coda = peakOf(24, 32);
+  assert.ok(bPeak > aPeak, `B 段峰值 ${bPeak.toFixed(2)} 应高于 A 段 ${aPeak.toFixed(2)}`);
+  assert.ok(coda < aPeak, `Coda ${coda.toFixed(2)} 应低于 A 段 ${aPeak.toFixed(2)}`);
+  for (let bar = 0; bar < 32; bar++) assert.ok(at(bar) >= 0 && at(bar) <= 3, `bar ${bar} 越界`);
+});
+
+test('intensityTarget: 无 sections 时退化为全局弧线（旧项目 JSON 兼容）', () => {
+  const legacy = { arc: 'fall', totalBars: 32, barsPerPhrase: 8 };
+  const a = intensityTarget(legacy, 0.1, false);
+  const b = intensityTarget(legacy, 0.9, false);
+  assert.ok(a > b, 'fall 弧线应下降');
+  assert.ok(a >= 0 && a <= 3);
+});
+
+test('sectionAt: 越界与非法输入安全降级', () => {
+  const secs = deriveSections('arch', 32);
+  assert.equal(sectionAt(secs, 0).id, 'A');
+  assert.equal(sectionAt(secs, 31).id, 'Coda');
+  assert.equal(sectionAt(secs, 99).id, 'Coda', '越界取末段');
+  assert.equal(sectionAt(secs, -5).id, 'A', '负数取首段');
+  assert.equal(sectionAt([], 0), null);
+  assert.equal(sectionAt(null, 0), null);
+  assert.equal(sectionAt(undefined, 3), null);
 });
 
 /* ---------------- 其余候选构造 ---------------- */

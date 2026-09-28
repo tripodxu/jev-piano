@@ -166,6 +166,10 @@ export const PLAN_SYS_PROMPT = [
   ' "mode":"major|minor|dorian|pentatonic 之一","keyPc":0-11 的整数(C=0,D=1,...,B=11),"bpm":50-140 的整数,',
   ' "mood":["两个英文情绪词"],"arc":"flat|rise|arch|fall 之一","swing":0-0.35,"density":0-1,"brightness":0-1,',
   ' "notes":"给演奏者的一句中文提示，20字内"}',
+  '可选字段 "sections"（曲式，系统二职责）：把整曲拆成 2-5 个段落，按出现顺序，形如 ',
+  '[{"id":"A","arc":"flat","level":1.2},{"id":"B","arc":"arch","level":2.2},{"id":"A2","arc":"flat","level":1.6},{"id":"Coda","arc":"fall","level":1.0}]。',
+  'arc ∈ flat|rise|arch|fall 表示该段内部的走向，level 是该段的基准强度 0-3。',
+  '典型四段式是 A 陈述 → B 对比（全曲峰值）→ A2 再现 → Coda 收束；没有把握就不要给这个字段。',
   '若 hint 里给了 style 必须服从；bpm/density/brightness 尽量符合 goal 的意图；mode 用小调表达阴郁、大调表达明亮，五声(pentatonic)适合东方与空灵题材。',
 ].join('\n');
 

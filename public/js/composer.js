@@ -5,7 +5,32 @@ import {
   chordLabel, chordMidis, scaleMidis, nearest, lhVoicing, midiName, keywordPlan, functionOf,
 } from './music.js';
 import { askJev, fixtureAnswer, expandPlan } from './jev.js';
-import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, functionCandidates } from './candidates.js';
+import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, functionCandidates, deriveSections } from './candidates.js';
+
+/**
+ * 校验 LLM 给的段落：数量 2..5、arc 合法、level ∈ [0,3]，长度不超剩余。
+ * 任一项不合格返回 null —— 调用方回退到 `deriveSections` 的模板。
+ * LLM 不必给 bars：缺省会均分到剩余长度，因此提示词可以只要求 id/arc/level。
+ */
+export function sanitizeSections(raw, totalBars) {
+  if (!Array.isArray(raw) || raw.length < 2 || raw.length > 5) return null;
+  const total = Math.max(1, Number(totalBars) || 32);
+  const out = [];
+  let start = 0;
+  for (let i = 0; i < raw.length && start < total; i++) {
+    const s = raw[i];
+    if (!s || !['flat', 'rise', 'arch', 'fall'].includes(s.arc)) return null;
+    const level = Number(s.level);
+    if (!Number.isFinite(level) || level < 0 || level > 3) return null;
+    const rest = total - start;
+    const left = raw.length - i;
+    const n = Math.max(1, Math.min(rest - (left - 1), Math.round(Number(s.bars) || rest / left) || 1));
+    const swing = Number(s.swing);
+    out.push({ id: String(s.id ?? i + 1).slice(0, 8), arc: s.arc, level, swing: Number.isFinite(swing) ? clamp(swing, 0, 1) : 0.4, bars: n, start });
+    start += n;
+  }
+  return out.length >= 2 ? out : null;
+}
 
 export function mulberry32(seed) {
   let a = seed >>> 0;
@@ -52,6 +77,7 @@ export async function buildPlan({ prompt = '', goal = '随机冒险', styleId = 
   const hint = { style: style?.name, goal };
 
   let base = null;
+  let llmSections = null;
   if (cfg.llm?.enabled && prompt.trim()) {
     const raw = await expandPlan(prompt, hint, cfg.llm);
     if (raw) {
@@ -73,6 +99,7 @@ export async function buildPlan({ prompt = '', goal = '随机冒险', styleId = 
           notes: String(raw.notes ?? '').slice(0, 80),
           source: 'llm',
         };
+        llmSections = raw.sections ?? null;   // 系统二：让 LLM 规划曲式（可选字段，非法则回退模板）
       }
     }
   }
@@ -95,6 +122,8 @@ export async function buildPlan({ prompt = '', goal = '随机冒险', styleId = 
 
   const st = STYLE_BY_ID[base.styleId];
   const [meterNum, meterDen] = st.meters[0].split('/').map(Number);
+  const barsPerPhrase = 8;
+  const totalBars = clamp(bars, 8, 128);
   return {
     ...base,
     title: base.title || `${prompt.slice(0, 12) || '无名'} · 即兴`,
@@ -102,8 +131,10 @@ export async function buildPlan({ prompt = '', goal = '随机冒险', styleId = 
     goal, seed,
     keyPc: base.keyPc ?? 0,
     meterNum: meterNum || 4, meterDen: meterDen || 4,
-    barsPerPhrase: 8,
-    totalBars: clamp(bars, 8, 128),
+    barsPerPhrase,
+    totalBars,
+    // 曲式（系统二）：LLM 给了就采纳它的，否则按弧线模板派生 A–B–A'–Coda
+    sections: sanitizeSections(llmSections, totalBars) ?? deriveSections(base.arc, totalBars, barsPerPhrase),
     melodyScale: base.mode === 'pentatonic' ? (st.id === 'oriental' ? 'pentatonicMinor' : 'pentatonicMajor') : base.mode,
     styleName: st.name,
   };

@@ -50,27 +50,6 @@ export function tensionSeries(bars) {
   return (bars ?? []).map(barTension);
 }
 
-/** 计划弧线在同一坐标下的形状：把强度曲线归一到 0..1，作为对照的"幽灵线" */
-export function targetSeries(plan, barsPerPhrase = 8) {
-  const out = [];
-  const n = Math.max(1, Number(plan?.totalBars) || 32);
-  for (let i = 0; i < n; i++) {
-    const p = i / n;
-    const isPhraseEnd = (i % barsPerPhrase) === barsPerPhrase - 1;
-    const v = targetArc(plan?.arc, p) - (isPhraseEnd ? 0.5 : 0);
-    out.push(clamp01(v / 3));
-  }
-  return out;
-}
-
-/** 与 composer 的 ARC_CURVES 同形（这里独立实现，避免分析层依赖决策层） */
-function targetArc(arc, p) {
-  if (arc === 'flat') return 0.9 + 0.3 * Math.sin(Math.PI * p);
-  if (arc === 'rise') return 0.6 + 1.8 * p;
-  if (arc === 'fall') return 2.4 - 1.8 * p;
-  return 0.7 + 1.8 * Math.sin(Math.PI * p);
-}
-
 /**
  * 滑动平滑（居中窗口）：张力逐小节抖动很大，直接连线会像心电图。
  * 窗口取奇数长度，端点做边缘复制（不丢数据）。

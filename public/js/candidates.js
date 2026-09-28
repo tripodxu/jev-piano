@@ -223,9 +223,70 @@ export function contourWeights(plan, barInPhrase) {
   return w;
 }
 
-/** 强度曲线值（fixture score 的期望位置） */
-export function intensityTarget(plan, progress, isPhraseEnd) {
-  const v = (ARC_CURVES[plan.arc] ?? ARC_CURVES.arch)(progress);
+/** 曲式模板：段落 id / 内部弧线 / 基准强度 / 内部起伏幅度。这是经典的 A–B–A'–Coda 四段式。
+ *  level 决定该段"响到什么程度"，arc 决定该段"内部怎么走"，swing 是起伏的比例。
+ *  **Coda 的 level 是相对该曲式的，不是绝对安静**——上升曲式的尾声仍应比开场响
+ *  （"庆典"收得比开场更轻是反直觉的）；Coda 的任务是收束，不是归零。 */
+const FORM_TEMPLATES = {
+  arch: [['A', 'flat', 1.4, 0.3], ['B', 'arch', 2.2, 0.6], ["A'", 'flat', 1.6, 0.35], ['Coda', 'fall', 0.8, 0.25]],
+  rise: [['A', 'flat', 1.2, 0.25], ['B', 'rise', 1.9, 0.5], ["A'", 'rise', 2.1, 0.45], ['Coda', 'fall', 1.9, 0.2]],
+  fall: [['A', 'flat', 1.9, 0.35], ['B', 'fall', 1.5, 0.45], ["A'", 'fall', 1.1, 0.4], ['Coda', 'fall', 0.6, 0.2]],
+  flat: [['A', 'flat', 1.4, 0.25], ['B', 'arch', 2.1, 0.55], ["A'", 'flat', 1.5, 0.3], ['Coda', 'flat', 1.0, 0.2]],
+};
+
+/** 段落数：短曲 2 段，正常长度 4 段。每段长度取乐句长度的整数倍，段落边界与乐句边界天然对齐。 */
+export function deriveSections(arc, totalBars, barsPerPhrase = 8) {
+  const bars = Math.max(1, Math.round(Number(totalBars) || 32));
+  const n = bars >= barsPerPhrase * 3 ? 4 : 2;
+  const tpl = FORM_TEMPLATES[arc] ?? FORM_TEMPLATES.arch;
+  // 模板比段数长时取前三段 + 收束段（rise 的 5 段模板在 4 段曲里丢掉 Climax，保留 Coda）
+  const picks = n === 4 && tpl.length > 4 ? [tpl[0], tpl[1], tpl[2], tpl.at(-1)] : tpl.slice(0, n);
+  const per = Math.floor(bars / picks.length);
+  const out = [];
+  for (let i = 0; i < picks.length; i++) {
+    const [id, a, level, swing] = picks[i];
+    const count = i === picks.length - 1 ? bars - per * (picks.length - 1) : per;
+    if (count > 0) out.push({ id, arc: a, level, swing, bars: count, start: per * i });
+  }
+  return out;
+}
+
+/** 某小节属于哪个段落；越界取首/末段，非法输入返回 null */
+export function sectionAt(sections, bar) {
+  if (!Array.isArray(sections) || !sections.length) return null;
+  const b = Number(bar) || 0;
+  for (const s of sections) if (b >= s.start && b < s.start + s.bars) return s;
+  return b < 0 ? sections[0] : sections.at(-1);
+}
+
+/** 强度曲线值：段落感知——每段用自己的 arc 与基准值，段内再走局部弧线。
+ *  没有 sections 时退化为全局弧线（旧项目 JSON / 无段落计划时的兼容路径）。 */
+export function intensityTarget(plan, progress, isPhraseEnd, barsPerPhrase = 8) {
+  const total = Math.max(1, Number(plan?.totalBars) || 32);
+  const bar = Math.min(total - 1, Math.max(0, Math.floor(progress * total)));
+  const sec = sectionAt(plan?.sections, bar);
+  let v;
+  if (sec) {
+    const local = sec.bars > 1 ? (bar - sec.start) / (sec.bars - 1) : 0;
+    v = sec.level + ((ARC_CURVES[sec.arc] ?? ARC_CURVES.arch)(local) - 1.3) * (sec.swing ?? 0.4);
+  } else {
+    v = (ARC_CURVES[plan?.arc] ?? ARC_CURVES.arch)(progress);
+  }
   return Math.min(3, Math.max(0, v - (isPhraseEnd ? 0.5 : 0)));
+}
+
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+
+/** 计划张力序列：把 intensityTarget 归一到 0..1，供张力对照带的「计划弧线」幽灵线使用。
+ *  放在本模块而不是 tension.js —— 它由 intensityTarget 派生、描述的是**计划**而非已生成的音乐；
+ *  放进分析层会造成「分析依赖决策」的反向耦合。 */
+export function planTargetSeries(plan, barsPerPhrase = 8) {
+  const total = Math.max(1, Number(plan?.totalBars) || 32);
+  const out = [];
+  for (let i = 0; i < total; i++) {
+    const isPhraseEnd = (i % barsPerPhrase) === barsPerPhrase - 1;
+    out.push(clamp01(intensityTarget(plan, i / total, isPhraseEnd, barsPerPhrase) / 3));
+  }
+  return out;
 }
 

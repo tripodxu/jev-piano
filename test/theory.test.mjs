@@ -157,3 +157,36 @@ test('色板确实是进行池的上界扩充：romantic 小调色板根音多�
   assert.ok(palRoots.size > poolRoots.size, `色板 ${palRoots.size} 应多于池 ${poolRoots.size}`);
   for (const r of poolRoots) assert.ok(palRoots.has(r), `池里的根音 ${r} 必须也在色板中（不回归既有风格色彩）`);
 });
+
+test('sanitizeSections: LLM 段落校验严格，任一不合格即回退 null（交给模板派生）', async () => {
+  const { sanitizeSections } = await import('../public/js/composer.js');
+  assert.equal(sanitizeSections(null, 32), null);
+  assert.equal(sanitizeSections('不是数组', 32), null);
+  assert.equal(sanitizeSections([{ arc: 'arch', level: 1.5, bars: 16 }], 32), null, '只有 1 段');
+  assert.equal(sanitizeSections([{ arc: '乱写', level: 1.5, bars: 16 }, { arc: 'flat', level: 1, bars: 16 }], 32), null, '非法 arc');
+  assert.equal(sanitizeSections([{ arc: 'arch', level: 9, bars: 16 }, { arc: 'flat', level: 1, bars: 16 }], 32), null, 'level 越界');
+  assert.equal(sanitizeSections([{ arc: 'arch', level: 1, bars: 16 }, { arc: 'flat', level: 1, bars: 16 }, { arc: 'x', level: 1, bars: 8 }], 32), null, '第三段非法则整体作废');
+  // 合法输入：start 必须首尾相接、长度之和等于总长
+  const ok = sanitizeSections([{ id: 'A', arc: 'flat', level: 1.2, bars: 16 }, { id: 'B', arc: 'rise', level: 2.4, bars: 16 }], 32);
+  assert.equal(ok.length, 2);
+  assert.equal(ok[0].start, 0);
+  assert.equal(ok[1].start, 16);
+  assert.equal(ok.reduce((s, x) => s + x.bars, 0), 32);
+  // 不给 bars 时应均分剩余（提示词可以只要求 id/arc/level）
+  const even = sanitizeSections([{ id: 'A', arc: 'flat', level: 1.2 }, { id: 'B', arc: 'rise', level: 2.4 }], 32);
+  assert.equal(even[0].bars, 16);
+  assert.equal(even[1].bars, 16);
+});
+
+test('buildPlan: 总是带合法 sections（LLM 不可用时由模板派生）', async () => {
+  const { buildPlan } = await import('../public/js/composer.js');
+  for (const bars of [16, 32, 64]) {
+    const plan = await buildPlan({ prompt: '雨夜的城市', goal: '随机冒险', styleId: 'random', seed: 5, bars }, {});
+    assert.ok(Array.isArray(plan.sections) && plan.sections.length >= 2, `bars=${bars} 缺 sections`);
+    assert.equal(plan.sections.reduce((s, x) => s + x.bars, 0), plan.totalBars, `bars=${bars} 段落长度之和应等于 totalBars`);
+    for (const s of plan.sections) {
+      assert.ok(['flat', 'rise', 'arch', 'fall'].includes(s.arc));
+      assert.ok(s.level >= 0 && s.level <= 3);
+    }
+  }
+});
