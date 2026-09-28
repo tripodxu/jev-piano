@@ -129,6 +129,41 @@ test('真实渠道失败时同构兜底：typesafe 无 key → fixture 决策，
   assert.ok(bar.notes.length >= 2);
 });
 
+/* ---------------- 强度连续化（score 问是整数档，音乐需要连续动态） ---------------- */
+
+test('强度连续化：相邻小节的强度跳变有界（不再出现整数档的 0↔3 翻转）', async () => {
+  for (const seed of [2020, 2022, 2027, 2028]) {
+    const { composer } = await makeComposer({ seed });
+    const seq = [];
+    for (let i = 0; i < 32; i++) seq.push((await composer.nextBar()).intensity);
+    let maxJump = 0, jumps2 = 0;
+    for (let i = 1; i < seq.length; i++) {
+      const d = Math.abs(seq[i] - seq[i - 1]);
+      maxJump = Math.max(maxJump, d);
+      if (d >= 2) jumps2++;
+    }
+    assert.ok(maxJump <= 1.0 + 1e-9, `seed ${seed} 最大跳变 ${maxJump.toFixed(2)} 超过速率上限 1.0`);
+    assert.equal(jumps2, 0, `seed ${seed} 出现 ${jumps2} 处 ≥2 档跳变`);
+  }
+});
+
+test('强度连续化：取值不再局限于整数档（连续化确实发生了）', async () => {
+  const { composer } = await makeComposer({ seed: 2022 });
+  const seq = [];
+  for (let i = 0; i < 32; i++) seq.push((await composer.nextBar()).intensity);
+  const nonInteger = seq.filter((v) => Math.abs(v - Math.round(v)) > 1e-6);
+  assert.ok(nonInteger.length >= 8, `32 小节里只有 ${nonInteger.length} 个非整数值，连续化没生效`);
+  for (const v of seq) assert.ok(v >= 0 && v <= 3, `${v} 越界`);
+});
+
+test('强度连续化：模型仍有发言权（不是退化成纯计划弧线）', async () => {
+  const { composer } = await makeComposer({ seed: 2022 });
+  const seq = [];
+  for (let i = 0; i < 32; i++) seq.push((await composer.nextBar()).intensity);
+  const unique = new Set(seq.map((v) => v.toFixed(3)));
+  assert.ok(unique.size >= 5, `强度序列只有 ${unique.size} 种取值，可能退化成了跟随弧线`);
+});
+
 test('强度曲线：rise 弧线的强度随进度上升（多种子相关性）', async () => {
   let cov = 0, n = 0;
   for (const seed of [5, 6, 7, 8, 9]) {

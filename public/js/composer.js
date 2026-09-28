@@ -20,6 +20,14 @@ export function mulberry32(seed) {
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const MODES = ['major', 'minor', 'dorian', 'mixolydian', 'pentatonic'];
 
+/** 强度的连续化参数。Jev 的 score 问按 API 契约只能答整数 0-3，但音乐需要连续动态：
+ *  实测直接渲染整数会让相邻小节平均跳 1.03 档、26.9% 的跳变 ≥2 档、6.2% 跳满 3 档
+ *  （力度 2.4 倍落差 + 左手织体分支同时翻转）。
+ *  dev  = 模型保留「相对计划弧线」偏移的比例（0.5 = 仍有一半发言权，不架空模型）
+ *  slew = 每小节允许的最大强度变化档数（速率限制，与压缩器 attack/release、MIDI CC 平滑同思路） */
+export const INTENSITY_DEV = 0.5;
+export const INTENSITY_SLEW = 1.0;
+
 /** 目标（goal）对计划参数的偏置 */
 export const GOAL_HINTS = {
   '放松助眠': { arc: 'flat', density: -0.15, brightness: -0.15 },
@@ -406,6 +414,7 @@ export class Composer {
     this.currentChord = null;
     this.lastEndMidi = null;
     this.intensitySoFar = 1;
+    this.lastIntensity = null;    // 上一小节实际渲染的强度（速率限制的参考点）
     this.directorNote = '';        // 用户自然语言演奏指示，实时生效
     this.pitchCenter = 72;         // 音区中心缓慢漂移，避免旋律总绕着同一个音域打转
     this.lastSigs = [];            // 最近两小节旋律指纹（反重复护栏）
@@ -593,7 +602,16 @@ export class Composer {
     const lh = lhs[ans.lh?.value] ? ans.lh.value : this.style.lh[0];
     const rhythmEntry = rhythms[ans.rhythm?.value] ?? rhythms.r0;
     const contour = CONTOURS[ans.contour?.value] ? ans.contour.value : 'wave';
-    const intensity = clamp(Number.isFinite(Number(ans.intensity?.value)) ? Number(ans.intensity.value) : intensityCurve, 0, 3);
+    // score 问只能答整数 0-3；直接渲染会跳档。两步连续化：
+    // ① 把整数解释为「相对计划弧线的偏移」，保留 dev 比例——模型仍决定往哪走；
+    // ② 对变化率设上限——模型仍决定去哪里，只是不能一小节跳三档。
+    const rawIntensity = Number(ans.intensity?.value);
+    const target = Number.isFinite(rawIntensity) ? clamp(rawIntensity, 0, 3) : intensityCurve;
+    const want = clamp(intensityCurve + (target - intensityCurve) * INTENSITY_DEV, 0, 3);
+    const intensity = this.lastIntensity == null
+      ? want
+      : clamp(this.lastIntensity + clamp(want - this.lastIntensity, -INTENSITY_SLEW, INTENSITY_SLEW), 0, 3);
+    this.lastIntensity = intensity;
     const breathe = ans.breathe?.value == null ? (this.rng() < breatheP) : !!ans.breathe.value;
     const dev = DEVELOP_OPS[ans.develop?.value] ? ans.develop.value : 'new';
     this.developHistory.push(dev);
