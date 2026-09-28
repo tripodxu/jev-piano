@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH } from '../public/js/ui.js';
 
 const bar = (over = {}) => ({
   index: 3,
@@ -72,4 +72,34 @@ test('planLine: 计划卡的段落清单是纯文本等价物（无颜色也能�
   assert.ok(!line.includes('<'), '纯文本，不应含 HTML');
   assert.equal(planLine(null), '', '无段落时整行不输出');
   assert.equal(planLine([]), '');
+});
+
+/* ---------------- 动机地图（文字/形状通道，不依赖颜色） ---------------- */
+
+test('motifShape: 音高序列归一化成可绘制轮廓（形状与音域大小无关）', () => {
+  const s = motifShape([72, 74, 76, 72]);
+  assert.equal(s.length, 4, '点数与音数一致');
+  for (const p of s) {
+    assert.ok(p.y >= 0 && p.y <= 1, `y=${p.y} 越界`);
+    assert.ok(p.x >= 0 && p.x <= 1, `x=${p.x} 越界`);
+  }
+  // 整体移调不改变形状：同一动机换个八度仍是同一形状
+  assert.deepEqual(motifShape([72, 74, 76, 72]), motifShape([60, 62, 64, 60]), '移调后形状应完全一致');
+  // 同音反复（span=0）不能除零
+  assert.deepEqual(motifShape([60, 60, 60]).map((p) => p.y), [0.5, 0.5, 0.5], '同音应落在中线');
+  assert.deepEqual(motifShape([]), [], '空输入不崩');
+  assert.deepEqual(motifShape(null), []);
+  assert.deepEqual(motifShape([60]), [{ x: 0, y: 0.5 }], '单音落在中线');
+  // 最高音在顶端（y 最小），这样画出来方向才对
+  const up = motifShape([60, 72]);
+  assert.ok(up[1].y < up[0].y, '音高上升应对应 y 减小');
+});
+
+test('DEVELOP_ZH: 五种发展手法都有标签（文字通道，不依赖颜色）', () => {
+  for (const k of ['repeat', 'sequence', 'inversion', 'ornament', 'new']) {
+    assert.ok(DEVELOP_ZH[k] !== undefined, `缺 ${k} 的标签`);
+  }
+  assert.equal(DEVELOP_ZH.repeat, '承', '承袭的标记是「承」');
+  assert.equal(DEVELOP_ZH.new, '', '新句无标记（它是「没有承袭」）');
+  assert.equal(Object.keys(DEVELOP_ZH).length, 5);
 });

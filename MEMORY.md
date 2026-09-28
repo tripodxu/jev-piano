@@ -7,6 +7,16 @@
 
 ---
 
+## [完成] 2026-09-28 · 动机地图（迭代轮次 12 · 前端）
+
+- **做了什么**（详见 [docs/memory/2026-09-28-motif-map.md](docs/memory/2026-09-28-motif-map.md)，计划 [docs/superpowers/plans/2026-09-28-motif-map.md](docs/superpowers/plans/2026-09-28-motif-map.md)）：新增**动机卡**——第 2 小节动机诞生时把旋律轮廓画成曲线（曲子的「形状」）并累计「回来 N 次」；功能轨每段加**发展手法通道**（承/模/倒/装），承袭额外给**顶部括线 + 亮边**的形状。skill 用 `impeccable/delight`。测试 105→**107**。
+- **Delight thesis**：「你的主题在曲子里回来了」。`impeccable/delight` 的判据是「这个瞬间必须只有这个产品做得出」——别的 AI 音乐生成器给音频不给可溯源结构，而第 11 轮才让主题真的会回来。**新造的能力如果没被看见，等于没造。**
+- **三套独立通道（不依赖颜色）**：功能=颜色（T/S/D/Tp 四色）· 手法=**文字**（承/模/倒/装）+ 承袭的**括线形状** · 段落=虚线竖线 + 段落名。每套都独立可读，灰度/色觉障碍下不失效。
+- **验证**：npm test 107/107；元素 id 契约 77/77（**只新增 1 个 id**：motifCanvas）；**决策指标 12 种子逐位不变**（chords 9.25 / entropy 2.45 / lh 27.83 / melody 30.17 / madj 0 / ladj 0）。
+- **坑**：① `motifShape` 的全同音边界——我原本用 `span || 1` 兜底除零，平线被贴在**顶边**；但「一条平线」放中线才符合直觉，是测试替我想到的；② 加导出 `DEV_ZH` 时没注意文件里已有同名私有常量 → SyntaxError（`node --check` 抓到，语法问题不会静默）。
+- **克制**：按 delight「不要为普通点击制造庆祝」+「重复一百次还讨喜是它的判据」，强调被限制成**一次性、900ms、零依赖**。**克制的彩蛋比华丽的动画更接近「被设计过」。**
+- **下一步**（迭代轮次 13 · 优化）：待定。
+
 ## [完成] 2026-09-28 · 动机发展真正落地（迭代轮次 11 · 创意）
 
 - **做了什么**（详见 [docs/memory/2026-09-28-motif-development.md](docs/memory/2026-09-28-motif-development.md)，计划 [docs/superpowers/plans/2026-09-28-motif-development.md](docs/superpowers/plans/2026-09-28-motif-development.md)）：README 承诺的「动机统一」此前**在渲染层从未实现**——`repeat`（承袭）走的是 `renderMelody`，与「新句」完全同一条路径。现���动机保存旋律素材（`midis`+`onsets`），新增 `buildFromMotif`，五种发展手法各走各的素材来源；`state.motif` 改为向模型描述动机本身。测试 104→**105**。

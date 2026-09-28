@@ -261,23 +261,30 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 }
 .now-bar { color: var(--text-dim); font-size: 13px; letter-spacing: 0.14em; font-variant-numeric: tabular-nums; }
 
+/* ---------- 动机卡：曲子的主题长什么样 ---------- */
+.motif-box { flex: none; padding: 0 26px 6px; }
+#motifCanvas {
+  display: block; width: 100%; height: 48px;
+  background: linear-gradient(180deg, rgba(12, 10, 8, 0.28), transparent);
+  border-left: 1px solid var(--line);
+}
 /* ---------- 和声功能轨：第 2 轮的和声语义在这里第一次变得可见 ---------- */
 .fn-ribbon-wrap { flex: none; padding: 0 26px 8px; }
 .fn-ribbon {
   list-style: none; margin: 0; padding: 0 0 1px;
   display: flex; gap: 3px; align-items: flex-end;
-  height: 34px; overflow-x: auto; overflow-y: hidden;
+  height: 44px; overflow-x: auto; overflow-y: hidden;
   scrollbar-width: none;
 }
 .fn-ribbon::-webkit-scrollbar { height: 0; }
 .fnseg {
   position: relative; flex: 1 0 26px; max-width: 54px;
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-  gap: 2px; cursor: default;
+  gap: 1px; cursor: default;
   animation: segIn .34s cubic-bezier(.16, 1, .3, 1);
 }
 @keyframes segIn { from { opacity: 0; transform: translateY(5px); } }
-.fnseg i { display: block; width: 100%; height: 12px; border-radius: 2px 2px 0 0; background: var(--seg-c, var(--brass)); }
+.fnseg i { display: block; width: 100%; height: 10px; border-radius: 2px 2px 0 0; background: var(--seg-c, var(--brass)); }
 .fnseg b {
   font: 500 10px/1 var(--sans); letter-spacing: .1em;
   color: var(--text-faint); font-weight: 500;
@@ -288,6 +295,17 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .fn-S i { --seg-c: var(--fn-S); }
 .fn-D i { --seg-c: var(--fn-D); }
 .fn-Tp i { --seg-c: var(--fn-Tp); }
+/* 发展手法：文字通道（与颜色无关）。承袭额外给一个形状——顶部括线 + 亮边 */
+.fnseg em {
+  font: 500 9px/1 var(--sans); letter-spacing: .06em; font-style: normal;
+  color: var(--text-faint); min-height: 9px;
+}
+.fnseg.theme i { box-shadow: 0 0 0 1px var(--brass-hi); }
+.fnseg.theme::before {
+  content: ""; position: absolute; left: -1px; right: -1px; top: 0; height: 4px;
+  border: 1px solid var(--brass-hi); border-bottom: none; border-radius: 3px 3px 0 0;
+}
+.fnseg.theme em { color: var(--brass-hi); font-weight: 600; }
 /* 循环锁死断路器触发：段顶一道细刻线——"这里被切断" */
 .fnseg.lock i::before {
   content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
@@ -549,6 +567,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   .now-chord { font-size: 40px; min-width: 84px; }
   .chordbox { padding: 14px 18px 6px; }
   .fn-ribbon-wrap { padding: 0 18px 6px; }
+  .motif-box { padding: 0 18px 4px; }
   .fnseg { flex: 1 0 22px; }        /* 窄屏下更窄的一段，宁可横滚也不挤压 */
   .fn-ribbon { justify-content: flex-end; }
   .keyboard { height: 100px; }

@@ -271,7 +271,8 @@ export function planLine(sections) {
   return sections.map((s) => `${sectionLabel(s)} ${Number(s?.bars) || 0} 小节`).join(' · ');
 }
 
-/** 决策日志：节目单式，一行一个小节 */
+/** 发展手法：第 7 问的五种手法，中文全称（供 title 等需要完整语义的场合） */
+export /** 决策日志：节目单式，一行一个小节 */
 const DEV_ZH = { repeat: '承袭', sequence: '模进', inversion: '倒影', ornament: '装饰', new: '新句' };
 const FN_ZH = { T: '主', S: '下属', D: '属', Tp: '色彩' };
 
@@ -319,6 +320,119 @@ export function addDecision(ul, bar) {
   while (ul.children.length > 60) ul.lastChild.remove();
 }
 
+/** 发展手法的短标签——功能轨上的**文字通道**（与颜色无关，灰度/色觉障碍下同样可读）。
+ *  颜色归和声功能，形态归发展手法，两个维度各用一套通道，互不干扰。 */
+export const DEVELOP_ZH = { repeat: '承', sequence: '模', inversion: '倒', ornament: '装', new: '' };
+
+/**
+ * 音高序列 → 归一化轮廓 [{x,y}]，x/y 都在 0..1。
+ * 整体移调不改变形状——同一动机换个八度仍是同一形状，这让"主题回来了"可以只比形状。
+ */
+export function motifShape(midis) {
+  if (!Array.isArray(midis) || !midis.length) return [];
+  const lo = Math.min(...midis), hi = Math.max(...midis);
+  const flat = hi === lo;                 // 全同音：形状是一条平线，放中线而不是贴顶边
+  const span = hi - lo || 1;
+  const n = midis.length;
+  return midis.map((m, i) => ({
+    x: n > 1 ? i / (n - 1) : 0,
+    y: flat || n < 2 ? 0.5 : 1 - (m - lo) / span,
+  }));
+}
+
+/**
+ * 动机卡：把曲子的主题画成一���「形状」，并累计它回来了几次。
+ *  骨架沿用 Fall / TensionGraph（ResizeObserver + setInterval 而非 rAF——标签页遮挡时 rAF 会被暂停）。
+ *  这是这个产品独有的东西：别的 AI 音乐生成器给音频，这里给可溯源的结构。
+ */
+export class MotifCard {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx2d = canvas.getContext('2d');
+    this.midis = [];
+    this.restatements = 0;
+    this.pulseAt = 0;
+    this.timer = null;
+    this._resize = () => {
+      const dpr = globalThis.devicePixelRatio || 1;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      this.ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.draw();
+    };
+    this._ro = new ResizeObserver(this._resize);
+    this._ro.observe(canvas);
+    this._resize();
+  }
+
+  /** 第 2 小节：动机诞生 */
+  setMotif(midis) {
+    this.midis = Array.isArray(midis) ? midis.filter((m) => Number.isFinite(m)) : [];
+    this.restatements = 0;
+    this.pulseAt = 0;
+    this.draw();
+    return this.midis.length;
+  }
+
+  /** 一次承袭：计数 +1，并触发一次**静默**强调（delight 的判据：只为真正有意义的瞬间庆祝，且只此一次） */
+  markRestatement() {
+    this.restatements++;
+    this.pulseAt = Date.now();
+    this.draw();
+  }
+
+  reset() { this.midis = []; this.restatements = 0; this.pulseAt = 0; this.draw(); }
+  start() { if (!this.timer) this.timer = setInterval(() => this.draw(), 120); }
+  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.draw(); }
+  destroy() { this.stop(); this._ro.disconnect(); }
+
+  draw() {
+    const { ctx2d: g, canvas } = this;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    if (!W || !H) return;
+    g.clearRect(0, 0, W, H);
+    g.save();
+    g.font = '10px var(--sans, sans-serif)';
+    g.fillStyle = 'rgba(154,144,120,0.95)';
+    g.textAlign = 'left'; g.textBaseline = 'top';
+    g.fillText('动机', 0, 0);
+    if (this.restatements) {
+      g.textAlign = 'right';
+      g.fillStyle = 'rgba(216,171,92,0.9)';
+      g.fillText(`回来 ${this.restatements} 次`, W, 0);
+    }
+    g.restore();
+
+    const pts = motifShape(this.midis);
+    if (pts.length < 2) {
+      g.save();
+      g.fillStyle = 'rgba(154,144,120,0.7)';
+      g.textAlign = 'left'; g.textBaseline = 'middle';
+      g.fillText(pts.length ? '' : '第 2 小节后出现', 0, H - 9);
+      g.restore();
+      return;
+    }
+    const padX = 6, top = 16, bot = 8;
+    const w = Math.max(1, W - padX * 2), h = Math.max(1, H - top - bot);
+    const X = (p) => padX + p.x * w;
+    const Y = (p) => top + p.y * h;
+    // 强调只在首次再现后约 900ms 内有效，之后回到常态——重复一百次还讨喜是 delight 的判据
+    const fresh = this.pulseAt && Date.now() - this.pulseAt < 900;
+    g.save();
+    g.strokeStyle = fresh ? 'rgba(240,205,138,0.98)' : 'rgba(216,171,92,0.72)';
+    g.lineWidth = fresh ? 2 : 1.4;
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.beginPath();
+    pts.forEach((p, i) => (i ? g.lineTo(X(p), Y(p)) : g.moveTo(X(p), Y(p))));
+    g.stroke();
+    g.fillStyle = fresh ? '#f6d695' : 'rgba(216,171,92,0.9)';
+    for (const p of [pts[0], pts[pts.length - 1]]) g.fillRect(X(p) - 2, Y(p) - 2, 4, 4);
+    g.restore();
+  }
+}
+
 /**
  * 和声功能轨：每个已演奏小节一格，按功能着色，标记断路器触发与候选集驳回。
  * 保留最近 RIBBON_MAX 格；最早的一格是"正在响"的那一小节，用 aria-current 标出。
@@ -338,10 +452,12 @@ export function pushFnSegment(ribbon, bar, sections) {
     ribbon.prepend(el);
   }
   const seg = document.createElement('span');
-  seg.className = fnSegClass(bar) + ' fresh';
+  const dev = bar.decision.develop;
+  const isTheme = dev === 'repeat';           // 「主题回来了」用形状+文字，不靠颜色
+  seg.className = fnSegClass(bar) + ' fresh' + (isTheme ? ' theme' : '');
   const fn = bar.decision.chordFn ?? 'T';
-  seg.innerHTML = `<i></i><b>${escapeHtml(fnLabel(fn))}</b>`;
-  seg.title = `第 ${bar.index + 1} 小节 ${bar.label} · ${bar.chord.symbol} · ${fnLabel(fn)}功能`;
+  seg.innerHTML = `<i></i><b>${escapeHtml(fnLabel(fn))}</b><em>${escapeHtml(DEVELOP_ZH[dev] ?? '')}</em>`;
+  seg.title = `第 ${bar.index + 1} 小节 ${bar.label} · ${bar.chord.symbol} · ${fnLabel(fn)}功能 · ${DEV_ZH[dev] ?? dev}`;
   ribbon.prepend(seg);
   while (ribbon.children.length > RIBBON_MAX + sectionsAt(sections)) ribbon.lastChild.remove();
   ribbon.querySelectorAll('[aria-current]').forEach((el) => el.removeAttribute('aria-current'));

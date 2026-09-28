@@ -6,7 +6,7 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, TensionGraph, addDecision, pushFnSegment, renderPlan, setStatus, toast } from './ui.js';
+import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast } from './ui.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { planTargetSeries } from './candidates.js';
 
@@ -20,6 +20,7 @@ const els = {
   fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), decisionLog: $('decisionLog'),
   fnRibbon: $('fnRibbon'), logEmpty: $('logEmpty'),
   tensionCanvas: $('tensionCanvas'), tensionStat: $('tensionStat'),
+  motifCanvas: $('motifCanvas'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
   settingsBtn: $('settingsBtn'), settingsDrawer: $('settingsDrawer'), settingsClose: $('settingsClose'),
   tabLive: $('tabLive'), tabStudio: $('tabStudio'), viewLive: $('viewLive'), viewStudio: $('viewStudio'),
@@ -83,6 +84,7 @@ const audio = getAudio();
 const kb = renderKeyboard(els.keyboard);
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);
 const tensionGraph = new TensionGraph(els.tensionCanvas);
+const motifCard = new MotifCard(els.motifCanvas);
 
 /* ---------------- 播放控制 ---------------- */
 let player = null;
@@ -118,6 +120,7 @@ async function start() {
   tensionGraph.reset();
   tensionGraph.setTarget([]);
   tensionGraph.setSections([]);
+  motifCard.reset();
   els.tensionStat.textContent = '';
   els.playBtn.disabled = true;
   els.playBtn.textContent = '… 编曲中';
@@ -155,6 +158,9 @@ async function start() {
       els.nowChord.textContent = bar.chord.symbol;
       els.nowBar.textContent = `第 ${bar.index + 1} 小节 ${bar.label} · 强度 ${bar.intensity.toFixed(1)}${bar.loop > 0 ? `，第 ${bar.loop + 1} 遍` : ''}`;
       addDecision(els.decisionLog, bar);
+      // 动机卡：第 2 小节是动机诞生点；此后每次「承袭」计一次
+      if (bar.index === 1) motifCard.setMotif(bar.notes.filter((n) => n.hand === 'R').map((n) => n.midi));
+      else if (bar.decision.develop === 'repeat' && motifCard.midis.length) motifCard.markRestatement();
       pushFnSegment(els.fnRibbon, bar, plan.sections);
       els.logEmpty.classList.add('hidden');
       // 张力对照带：逐小节长出实际张力，并给出可读读数
@@ -182,6 +188,7 @@ async function start() {
   });
   fall.start();
   tensionGraph.start();
+  motifCard.start();
   player.start();
   els.playBtn.textContent = '▶ 开始演奏';
   setButtons(true);
@@ -191,6 +198,7 @@ function stopAll() {
   player?.stop();
   fall.stop();
   tensionGraph.stop();
+  motifCard.stop();
   kb.clear();
   if (recording) { recording.stop().then((blob) => download(blob, `${plan?.title ?? 'jev-piano'}.webm`)); recording = null; els.recBtn.textContent = '● 录音'; }
   setButtons(false); // player 保留引用：已演奏的 records 仍可导出 MIDI
