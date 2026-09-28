@@ -1,0 +1,24 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # 零依赖项目：node --test 不需要 npm install（无 lockfile，测试零环境变量依赖，见计划 Phase 0 F4）
+      - name: Syntax check (all JS/MJS)
+        run: |
+          for f in public/js/*.js src/worker.js scripts/*.mjs test/*.mjs; do
+            node --check "$f" || exit 1
+          done
+      - name: Unit tests
+        run: node --test
