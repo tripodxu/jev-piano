@@ -7,6 +7,16 @@
 
 ---
 
+## [完成] 2026-09-28 · 段落可见化（迭代轮次 9 · 前端）
+
+- **做了什么**（详见 [docs/memory/2026-09-28-section-visibility.md](docs/memory/2026-09-28-section-visibility.md)，计划 [docs/superpowers/plans/2026-09-28-section-visibility.md](docs/superpowers/plans/2026-09-28-section-visibility.md)）：轮次 8 的**段落结构在界面上变可见**——计划卡输出纯文本清单（`曲式 A 8 小节 · B 8 小节 · A' 8 小节 · Coda 8 小节`）、功能轨插入段落标记、张力带与卷帘画段落竖线+段落名。skill 用 `ui-ux-pro-max`（首次使用）。测试 96→**99**。
+- **设计依据（来自 skill 查询，非我拍脑袋）**：`ui-ux-pro-max` chart 域命中 *"Mark anomalies with a distinct shape and text annotation as well as color. **Do not rely on color alone.**"* 因此段落边界一律用**两种独立于颜色的线索**：虚线竖线（形状）+ 段落名（文字）。这对本项目尤其关键——功能轨本身就是**用颜色编码和声功能**的，若段落边界也只用颜色，灰度下整条轨会退化成不可读。
+- **验证**：npm test 99/99；元素 id 契约 76/76（**未新增任何 id**）；**决策指标 12 种子逐位不变**（chords 9.42 / entropy 2.51 / lh 28.33 / madj 0 / ladj 0）——纯展示层的直接证明。
+- **关键做法**：给 `planLine` 加了 `assert.ok(!line.includes('<'))`，把"这是一条无障碍通道"**从注释变成测试**——注释会被后人删掉，测试不会。三处 canvas + 一处 DOM 共享同一个 `sectionLabel`，段落名只在一个函数里产生，四处显示不可能不一致。
+- **小细节**：`pushFnSegment` 的上限要给段落标记留格子（`RIBBON_MAX + min(8, sections.length)`），否则段落一多功能轨会变短。
+- **反思**：**skill 的价值不在于它给了什么审美，而在于它给了什么约束。** 数据库里对这个项目的审美（午夜音乐厅）多半没有对应条目，但它那条"标注不能只靠颜色"是硬规则且正中要害——工具给出的约束比工具给出的风格更值钱。
+- **下一步**（迭代轮次 10 · 优化）：待定。
+
 ## [完成] 2026-09-28 · 段落/曲式规划（迭代轮次 8 · 创意）
 
 - **做了什么**（详见 [docs/memory/2026-09-28-form-sections.md](docs/memory/2026-09-28-form-sections.md)，计划 [docs/superpowers/plans/2026-09-28-form-sections.md](docs/superpowers/plans/2026-09-28-form-sections.md)）：`plan.sections` = `[{id,arc,level,swing,bars,start}]`，经典四段式 **A 陈述 → B 对比（峰值）→ A' 再现 → Coda 收束**。`intensityTarget` 改为段落感知（每段用自己的 arc 与 level）；LLM 可给 `sections`（提示词里是可选项，即 README 路线图第 3 条「系统二规划曲式」），`sanitizeSections` 严格校验后回退模板。测试 89→**96**。
@@ -154,7 +164,7 @@
 | 待办 | 钢琴卷帘量化与力度编辑（卷帘时间轴已就位，可直接在轨上选区量化） | `studio.js` + `test/studio.test.mjs` | 测试全绿 |
 | 待办 | 音质升级评估：@tonejs/piano 采样（数 MB，违背轻量，需 ADR） | — | ADR 结论 |
 | 待办 | 把段落信息喂进 Jev `state`（`position.section` / `is_section_start`），让模型在段落边界主动收束而不只是被代码约束 | `composer.js` | 12 种子指标不退化 |
-| ~~待办~~ | ~~曲式/段落规划~~ → 轮次 8 已完成（README 路线图第 3 条落地，chords 9.25→9.42） | — | 已完成 |
+| ~~待办~~ | ~~曲式/段落规划~~ → 轮次 8 完成（内核）+ 轮次 9 完成（界面可见） | — | 已完成 |
 | ~~待办~~ | ~~intensity 量化抖动~~ → 轮次 7 已完成（dev 0.5 + slew 1.0，跳≥2 档 26.9%→0%） | — | 已完成 |
 | ~~待办~~ | ~~工作室界面的和声功能/张力可视化~~ → 轮次 6 已完成（画进卷帘头部，与音符区共用 ZOOM） | — | 已完成 |
 | ~~待办~~ | ~~和弦显示升/降号美化~~ → 轮次 4 已完成（C 小调 bVI 现为 Ab） | — | 已完成 |

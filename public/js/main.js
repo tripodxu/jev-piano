@@ -117,6 +117,7 @@ async function start() {
   els.logEmpty.classList.remove('hidden');
   tensionGraph.reset();
   tensionGraph.setTarget([]);
+  tensionGraph.setSections([]);
   els.tensionStat.textContent = '';
   els.playBtn.disabled = true;
   els.playBtn.textContent = '… 编曲中';
@@ -139,6 +140,7 @@ async function start() {
   if (!settings.llmEnabled) els.planCard.querySelector('.badge')?.classList.add('dim');
   // 张力对照带：计划弧线在演奏前就位，实际张力随小节逐条长出来
   tensionGraph.setTarget(smooth(planTargetSeries(plan, plan.barsPerPhrase), 3));
+  tensionGraph.setSections(plan.sections);
   tensionGraph.reset();
 
   const composer = new Composer(plan, {
@@ -153,7 +155,7 @@ async function start() {
       els.nowChord.textContent = bar.chord.symbol;
       els.nowBar.textContent = `第 ${bar.index + 1} 小节 ${bar.label} · 强度 ${bar.intensity.toFixed(1)}${bar.loop > 0 ? `，第 ${bar.loop + 1} 遍` : ''}`;
       addDecision(els.decisionLog, bar);
-      pushFnSegment(els.fnRibbon, bar);
+      pushFnSegment(els.fnRibbon, bar, plan.sections);
       els.logEmpty.classList.add('hidden');
       // 张力对照带：逐小节长出实际张力，并给出可读读数
       tensionGraph.push(barTension(bar));

@@ -6,7 +6,7 @@ import { buildPlan, Composer } from './composer.js';
 import { askJev } from './jev.js';
 import { getAudio } from './audio.js';
 import { exportMidi } from './midi.js';
-import { renderKeyboard, toast } from './ui.js';
+import { renderKeyboard, toast, sectionLabel } from './ui.js';
 import { loadSettings } from './settings.js';
 import { chordMidis, scaleMidis, nearest, NOTE_NAMES, functionOfPc } from './music.js';
 import { barTension } from './tension.js';
@@ -288,7 +288,7 @@ async function compose(newSeed) {
     });
     const p = {
       version: 1, plan, totalBars: bars, nid: 1,
-      notes: [], barChords: [], bpm: plan.bpm,
+      notes: [], barChords: [], bpm: plan.bpm, sections: plan.sections ?? [],
     };
     piece = p;
     invalidateTension();
@@ -354,6 +354,22 @@ function drawTimeline(g, W, piece) {
     const bc = piece.barChords[i];
     g.fillStyle = `${FN_COLOR[barFunction(bc, mode)]}d0`;
     g.fillRect(bc.startBeat * ZOOM, H_TENSION, Math.max(1, meter * ZOOM - 1), H_FN);
+  }
+
+  // 3) 段落边界：竖线（形状线索）+ 段落名（文字线索）——不依赖颜色
+  for (const s of piece.sections ?? []) {
+    const x = s.start * meter * ZOOM;
+    g.save();
+    g.strokeStyle = 'rgba(240,205,138,0.45)';
+    g.lineWidth = 1;
+    g.setLineDash([2, 3]);
+    g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, HEADER); g.stroke();
+    g.setLineDash([]);
+    g.font = '600 9px var(--mono, monospace)';
+    g.fillStyle = 'rgba(240,205,138,0.85)';
+    g.textBaseline = 'top';
+    g.fillText(sectionLabel(s), x + 3, 1);
+    g.restore();
   }
 }
 

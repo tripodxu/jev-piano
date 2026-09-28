@@ -20,7 +20,7 @@ public/js/composer.js    决策器（七问 + 渲染内核 + 动机记忆 + 双�
 public/js/jev.js         Jev 客户端（4 渠道 + fixture 同构兜底）
 public/js/player.js      lookahead 调度器（提前 2 小节决策）
 public/js/audio.js       合成钢琴
-public/js/ui.js/main.js/studio.js  三个界面层（含和声功能轨、张力对照带）
+public/js/ui.js/main.js/studio.js  三个界面层（和声功能轨、张力对照带、段落标注）
 public/js/tension.js     分析层：音乐张力（只读，不参与决策）
 src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 ```
@@ -37,7 +37,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | 改 Jev 客户端/渠道 | `public/js/jev.js`、`test/jev.test.mjs`、`src/worker.js` | `docs/research/jevthoven-调研.md` |
 | 改实时播放/调度 | `public/js/player.js`、`test/player.test.mjs` | — |
 | 改音频/音色 | `public/js/audio.js`、`test/audio.test.mjs` | — |
-| 改实时界面 | `public/js/ui.js`、`public/js/main.js`、`public/index.html` | `public/styles.css` |
+| 改实时界面 | `public/js/ui.js`、`public/js/main.js`、`public/index.html` | `public/styles.css`、`candidates.js`（`planTargetSeries`/段落）、`composer.js`（`plan.sections`） |
 | 改工作室界面 | `public/js/studio.js`、`test/studio.test.mjs`、`docs/memory/2026-09-28-studio-view.md` | `public/js/tension.js`（张力）、`public/js/music.js`（`functionOfPc`） |
 | 改 Worker/部署 | `src/worker.js`、`wrangler.toml`、`.dev.vars.example` | README「部署」 |
 | 修重复/听感问题 | `public/js/candidates.js`、`scripts/analyze-repetition.mjs`、`docs/memory/2026-09-28-anti-repetition-overhaul.md` | `composer.js` 渲染内核 |
@@ -61,7 +61,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | `audio.js` | 133 | 合成钢琴（三角波+泛音+包络+低通+生成式混响）、录音 | `envFor` 纯函数有单测 |
 | `player.js` | 116 | lookahead 调度器（提前 2 小节），`now/setIntervalFn` 可注入 | 时钟注入契约被测试锁定 |
 | `midi.js` | 56 | SMF Type-1 双轨导出 | 字节格式有单测 |
-| `ui.js` | 320 | 键盘 DOM、下落音符 canvas、**和声功能轨**（`pushFnSegment`/`fnSegClass`）、**张力对照带**（`TensionGraph`）、决策日志、计划卡、toast | 功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；canvas 渲染用 setInterval 而非 rAF（标签页遮挡时 rAF 会被暂停） |
+| `ui.js` | 384 | 键盘 DOM、下落音符 canvas、**和声功能轨**（`pushFnSegment`/`fnSegClass`）、**张力对照带**（`TensionGraph`）、**段落标注**（`sectionLabel`/`sectionMarkerAt`/`planLine`）、决策日志、计划卡、toast | 功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；**段落标注必须有文字通道**（不依赖颜色，见 ui-ux-pro-max chart 域）；canvas 渲染用 setInterval 而非 rAF（标签页遮挡时 rAF 会被暂停） |
 | `main.js` | 295 | 实时即兴接线：设置持久化、渠道探测、开始/停止/导出、张力/功能轨喂数 | 元素 id 契约见 `index.html` |
 | `studio.js` | 738 | 工作室界面：批量生成 job、钢琴卷帘编辑（**头部含张力曲线 + 功能带**）、Jev 路由的自然语言修改、JSON 导入导出 | 确定性编辑纯函数有单测；卷帘头部三段（张力/功能/和弦名）与音符区**共用 `ZOOM`**——改 `ZOOM` 三者自动同步；张力缓存 `tensionCache` 必须在每次音符改动后 `invalidateTension()` |
 | `settings.js` | 20 | localStorage 设置读写 | — |
@@ -79,7 +79,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | 路径 | 职责 |
 |---|---|
 | `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
-| `test/*.test.mjs` | `node --test`，共 96 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
+| `test/*.test.mjs` | `node --test`，共 99 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
 | `scripts/probe-jev.mjs` `scripts/probe-bar.mjs` | 真实 API 冒烟（需 key，计费） |
 | `scripts/analyze-repetition.mjs` | 重复度量化分析（`node scripts/analyze-repetition.mjs 32 <seed> random [--real]`）。**单种子噪声大，结论至少取 12 个种子求均值** |
 | `dev-proxy.py` | 本地开发：静态服务 + mock/真实转发（stdlib only） |
@@ -102,7 +102,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 2. 读 MEMORY.md 顶部 3 条 + 任务相关 memory 条目（最新在最上，先看有没有人踩过坑）
 3. 实现：先改/加测试，再改实现（本项目测试驱动传统，见 docs/adr/0004）
 4. 验证关卡（全部通过才算完成）：
-   a. npm test                        全绿（96 个，只增不减）
+   a. npm test                        全绿（99 个，只增不减）
    b. node --check 改动的新 .js        语法
    c. 涉及真实 API 的：scripts/probe-*.mjs 冒烟（可选，计费）
    d. 涉及听感/反重复的：analyze-repetition.mjs 对比指标不退化
@@ -169,7 +169,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 ## 6. 常用命令
 
 ```bash
-npm test                                  # 96 个单测（node --test）
+npm test                                  # 99 个单测（node --test）
 python dev-proxy.py --port 8000           # 本地开发（或 npm run dev）→ http://127.0.0.1:8000
 node scripts/analyze-repetition.mjs 32 2026 random   # 重复度指标（结论至少 12 种子求均值）
 node scripts/probe-jev.mjs                # 真实 API 冒烟（需 TYPESAFE_API_KEY）

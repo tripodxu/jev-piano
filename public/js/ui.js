@@ -143,6 +143,7 @@ export class TensionGraph {
     this.barsPerPhrase = barsPerPhrase;
     this.actual = [];    // 已演奏小节的张力
     this.target = [];    // 计划弧线
+    this.sections = [];  // 段落（画竖线 + 段落名）
     this.timer = null;
     this._resize = () => {
       const dpr = globalThis.devicePixelRatio || 1;
@@ -167,6 +168,12 @@ export class TensionGraph {
   /** 设定计划弧线（一次性，演奏开始前） */
   setTarget(series) {
     this.target = Array.isArray(series) ? series : [];
+    this.draw();
+  }
+
+  /** 设定段落：竖线 + 段落名（文字通道，不依赖颜色） */
+  setSections(sections) {
+    this.sections = Array.isArray(sections) ? sections.filter((s) => Number.isFinite(s?.start)) : [];
     this.draw();
   }
 
@@ -214,6 +221,25 @@ export class TensionGraph {
     line(this.target, 'rgba(214,178,110,0.34)', 1.2, true);
     line(this.actual, '#e8c57c', 1.8, false);
 
+    // 段落竖线 + 段落名：虚线是**独立于颜色的形状线索**，段落名是文字线索，
+    // 二者叠加满足「不依赖颜色」（ui-ux-pro-max chart 域）
+    g.save();
+    g.font = '9px monospace';
+    g.textAlign = 'left';
+    g.textBaseline = 'top';
+    for (const s of this.sections) {
+      const i = Math.round((s.start / Math.max(1, n)) * (n - 1));
+      const x = padL + (n > 1 ? (i / (n - 1)) * iw : 0);
+      g.strokeStyle = 'rgba(240,205,138,0.45)';
+      g.lineWidth = 1;
+      g.setLineDash([2, 3]);
+      g.beginPath(); g.moveTo(x, padT); g.lineTo(x, padT + ih); g.stroke();
+      g.setLineDash([]);
+      g.fillStyle = 'rgba(240,205,138,0.8)';
+      g.fillText(sectionLabel(s), x + 3, padT);
+    }
+    g.restore();
+
     g.save();
     g.font = '9px monospace';
     g.fillStyle = 'rgba(154,144,120,0.9)';
@@ -221,6 +247,28 @@ export class TensionGraph {
     for (const v of [0, 0.5, 1]) g.fillText(v.toFixed(1), padL - 5, yOf(v));
     g.restore();
   }
+}
+
+/**
+ * 段落标注：段落名（A / B / A' / Coda）。
+ * 这是「不依赖颜色」的文字通道——ui-ux-pro-max 的 chart 域明确要求
+ * "Mark ... with a distinct shape and text annotation as well as color. Do not rely on color alone."
+ * 曲式是结构信息，必须在灰度/色觉障碍下同样可读。
+ */
+export function sectionLabel(sec) {
+  return sec && sec.id != null ? String(sec.id) : '';
+}
+
+/** 某小节是否开启新段落；是则返回该段落，否则 null */
+export function sectionMarkerAt(sections, bar) {
+  if (!Array.isArray(sections) || !sections.length) return null;
+  return sections.find((s) => s && s.start === bar) ?? null;
+}
+
+/** 计划卡的段落清单（纯文本）：「A 8 小节 · B 8 小节 · …」；无段落时返回空串（整行不输出） */
+export function planLine(sections) {
+  if (!Array.isArray(sections) || !sections.length) return '';
+  return sections.map((s) => `${sectionLabel(s)} ${Number(s?.bars) || 0} 小节`).join(' · ');
 }
 
 /** 决策日志：节目单式，一行一个小节 */
@@ -278,25 +326,41 @@ export function addDecision(ul, bar) {
  */
 export const RIBBON_MAX = 18;
 
-export function pushFnSegment(ribbon, bar) {
+export function pushFnSegment(ribbon, bar, sections) {
   if (!ribbon) return;
+  // 段落边界：竖线 + 段落名（文字通道，不依赖颜色）
+  const mark = sectionMarkerAt(sections, bar.index);
+  if (mark) {
+    const el = document.createElement('span');
+    el.className = 'fnsec';
+    el.innerHTML = `<i></i><b>${escapeHtml(sectionLabel(mark))}</b>`;
+    el.title = `段落 ${sectionLabel(mark)} 从第 ${bar.index + 1} 小节开始`;
+    ribbon.prepend(el);
+  }
   const seg = document.createElement('span');
   seg.className = fnSegClass(bar) + ' fresh';
   const fn = bar.decision.chordFn ?? 'T';
   seg.innerHTML = `<i></i><b>${escapeHtml(fnLabel(fn))}</b>`;
   seg.title = `第 ${bar.index + 1} 小节 ${bar.label} · ${bar.chord.symbol} · ${fnLabel(fn)}功能`;
   ribbon.prepend(seg);
-  while (ribbon.children.length > RIBBON_MAX) ribbon.lastChild.remove();
+  while (ribbon.children.length > RIBBON_MAX + sectionsAt(sections)) ribbon.lastChild.remove();
   ribbon.querySelectorAll('[aria-current]').forEach((el) => el.removeAttribute('aria-current'));
-  ribbon.firstElementChild?.setAttribute('aria-current', 'true');
+  ribbon.firstElementChild?.querySelector('b')?.parentElement?.setAttribute?.('aria-current', 'true');
+}
+
+// 段落标记会占用额外格子，避免它们把功能段挤出上限
+function sectionsAt(sections) {
+  return Array.isArray(sections) ? Math.min(8, sections.length) : 0;
 }
 
 /** 计划卡 */
 export function renderPlan(el, plan) {
   const srcBadge = plan.source === 'llm' ? '<span class="badge">LLM 扩写</span>' : '<span class="badge">关键词理解</span>';
+  const form = planLine(plan.sections);
   el.innerHTML =
     `<h3>${escapeHtml(plan.title)}${srcBadge}</h3>` +
     `<div class="meta">${escapeHtml(plan.styleName)}　${'CDEFGAB'[plan.keyPc]} ${plan.mode}　${plan.bpm} BPM　${plan.meterNum}/4　弧线 ${plan.arc}　${plan.totalBars} 小节</div>` +
+    (form ? `<div class="meta form-line" title="曲式：段落划分">曲式 ${escapeHtml(form)}</div>` : '') +
     `<div class="meta" style="margin-top:2px">情绪 ${escapeHtml(plan.mood.join(' / '))}</div>` +
     (plan.notes ? `<div class="notes">${escapeHtml(plan.notes)}</div>` : '');
 }

@@ -228,6 +228,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   font-size: 21px; line-height: 1.25; color: var(--brass-hi);
 }
 .plan-card .meta { color: var(--text-dim); font-size: 12.5px; letter-spacing: 0.04em; }
+.plan-card .form-line { color: var(--brass); font-family: var(--mono); font-size: 11.5px; margin-top: 4px; }
 .plan-card .notes { margin-top: 8px; color: var(--text); font-size: 13px; }
 .plan-card .notes::before { content: "—— "; color: var(--brass-lo); }
 .badge {
@@ -294,6 +295,18 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 }
 /* 候选集强制驳回：段右端一个小缺口——"模型越界被驳回" */
 .fnseg.rej i { clip-path: polygon(0 0, 100% 0, 100% 100%, 86% 100%, 86% 30%, 0 30%); }
+/* 段落边界标记：竖线（形状）+ 段落名（文字）——不依赖颜色 */
+.fnsec {
+  position: relative; flex: 0 0 auto; display: flex; flex-direction: column;
+  align-items: center; gap: 2px; align-self: stretch; padding: 0 3px;
+  border-left: 1px dashed rgba(240, 205, 138, 0.45);
+  margin-right: 2px;
+}
+.fnsec i { display: block; width: 0; height: 0; }
+.fnsec b {
+  font: 500 9px/1 var(--sans); letter-spacing: .08em; white-space: nowrap;
+  color: var(--brass-hi); opacity: .85; margin-top: auto; padding-bottom: 1px;
+}
 .fn-legend {
   display: flex; gap: 12px; margin: 6px 0 0; padding: 0;
   font: 400 10px/1 var(--sans); letter-spacing: .16em; color: var(--text-faint);
