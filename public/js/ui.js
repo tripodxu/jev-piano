@@ -130,6 +130,99 @@ export class Fall {
   destroy() { this.stop(); this._ro.disconnect(); }
 }
 
+/**
+ * 张力对照带：实线 = 已经演奏出来的实际张力，虚线幽灵 = 计划弧线。
+ * 沿用 Fall 的骨架（canvas + ResizeObserver + setInterval 而非 rAF）：
+ * 标签页被遮挡时 rAF 会被浏览器暂停，画面会就此冻结。
+ * 纯展示层——只读已经生成的小节，不参与任何决策。
+ */
+export class TensionGraph {
+  constructor(canvas, { barsPerPhrase = 8 } = {}) {
+    this.canvas = canvas;
+    this.ctx2d = canvas.getContext('2d');
+    this.barsPerPhrase = barsPerPhrase;
+    this.actual = [];    // 已演奏小节的张力
+    this.target = [];    // 计划弧线
+    this.timer = null;
+    this._resize = () => {
+      const dpr = globalThis.devicePixelRatio || 1;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      this.ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.draw();
+    };
+    this._ro = new ResizeObserver(this._resize);
+    this._ro.observe(canvas);
+    this._resize();
+  }
+
+  /** 追加一个已演奏小节（tension 0..1） */
+  push(tension) {
+    if (Number.isFinite(tension)) this.actual.push(tension);
+    this.draw();
+  }
+
+  /** 设定计划弧线（一次性，演奏开始前） */
+  setTarget(series) {
+    this.target = Array.isArray(series) ? series : [];
+    this.draw();
+  }
+
+  reset() { this.actual = []; this.draw(); }
+  start() { if (!this.timer) this.timer = setInterval(() => this.draw(), 120); }
+  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.draw(); }
+  destroy() { this.stop(); this._ro.disconnect(); }
+
+  draw() {
+    const { ctx2d: g, canvas } = this;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    if (!W || !H) return;
+    g.clearRect(0, 0, W, H);
+    const padL = 26, padR = 6, padT = 6, padB = 12;
+    const iw = Math.max(1, W - padL - padR), ih = Math.max(1, H - padT - padB);
+    const yOf = (v) => padT + (1 - Math.min(1, Math.max(0, v))) * ih;
+    const n = Math.max(this.target.length, this.actual.length, 1);
+
+    // 乐句分隔竖线：让"形状"有可读的乐句单位
+    g.strokeStyle = 'rgba(214,178,110,0.10)';
+    g.lineWidth = 1;
+    for (let b = this.barsPerPhrase; b < n; b += this.barsPerPhrase) {
+      const x = Math.round(padL + (b / n) * iw) + 0.5;
+      g.beginPath(); g.moveTo(x, padT); g.lineTo(x, padT + ih); g.stroke();
+    }
+    g.strokeStyle = 'rgba(214,178,110,0.16)';
+    g.beginPath(); g.moveTo(padL, Math.round(yOf(0)) + 0.5); g.lineTo(padL + iw, Math.round(yOf(0)) + 0.5); g.stroke();
+
+    const line = (series, color, width, dashed) => {
+      if (!series.length || n < 1) return;
+      g.save();
+      g.strokeStyle = color; g.lineWidth = width; g.lineJoin = 'round'; g.lineCap = 'round';
+      if (dashed) g.setLineDash([3, 3]);
+      g.beginPath();
+      series.forEach((v, i) => {
+        const x = padL + (n > 1 ? (i / (n - 1)) * iw : 0);
+        const y = yOf(v);
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      });
+      g.stroke();
+      g.restore();
+    };
+
+    // 计划弧线（幽灵）在下，实际张力在上——实际值压得住参照线
+    line(this.target, 'rgba(214,178,110,0.34)', 1.2, true);
+    line(this.actual, '#e8c57c', 1.8, false);
+
+    g.save();
+    g.font = '9px monospace';
+    g.fillStyle = 'rgba(154,144,120,0.9)';
+    g.textAlign = 'right'; g.textBaseline = 'middle';
+    for (const v of [0, 0.5, 1]) g.fillText(v.toFixed(1), padL - 5, yOf(v));
+    g.restore();
+  }
+}
+
 /** 决策日志：节目单式，一行一个小节 */
 const DEV_ZH = { repeat: '承袭', sequence: '模进', inversion: '倒影', ornament: '装饰', new: '新句' };
 const FN_ZH = { T: '主', S: '下属', D: '属', Tp: '色彩' };

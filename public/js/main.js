@@ -6,7 +6,8 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, addDecision, pushFnSegment, renderPlan, setStatus, toast } from './ui.js';
+import { renderKeyboard, Fall, TensionGraph, addDecision, pushFnSegment, renderPlan, setStatus, toast } from './ui.js';
+import { barTension, targetSeries, smooth, tensionStats } from './tension.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -17,6 +18,7 @@ const els = {
   planCard: $('planCard'), nowChord: $('nowChord'), nowBar: $('nowBar'),
   fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), decisionLog: $('decisionLog'),
   fnRibbon: $('fnRibbon'), logEmpty: $('logEmpty'),
+  tensionCanvas: $('tensionCanvas'), tensionStat: $('tensionStat'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
   settingsBtn: $('settingsBtn'), settingsDrawer: $('settingsDrawer'), settingsClose: $('settingsClose'),
   tabLive: $('tabLive'), tabStudio: $('tabStudio'), viewLive: $('viewLive'), viewStudio: $('viewStudio'),
@@ -79,6 +81,7 @@ els.bpmRange.addEventListener('input', () => { if (!els.bpmAuto.checked) els.bpm
 const audio = getAudio();
 const kb = renderKeyboard(els.keyboard);
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);
+const tensionGraph = new TensionGraph(els.tensionCanvas);
 
 /* ---------------- 播放控制 ---------------- */
 let player = null;
@@ -111,6 +114,9 @@ async function start() {
   els.decisionLog.innerHTML = '';
   els.fnRibbon.innerHTML = '';
   els.logEmpty.classList.remove('hidden');
+  tensionGraph.reset();
+  tensionGraph.setTarget([]);
+  els.tensionStat.textContent = '';
   els.playBtn.disabled = true;
   els.playBtn.textContent = '… 编曲中';
 
@@ -130,6 +136,9 @@ async function start() {
   });
   renderPlan(els.planCard, plan);
   if (!settings.llmEnabled) els.planCard.querySelector('.badge')?.classList.add('dim');
+  // 张力对照带：计划弧线在演奏前就位，实际张力随小节逐条长出来
+  tensionGraph.setTarget(smooth(targetSeries(plan, plan.barsPerPhrase), 3));
+  tensionGraph.reset();
 
   const composer = new Composer(plan, {
     channel: settings.channel,
@@ -145,6 +154,12 @@ async function start() {
       addDecision(els.decisionLog, bar);
       pushFnSegment(els.fnRibbon, bar);
       els.logEmpty.classList.add('hidden');
+      // 张力对照带：逐小节长出实际张力，并给出可读读数
+      tensionGraph.push(barTension(bar));
+      const st = tensionStats(tensionGraph.actual);
+      els.tensionStat.textContent = tensionGraph.actual.length
+        ? `${st.mean.toFixed(2)} 均值 · ${st.min.toFixed(2)}–${st.max.toFixed(2)} 跨度 ${st.span.toFixed(2)}`
+        : '';
       if (!bar.decision.fixture) {
         stats.tokens += bar.decision.inputTokens;
         stats.usd += bar.decision.usd;
@@ -163,6 +178,7 @@ async function start() {
     },
   });
   fall.start();
+  tensionGraph.start();
   player.start();
   els.playBtn.textContent = '▶ 开始演奏';
   setButtons(true);
@@ -171,6 +187,7 @@ async function start() {
 function stopAll() {
   player?.stop();
   fall.stop();
+  tensionGraph.stop();
   kb.clear();
   if (recording) { recording.stop().then((blob) => download(blob, `${plan?.title ?? 'jev-piano'}.webm`)); recording = null; els.recBtn.textContent = '● 录音'; }
   setButtons(false); // player 保留引用：已演奏的 records 仍可导出 MIDI

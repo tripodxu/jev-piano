@@ -165,6 +165,13 @@
       <section class="programme reveal" style="--d:.25s">
         <h2 class="programme-title">演奏记录 <span class="programme-sub">每小节一次 Jev 决策，七问并行</span></h2>
         <p id="logEmpty" class="log-empty">尚未开演——写下灵感，按下「开始演奏」，这里会逐小节目录 Jev 的每一个决定。</p>
+        <div class="tension-box">
+          <canvas id="tensionCanvas" height="72" role="img" aria-label="张力对照带：实线为已演奏小节的张力，虚线为乐章计划的张力弧线"></canvas>
+          <p class="tension-legend" aria-hidden="true">
+            <span class="k k-actual">实际张力</span><span class="k k-target">计划弧线</span>
+            <span id="tensionStat" class="tension-stat"></span>
+          </p>
+        </div>
         <ul id="decisionLog" class="dlog"></ul>
       </section>
     </section>
