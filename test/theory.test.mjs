@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseRoman, chordMidis, chordPcs, lhVoicing, scaleMidis, nearest, chordLabel,
+  parseRoman, chordMidis, chordPcs, lhVoicing, scaleMidis, nearest, chordLabel, midiName,
   STYLES, LH_DEFS, STYLE_BY_ID, keywordPlan,
   HARMONIC_FUNCTIONS, functionOf, modePalette,
 } from '../public/js/music.js';
@@ -55,9 +55,29 @@ test('nearest', () => {
   assert.equal(nearest(60, [62, 64]), 62);
 });
 
-test('chordLabel', () => {
-  assert.equal(chordLabel(9, 'm7'), 'Am7');
+test('chordLabel: 降号侧用降号拼写（C 小调的 bVI/bVII/bIII 必须是 Ab/Bb/Eb）', () => {
   assert.equal(chordLabel(0, ''), 'C');
+  assert.equal(chordLabel(9, 'm7'), 'Am7');
+  assert.equal(chordLabel(7, '7'), 'G7');
+  // 核心三条：旧实现全部返回 G#/A#/D#，在 C 小调里是错的记谱
+  assert.equal(chordLabel(8, ''), 'Ab', 'bVI 必须是 Ab');
+  assert.equal(chordLabel(10, ''), 'Bb', 'bVII 必须是 Bb');
+  assert.equal(chordLabel(3, ''), 'Eb', 'bIII 必须是 Eb');
+  assert.equal(chordLabel(8, '7sus4'), 'Ab7sus4', '后缀跟着根名走');
+  assert.equal(chordLabel(3, 'm7b5'), 'Ebm7b5', '半减后缀不丢');
+  assert.equal(chordLabel(2, 'ø'), 'Dø', '半减记号保留');
+});
+
+test('chordLabel: 拼写表是 12 个音级的单射（不能两个音级同名）', () => {
+  const names = [];
+  for (let pc = 0; pc < 12; pc++) names.push(chordLabel(pc, ''));
+  assert.equal(new Set(names).size, 12, `拼写表非单射: ${names.join(' ')}`);
+});
+
+test('midiName: 保持升号——它标的是琴键的物理键名，不是和声拼写', () => {
+  assert.equal(midiName(60), 'C4');
+  assert.equal(midiName(61), 'C#4', '琴键只有 C#，没有 Db');
+  assert.equal(midiName(68), 'G#4', '琴键只有 G#，没有 Ab');
 });
 
 test('STYLES 完整性：所有进行可解析、bpm 有序、lh 有定义、拍号合理', () => {

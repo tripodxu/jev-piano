@@ -64,8 +64,17 @@ export function parseRoman(rawSym) {
   return { rootPc: root, shape };
 }
 
+/**
+ * 和声拼写约定：降号侧五个音级（1/3/6/8/10）用降号名，其余用升号/自然名。
+ * 这不是"按调号切换"——它是固定的记谱惯例：C 小调的 bVI 恒为 Ab（不管当前 keyPc 是几），
+ * 因为 STYLES 里带 b 前缀的罗马数字恰好就是这五个音级，两者天然一致。
+ * 与 midiName 的分工：midiName 标的是**琴键的物理键名**（钢琴上没有 Ab 键），必须保持升号；
+ * chordLabel 标的是**和声记谱**，必须按乐理拼写。
+ */
+export const PREFERRED_NAME = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
 export function chordLabel(rootPc, shape) {
-  return NOTE_NAMES[rootPc] + (shape === '' ? '' : shape);
+  return PREFERRED_NAME[((rootPc % 12) + 12) % 12] + (shape === '' ? '' : shape);
 }
 
 /** 某和弦的全部音级（pc 集合） */

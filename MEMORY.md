@@ -7,6 +7,15 @@
 
 ---
 
+## [完成] 2026-09-28 · 和弦拼写（降号侧）（迭代轮次 4 · 优化）
+
+- **做了什么**（详见 [docs/memory/2026-09-28-chord-spelling.md](docs/memory/2026-09-28-chord-spelling.md)，计划 [docs/superpowers/plans/2026-09-28-chord-spelling.md](docs/superpowers/plans/2026-09-28-chord-spelling.md)）：`chordLabel` 从绝对音高类（永远升号）改为固定的音级拼写约定表 `PREFERRED_NAME`，降号侧五音级恒用降号名。C 小调的 bVI/bVII/bIII 从 `G# A# D#` 变为正确的 `Ab Bb Eb`。**函数签名不变**，两个调用点零改动（STYLES 里带 `b` 前缀的罗马数字恰好就是这五个音级，记谱天然一致）。测试 74→**76**。
+- **为什么**：任务板上挂了很久的待办；第 2 轮色板大量产出 `bVI/bIII/bVII` 后更显眼。实测浪漫小调 **14/32 小节（44%）记谱错误**——钢琴家看到 `G#` 会弹出不协和的音，这是正确性 bug 不是审美问题。
+- **关键边界**：`midiName` **保持升号不动**——它标的是琴键的物理键名（钢琴上没有 Ab 键），`renderKeyboard` 的 title 也在用。和弦名是和声记谱，键名是物理事实。已加单测锁住。
+- **坑**：我的取证脚本第一版**自己错了**——按根音而非调号分类「降号调」，把 C minor（本身三个降号）判成升号调，报告「0 错误」而实际 14/32 全错；是"0/32"与肉眼可见的 `G#` 自相矛盾才让我回头查。修完再跑，同一个脚本又报「14/32 错误，显示 Ab 应为 G#」——这次是它的期望值过期，**差点把正确实现改回去**。
+- **验证**：npm test 76/76；TDD 红绿实跑；端到端 C minor 序列变为 `Ab Fm Ab Ab7sus4 Cm Dm7b5 Bb Eb …` 且无任何升号残留；不回归 `unique_chords` 仍 9、熵 2.85、两个相邻重复均 0；新增拼写表单射性测试。
+- **下一步**（迭代轮次 5 · 创意）：待定。
+
 ## [完成] 2026-09-28 · 和声功能轨 + 前端精修（迭代轮次 3 · 前端）
 
 - **做了什么**（详见 [docs/memory/2026-09-28-harmonic-ribbon-frontend.md](docs/memory/2026-09-28-harmonic-ribbon-frontend.md)，设计 [spec](docs/superpowers/specs/2026-09-28-harmonic-ribbon-design.md)）：新增**和声功能轨**——和弦区与下落音符之间一条横向轨，每小节一格按 T/S/D/Tp 着色，断路器直接画在格上（`loopLocked` 顶部细刻线、`rejected` 右端缺口），日志每行加同色功能徽章。让第 2 轮的和声语义第一次在界面上可见。精修：浏览器表面（`::selection`/`caret-color`/滚动条）、决策日志空状态、嵌套卡片降级为内嵌区域、对比度提亮、移动端适配。测试 70→**74**（新 `test/ui.test.mjs`）。skill：`frontend-design` + `impeccable`（`SCOPED_EXISTING_ALLOWED` → 精修不重做）。
@@ -103,9 +112,9 @@
 | 状态 | 任务 | 领地 | 验收 |
 |---|---|---|---|
 | 待办 | 工作室界面的和声功能可视化（钢琴卷帘上的功能分段/色带）——实时即兴已有功能轨，工作室还没有 | `studio.js` + `test/studio.test.mjs` | 测试全绿 + 手工冒烟 |
-| 待办 | 和弦显示升/降号美化（C minor 的 Ab 现显示 G#）——功能层已产出 bVI/bVII 等符号，此项更显眼了 | `music.js` `chordLabel` + 测试 | 测试全绿 + 试听无回归 |
-| 待办 | 音质升级评估：@tonejs/piano 采样（数 MB，违背轻量，需 ADR） | — | ADR 结论 |
 | 待办 | 钢琴卷帘量化与力度编辑 | `studio.js` + `test/studio.test.mjs` | 测试全绿 |
+| 待办 | 音质升级评估：@tonejs/piano 采样（数 MB，违背轻量，需 ADR） | — | ADR 结论 |
+| ~~待办~~ | ~~和弦显示升/降号美化~~ → 轮次 4 已完成（C 小调 bVI 现为 Ab） | — | 已完成 |
 | ~~待办~~ | ~~前端展示 4 个归因字段~~ → 轮次 3 已完成（功能轨 + 徽章 + 断路器标记） | — | 已完成 |
 | ~~待办~~ | ~~扩 `STYLES[*].progs` 根音词汇量~~ → 轮次 2 已用**调式色板**解决 | — | 已由色板替代 |
 
