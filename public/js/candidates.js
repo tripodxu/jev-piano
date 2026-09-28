@@ -2,7 +2,7 @@
 // 与 composer.js 的分工：本模块只回答"哪些选择合法、各自多大概率"，绝不渲染音符；
 // 反重复的"候选侧"机制也住在这里（根音疲劳断路器、循环锁死断路器）——剔除即强制（ADR-0003）。
 // 纯函数，无副作用，可直接单测。
-import { LH_DEFS, RHYTHM_POOLS, parseRoman, chordLabel } from './music.js';
+import { LH_DEFS, RHYTHM_POOLS, parseRoman, chordLabel, chordPcs, modePalette, functionOf, HARMONIC_FUNCTIONS, ROMAN_BY_PC } from './music.js';
 
 /** 根音的和谐角色（写进 criteria，让模型知道每个候选"意味着什么"） */
 const ROOT_ROLE = {
@@ -20,9 +20,52 @@ const ARC_CURVES = {
   fall: (p) => 2.4 - 1.8 * p,
 };
 
-const ROMAN_BY_PC = { 0: 'I', 1: 'bII', 2: 'II', 3: 'bIII', 4: 'III', 5: 'IV', 6: 'bV', 7: 'V', 8: 'bVI', 9: 'VI', 10: 'bVII', 11: 'VII' };
+/** 共同音数：两和弦的音级交集大小——声部进行平滑度的核心指标（0..4） */
+export function commonTones(shapeA, rootA, shapeB, rootB) {
+  const a = new Set(chordPcs(rootA, shapeA));
+  return chordPcs(rootB, shapeB).filter((pc) => a.has(pc)).length;
+}
 
-/** 和谐循环检测（按根音）：最近 window 小节内 ≤maxDistinct 个不同根音即视为锁死，members = 循环根音集合。
+/** 根音在五度圈上的环形距离（0..6）：C→G=1、C→F=1、C→C#=2 */
+export function fifthsDist(rootA, rootB) {
+  const d = Math.abs((((rootA * 7) % 12) + 12) % 12 - (((rootB * 7) % 12) + 12) % 12);
+  return Math.min(d, 12 - d);
+}
+
+/** 声部进行平滑度：共音越多越平滑，五度圈上越近越平滑 */
+export function smoothness(cur, cand) {
+  if (!cur) return 0;
+  return commonTones(cur.shape, cur.rootPc, cand.shape, cand.rootPc) * 1.0 - fifthsDist(cur.rootPc, cand.rootPc) * 0.25;
+}
+
+// 功能转移矩阵：T→S/D，S→D/Tp，D→T，Tp→D/T（经典功能和声：大写=稳定/下属/属三区）
+const FN_NEXT = {
+  T: { S: 1.0, D: 1.0, T: 0.3, Tp: 0.5 },
+  S: { D: 1.2, Tp: 1.0, T: 0.4, S: 0.2 },
+  D: { T: 1.6, Tp: 0.9, S: 0.3, D: 0.2 },
+  Tp: { D: 1.0, T: 0.9, S: 0.5, Tp: 0.3 },
+};
+
+// 声部进行权重与功能转移权重的系数（两者相加，量纲 ≈ 共同音数与功能边权）
+// 声部进行权重与功能转移权重的系数（两者相加，量纲 ≈ 共同音数与功能边权）。
+// W_SMOOTH 实测锁在 0.5：调到 0.35 能把音程熵抬到 2.57，但会让旋律指纹护栏在 12 种子中失败 3 次
+// （相邻字面重复 >0）。硬不变量优先于软指标——见 docs/memory/2026-09-28-harmonic-function-layer.md。
+const W_SMOOTH = 0.5;
+const W_FN = 0.8;
+// 色板条目的基础权重：低于进行池的 1.0（保住曲风身份），但高到能凭平滑度/功能加分挤进候选
+const W_PALETTE = 0.8;
+
+/** 第 7 问的候选：下一小节该选哪个和声功能（不硬过滤和弦，只作语义提示与回落依据） */
+export function functionCandidates(plan, curFn, isPhraseEnd, barInPhrase) {
+  const base = { ...(FN_NEXT[curFn] ?? FN_NEXT.T) };
+  if (isPhraseEnd) { base.T += 1.0; base.D += 0.5; base.S *= 0.4; base.Tp *= 0.4; }
+  if (barInPhrase === 0) base.T += 0.6;
+  const out = {};
+  for (const [k, v] of Object.entries(base)) if (v > 0) out[k] = { w: v, desc: HARMONIC_FUNCTIONS[k] };
+  return out;
+}
+
+/** 和声循环检测（按根音）：最近 window 小节内 ≤maxDistinct 个不同根音即视为锁死，members = 循环根音集合。
  *  按根音而非罗马数字匹配：G / V7sus4 / G7 是同一功能，防止换后缀绕过断路器 */
 export function detectLoop(recentRoots, window = 6, maxDistinct = 3) {
   const recent = recentRoots.slice(-window);
@@ -57,8 +100,17 @@ export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEn
     }
     if (matched) poolNext = [...nexts][0] ?? null;
   }
+  // 候选全集 = 风格进行池 ∪ 调式全调内色板。
+  // 色板是关键扩充：只有池时，每条 pool 4 个和弦 → 候选词汇有天花板（romantic 小调仅 6 个根音）；
+  // 并入色板后词汇随调式自动增长，且池内符号的既有权重/音色（七和弦等）原样保留。
+  for (const c of modePalette(plan.mode)) {
+    if (cand.has(c.sym)) continue; // 池里已有（如 V7），不被色板的三和弦条目覆盖
+    cand.set(c.sym, { w: W_PALETTE, cont: false, pools: 0, palette: true });
+  }
   // 替换候选：让 Jev 有进行池之外的和声选择，打破 4 和弦循环
   const curSym = currentSym ? parseRoman(currentSym) : null;
+  const curFn = curSym ? (functionOf(currentSym, plan.mode) ?? 'T') : null;
+  const fnNext = FN_NEXT[curFn] ?? {};
   const subs = [];
   if (curSym) {
     if (poolNext) {
@@ -99,14 +151,21 @@ export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEn
         weight += 0.5; // 乐句开头换进行：换个起点，别每段都一样开场
       }
       const role = ROOT_ROLE[p.rootPc] ?? '色彩和弦';
-      const desc = `${role}${p.shape.includes('7') || p.shape.includes('9') ? '（延伸音色）' : ''}${cont ? '；进行计划的延续' : ''}`;
-      list.push({ sym, weight, desc, label: chordLabel(p.rootPc, p.shape), ...p });
+      const fn = functionOf(sym, plan.mode) ?? 'Tp';
+      // 声部进行 + 功能转移：可解释的加权取代"纯池计数"启发式
+      weight += smoothness(curSym, p) * W_SMOOTH;
+      weight += (fnNext[fn] ?? 0.25) * W_FN;
+      const fnMark = { T: '·主功能', S: '·下属功能', D: '·属功能', Tp: '·色彩功能' }[fn];
+      const desc = `${role}${fnMark}${p.shape.includes('7') || p.shape.includes('9') ? '（延伸音色）' : ''}${cont ? '；进行计划的延续' : ''}`;
+      list.push({ sym, weight, desc, label: chordLabel(p.rootPc, p.shape), fn, ...p });
     }
     for (const s of subs) {
       const p = parseRoman(s.sym);
       if (!p || list.some((c) => c.sym === s.sym)) continue;
       if (banned(p.rootPc)) continue; // 替换和弦不能把被断路器剔除的根音偷渡回来
-      list.push({ ...s, ...p });
+      const fn = functionOf(s.sym, plan.mode) ?? 'Tp';
+      const w = s.weight + smoothness(curSym, p) * W_SMOOTH + (fnNext[fn] ?? 0.25) * W_FN;
+      list.push({ ...s, weight: w, fn, desc: `${s.desc}（${fn} 功能）`, ...p });
     }
     return list;
   };
@@ -116,9 +175,10 @@ export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEn
   if (out.length < 3) out = build(false, true);
   if (out.length < 3) out = build(false, false);
   out.sort((a, b) => b.weight - a.weight);
-  const poolTop = out.filter((c) => !c.sub).slice(0, 6);
+  // 名额从 6+2 放宽到 7+2：色板扩充若没有名额就是死代码（池和弦会占满前 6）
+  const poolTop = out.filter((c) => !c.sub).slice(0, 7);
   const subTop = out.filter((c) => c.sub).slice(0, 2);
-  const merged = [...poolTop, ...subTop].sort((a, b) => b.weight - a.weight).slice(0, 8);
+  const merged = [...poolTop, ...subTop].sort((a, b) => b.weight - a.weight).slice(0, 9);
   if (merged.length < 3) { // 安全兜底：排除过度时按权重回填
     const rest = out.filter((c) => !merged.includes(c)).slice(0, 3 - merged.length);
     return [...merged, ...rest];

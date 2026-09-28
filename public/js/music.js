@@ -111,6 +111,72 @@ export function lhVoicing(rootPc, shape) {
   return { bass, upper };
 }
 
+/* ==================== 和声功能与调式色板 ==================== */
+
+/** 罗马数字 ↔ 音级（候选集与色板共用一份，别处禁止再定义） */
+export const ROMAN_BY_PC = { 0: 'I', 1: 'bII', 2: 'II', 3: 'bIII', 4: 'III', 5: 'IV', 6: 'bV', 7: 'V', 8: 'bVI', 9: 'VI', 10: 'bVII', 11: 'VII' };
+
+// 四功能和声功能。Tp = 离调色彩和弦（承担 ii°/iv/Neapolitan/中音级角色）
+export const HARMONIC_FUNCTIONS = {
+  T: 'tonic — stable, home; a place to rest',
+  S: 'subdominant — opens outward, prepares motion',
+  D: 'dominant — tension, pulls back home',
+  Tp: 'tonic proxy — color, relative-mode or borrowed hue',
+};
+
+// 根音 → 功能（大调）
+const FN_MAJOR = { 0: 'T', 5: 'S', 7: 'D', 2: 'S', 9: 'Tp', 4: 'Tp', 11: 'Tp' };
+// 根音 → 功能（小调）：ii(2) 归下属（半减作下属功能），III(4)/VII(11) 归 Tp 色彩
+const FN_MINOR = { 0: 'T', 3: 'S', 5: 'S', 2: 'S', 7: 'D', 8: 'Tp', 10: 'Tp', 4: 'Tp', 11: 'Tp' };
+
+/** 罗马数字 → 和声功能；不可解析返回 null。小调族（minor/dorian/mixolydian/五声）共用小调功能表。 */
+export function functionOf(romanSym, mode = 'major') {
+  const p = parseRoman(romanSym);
+  if (!p) return null;
+  const table = (mode === 'major' || mode === 'lydian') ? FN_MAJOR : FN_MINOR;
+  return table[p.rootPc] ?? 'Tp';
+}
+
+/**
+ * 各调式的自然音级性质（音级半音数 → 和弦性质后缀）。
+ * '' = 大三和弦，'m' = 小三和弦，'ø' = 半减和弦。
+ * 这是色板的"质"来源——只扩根音对 unique_chords 帮助有限（单一调式的根音数天然封顶），
+ * 扩"符号"（i / iiø / bIII / iv / V / bVI / bVII）才是词汇天花板的真正解法。
+ */
+const PALETTE_QUALITY = {
+  major: { 0: '', 2: 'm', 4: 'm', 5: '', 7: '', 9: 'm', 11: 'ø' },
+  lydian: { 0: '', 2: 'm', 4: 'm', 5: '', 6: '', 7: '', 9: 'm', 11: 'm' },
+  dorian: { 0: 'm', 2: '', 3: '', 5: 'm', 7: 'm', 9: 'm', 10: '' },
+  mixolydian: { 0: '', 2: 'm', 4: 'm', 5: '', 7: 'm', 9: 'm', 10: '' },
+  minor: { 0: 'm', 2: 'ø', 3: '', 4: '', 5: 'm', 7: '', 8: '', 10: '' },
+  pentatonicMajor: { 0: '', 2: 'm', 4: 'm', 7: '', 9: 'm' },
+  pentatonicMinor: { 0: 'm', 3: '', 5: 'm', 7: '', 10: '' },
+};
+
+/**
+ * 调式的全调内和声色板：取 SCALES[mode] 的全部音级，按该调式的性质拼成罗马数字并标注功能。
+ * 这是突破「进行池每条只有 4 个和弦 → 候选词汇天花板」的关键来源：
+ * 候选集不再等于 pool 并集，而是 pool 并集 ∪ 本色板（`candidates.js` 负责合并）。
+ */
+export function modePalette(mode) {
+  const semis = SCALES[mode] || SCALES.major;
+  const quality = PALETTE_QUALITY[mode] ?? PALETTE_QUALITY.major;
+  const out = [];
+  for (const s of semis) {
+    const rootPc = ((s % 12) + 12) % 12;
+    const base = ROMAN_BY_PC[rootPc];
+    const q = quality[s] ?? '';
+    // 大三和弦用大写罗马数字、小三用小写（parseRoman 里小写无后缀即小三和弦，不需要 'm' 后缀），
+    // 半减用小写 + 'ø'；变音前缀 b/# 原样保留
+    const letter = q === 'ø' ? base.toLowerCase() : (q === '' ? base : (base[0] === 'b' || base[0] === '#' ? base[0] + base.slice(1).toLowerCase() : base.toLowerCase()));
+    const sym = q === 'ø' ? letter + 'ø' : letter;
+    const p = parseRoman(sym);
+    if (!p) continue; // 防御：该调式的性质拼不出合法罗马数字时跳过
+    out.push({ sym, rootPc, shape: p.shape, fn: functionOf(sym, mode) });
+  }
+  return out;
+}
+
 /* ============================ 曲风预设 ============================ */
 
 // 节奏型：以 16 分音符为格的 onset 数组（4/4 一小节 16 格，3/4 为 12 格）。

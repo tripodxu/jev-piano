@@ -7,6 +7,15 @@
 
 ---
 
+## [完成] 2026-09-28 · 和声功能层（迭代轮次 2 · 创意）
+
+- **做了什么**（详见 [docs/memory/2026-09-28-harmonic-function-layer.md](docs/memory/2026-09-28-harmonic-function-layer.md)，设计 [spec](docs/superpowers/specs/2026-09-28-harmonic-function-layer-design.md)、[计划](docs/superpowers/plans/2026-09-28-harmonic-function-layer.md)）：候选集来源从「进行池并集」换成「**调式全调内色板 ∪ 进行池**」。`music.js` 加四和声功能分类（T/S/D/Tp）与带调式性质的色板（小调出 iiø、大调出 viiø、dorian 出 bVII）；`candidates.js` 加**共同音 + 五度圈距离**的声部进行打分与功能转移矩阵；`composer.js` 加 Jev **第 7 问「和声功能」**（不做硬过滤，只作语义提示 + 功能族内回落 + UI 轴）。测试 55→**70**。
+- **为什么**：第 1 轮判定 `unique_chords` 停在 6-7 是曲风词汇上限——候选全集严格等于 pool 并集，romantic 小调只有 6 个根音。只能换来源，调参无效。
+- **顺手修的两个真 bug**：① 旋律护栏判定的是未锚定形态、存进 `lastSigs` 的却是乐句尾锚定后的形态 → 乐句尾出现相邻重复（修法：护栏在最终形态上判定）；② 护栏兜底 `return rh` 直接返回已知撞车的旋律，README「绝不逐字重复」是假的（修法：加可证有效的节奏压缩变形 + 音高扫掠）。另发现**左手完全没有指纹护栏**，补上了。
+- **坑**：① 第一版色板只输出根音，C 小调只比池多 1 个音级且被 `slice(0,6)` 挤掉——**瓶颈单位是符号不是根音**；② `W_SMOOTH` 调到 0.35 能让熵过门但旋律相邻重复在 3/12 种子上失败，硬不变量优先，已锁回 0.5；③ 我自己的 A/B 脚本把 melody+lh 相加成一个 adj，一度误判成旋律护栏失效、改错两次代码——**指标合并会掩盖失效部位**。
+- **验证**：npm test 70/70；12 种子 fixture：和弦种类 8.25→**9.25**、左手唯一 27.67→**29.58**、跳进 13.25%→14.75%、旋律/左手相邻重复均 **0**、音程熵 2.53→2.47（差 0.06，噪声内，如实记录为未过门）；**真实 Jev `unique_chords` 7/6 → 8/8**（挂了两轮的目标达成），新 `Dm7b5` 在真实序列中反复出现。计费约 $0.004。
+- **下一步**（迭代轮次 3 · 前端）：`fn`/`chordFn`/`loopLocked`/`rejected` 四个归因字段已就位但 UI 零展示，做成「断路器指示 + 和声功能轴」。
+
 ## [完成] 2026-09-28 · 循环锁死断路器接线（迭代轮次 1 · 优化）
 
 - **做了什么**（详见 [docs/memory/2026-09-28-loop-lock-breaker.md](docs/memory/2026-09-28-loop-lock-breaker.md)，计划 [docs/superpowers/plans/2026-09-28-loop-lock-breaker.md](docs/superpowers/plans/2026-09-28-loop-lock-breaker.md)）：发现 `chordCandidates` 的 `recentRoots` 是**死参数**——JSDoc 承诺的「循环锁死剔除」从未实现，`detectLoop().members` 全仓零消费者。已接线（与根音疲劳组成两条断路器，取舍顺序：先放疲劳、留锁死）；顺手修掉兜底判据 `!out.length` 应为 `out.length < 3` 的既有 bug（断路器很凶时只返回 1 个候选）；抽出 `public/js/candidates.js`（171 行），composer.js 769→**616**；加决策归因字段 `loopLocked`/`rejected`（ADR-0003 后果条款）。测试 47→**55**。
@@ -84,11 +93,11 @@
 
 | 状态 | 任务 | 领地 | 验收 |
 |---|---|---|---|
-| 待办 | **扩 `STYLES[*].progs` 根音词汇量**：这是 `unique_chords` 停在 6-7 的真因（曲风词汇上限），非断路器问题 | `music.js` + `test/theory.test.mjs` | 测试全绿 + 12 种子 `unique_chords` ≥ 8 |
-| 待办 | 前端把 `decision.loopLocked` / `rejected` 做成可见的「断路器指示」 | `ui.js` / `index.html` / `styles.css` | 手工冒烟 + 测试全绿 |
+| 待办 | **前端展示 4 个归因字段** `fn`/`chordFn`/`loopLocked`/`rejected`：和声功能轴 + 断路器指示 | `ui.js` / `index.html` / `styles.css` | 手工冒烟 + 测试全绿 |
 | 待办 | 和弦显示升/降号美化（C minor 的 Ab 现显示 G#） | `music.js` `chordLabel` + 测试 | 测试全绿 + 试听无回归 |
 | 待办 | 音质升级评估：@tonejs/piano 采样（数 MB，违背轻量，需 ADR） | — | ADR 结论 |
 | 待办 | 钢琴卷帘量化与力度编辑 | `studio.js` + `test/studio.test.mjs` | 测试全绿 |
+| ~~待办~~ | ~~扩 `STYLES[*].progs` 根音词汇量~~ → 轮次 2 已用**调式色板**解决，优先级下降 | — | 已由色板替代 |
 
 > 格式约定：完成任务 → 条目移入上部「完成」区（最新在上）；新接任务 → 按下条格式写接力条：
 > `[进行中] 任务名 · 日期` + 目标/进度/下一步/已知坑/验收/领地（完整格式见 AGENTS.md §4.2）。

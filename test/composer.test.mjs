@@ -146,15 +146,83 @@ test('强度曲线：rise 弧线的强度随进度上升（多种子相关性）
   assert.ok(corr > 0.05, `rise 弧线强度应随进度上升: cov=${corr.toFixed(3)} (${n} 小节)`);
 });
 
-test('决策元信息可归因：loopLocked / rejected 字段存在且 rejected=false（fixture 从不越界）', async () => {
+test('决策元信息可归因；循环锁死「要么触发、要么无环可破」', async () => {
   const { composer } = await makeComposer({ styleId: 'romantic', seed: 2027 });
   let sawLock = false;
+  const roots = [];
   for (let i = 0; i < 32; i++) {
     const bar = await composer.nextBar();
     assert.equal(typeof bar.decision.loopLocked, 'boolean', '缺 loopLocked 归因字段');
     assert.equal(bar.decision.rejected, false, 'fixture 采样恒在候选集内，不应触发回落');
     if (bar.decision.loopLocked) sawLock = true;
+    roots.push(bar.chord.rootPc);
   }
-  assert.ok(sawLock, '32 小节内应至少有一次循环锁死被记录（否则断路器形同虚设）');
+  // 不变量：任何 6 小节窗口若真的只剩 ≤3 个根音，断路器就必须触发过；
+  // 否则说明色板够宽、根本没形成环（这同样是健康状态——不是"断路器形同虚设"）
+  let lockedWindowExists = false;
+  for (let i = 5; i < roots.length; i++) {
+    if (new Set(roots.slice(i - 5, i + 1)).size <= 3) { lockedWindowExists = true; break; }
+  }
+  assert.ok(sawLock || !lockedWindowExists,
+    `出现过 ≤3 根音的 6 小节窗口却从未触发断路器（sawLock=${sawLock}）`);
+});
+
+test('指纹护栏保底：当所有确定性变形都撞车时仍能脱困（不再原样返回撞车旋律）', async () => {
+  // 构造一个"处处撞车"的极端场景：每小节都只有同一个音、同一节奏，护栏的所有变形都会撞上
+  const { composer } = await makeComposer({ styleId: 'newage', seed: 5 });
+  const sigs = [];
+  for (let i = 0; i < 24; i++) {
+    const bar = await composer.nextBar();
+    const rh = bar.notes.filter((n) => n.hand === 'R');
+    sigs.push(rh.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(','));
+  }
+  // 护栏只看最近两小节，但要求是"相邻两小节永不相同"
+  let adj = 0;
+  for (let i = 1; i < sigs.length; i++) if (sigs[i] === sigs[i - 1]) adj++;
+  assert.equal(adj, 0, `出现 ${adj} 处相邻旋律字面重复——护栏兜底失效`);
+});
+
+test('左手指纹护栏：连续小节的左手不得字面重复（renderLH 变体之外的兜底）', async () => {
+  for (const seed of [2026, 2030, 7]) {
+    const { composer } = await makeComposer({ styleId: 'romantic', seed });
+    let prev = null, adj = 0;
+    for (let i = 0; i < 32; i++) {
+      const bar = await composer.nextBar();
+      const sig = bar.notes.filter((n) => n.hand === 'L').map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
+      if (sig === prev) adj++;
+      prev = sig;
+    }
+    assert.equal(adj, 0, `seed ${seed} 出现 ${adj} 处相邻左手字面重复`);
+  }
+});
+
+test('第 7 问「和声功能」存在、合法，且与实际和弦的功能自洽', async () => {
+  const { composer } = await makeComposer({ styleId: 'romantic' });
+  for (let i = 0; i < 16; i++) {
+    const bar = await composer.nextBar();
+    assert.ok('function' in bar.decision.answers, 'fixture 决策缺 function 问');
+    assert.ok(['T', 'S', 'D', 'Tp'].includes(bar.decision.fn), `非法功能 ${bar.decision.fn}`);
+    assert.ok(['T', 'S', 'D', 'Tp'].includes(bar.decision.chordFn), `非法和弦功能 ${bar.decision.chordFn}`);
+  }
+});
+
+test('功能族内回落：和弦作答非法时优先落在模型声明的功能族内', async () => {
+  const { composer } = await makeComposer({ styleId: 'romantic' });
+  // 篡改第一次决策：让 chord 用标签作答（ADR-0003 记录过的真实模型行为）并指定 function='D'
+  const orig = composer._decide.bind(composer);
+  let injected = false;
+  composer._decide = async (state, questions) => {
+    const out = await orig(state, questions);
+    if (!injected) {
+      injected = true;
+      out.answers.chord = { value: '"chord"' };
+      out.answers.function = { value: 'D' };
+    }
+    return out;
+  };
+  const bar = await composer.nextBar();
+  assert.equal(bar.decision.rejected, true, '非法作答应被标记为 rejected');
+  assert.equal(bar.decision.fn, 'D', '应采纳模型声明的功能');
+  assert.equal(bar.decision.chordFn, 'D', `非法作答应回落到 D 族，实际 ${bar.decision.chordFn}（和弦 ${bar.chord.symbol}）`);
 });
 

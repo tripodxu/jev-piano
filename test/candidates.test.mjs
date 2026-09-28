@@ -2,8 +2,8 @@
 // 这些纯函数决定了"模型能选什么"，因此这里锁住的是"不可选"的不变量，而不只是"可选"。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget } from '../public/js/candidates.js';
-import { STYLE_BY_ID } from '../public/js/music.js';
+import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, commonTones, fifthsDist, functionCandidates } from '../public/js/candidates.js';
+import { parseRoman, STYLE_BY_ID, HARMONIC_FUNCTIONS } from '../public/js/music.js';
 
 const MINOR_PLAN = { mode: 'minor', meterNum: 4, barsPerPhrase: 8, density: 0.5, totalBars: 32, arc: 'arch' };
 
@@ -57,6 +57,40 @@ test('chordCandidates: 全池都在循环里时兜底不剔空（长曲保护）
   }
 });
 
+/* ---------------- 色板扩充 + 声部进行权重 ---------------- */
+
+test('chordCandidates: 候选来源是全调内色板（带调式性质），不再受 4 和弦进行池限制', () => {
+  const cands = chordCandidates(STYLE_BY_ID.romantic, MINOR_PLAN, 'i', 3, false, null, [], {});
+  const syms = new Set(cands.map((c) => c.sym));
+  const roots = new Set(cands.map((c) => c.rootPc));
+  assert.ok(roots.size >= 4, `色板应给出多个根音，实际 ${[...roots]}`);
+  assert.ok(cands.every((c) => HARMONIC_FUNCTIONS[c.fn]), '每个候选都应带合法功能标注');
+  assert.ok(cands.some((c) => c.rootPc === 0), '主和弦应在候选内');
+  // 小调色板独有的 iiø（池里只有 i/bVI/bIII/bVII/iv/V）
+  assert.ok(syms.has('iiø'), `应出现小调 iiø，实际 ${[...syms]}`);
+});
+
+test('chordCandidates: 风格进行池的原有色彩不被色板挤掉（jazz 七和弦仍在）', () => {
+  const cands = chordCandidates(STYLE_BY_ID.jazz, { ...MINOR_PLAN, mode: 'major' }, 'I', 3, false, null, [], {});
+  assert.ok(cands.some((c) => c.sym === 'V7'), '爵士的 V7 不应被大三色板条目挤掉');
+  assert.ok(cands.some((c) => c.sym === 'ii7'), '爵士的 ii7 不应被挤掉');
+});
+
+test('chordCandidates: 共同音多的和弦权重更高（声部进行优先于五度圈远距）', () => {
+  // C 之后：IV(F A C) 与 C 共 1 音；viiø(B D F) 与 C 共 0 音且五度圈距离 3
+  const cands = chordCandidates(STYLE_BY_ID.classical, { ...MINOR_PLAN, mode: 'major' }, 'I', 3, false, null, [], {});
+  const w = (sym) => cands.find((c) => c.sym === sym)?.weight ?? -Infinity;
+  assert.ok(w('IV') > w('viiø'), `IV(${w('IV')}) 应高于 viiø(${w('viiø')})`);
+});
+
+test('chordCandidates: 功能转移加分（属之后主和弦加分，主之后下属/属加分）', () => {
+  const afterD = chordCandidates(STYLE_BY_ID.romantic, MINOR_PLAN, 'V', 4, false, null, [], {});
+  const afterT = chordCandidates(STYLE_BY_ID.romantic, MINOR_PLAN, 'i', 4, false, null, [], {});
+  const w = (cands, pc) => cands.find((c) => c.rootPc === pc)?.weight ?? -Infinity;
+  assert.ok(w(afterD, 0) > w(afterD, 5), `属之后主(${w(afterD, 0)}) 应高于下属(${w(afterD, 5)})`);
+  assert.ok(w(afterT, 5) > w(afterT, 0), `主之后下属(${w(afterT, 5)}) 应高于主(${w(afterT, 0)})`);
+});
+
 /* ---------------- 其余候选构造 ---------------- */
 
 test('lhCandidates: 连续同织体衰减，强度偏置方向正确', () => {
@@ -97,4 +131,39 @@ test('contourWeights / intensityTarget: 乐句位置与弧线偏置生效且有�
     }
   }
   assert.ok(intensityTarget({ arc: 'arch' }, 0.5, false) > intensityTarget({ arc: 'arch' }, 0.5, true), '乐句尾应减强度');
+});
+
+/* ---------------- 声部进行打分与功能转移矩阵 ---------------- */
+
+test('commonTones: 共音计数正确', () => {
+  // C = {0,4,7}；Am = {9,0,4} → 交集 {0,4} = 2
+  assert.equal(commonTones('', 0, 'm', 9), 2, 'C→Am 共 2 音');
+  // C = {0,4,7}；G = {7,11,2} → 交集 {7} = 1
+  assert.equal(commonTones('', 0, '', 7), 1, 'C→G 共 1 音');
+  // C 与 F# 大三 {6,10,1} → 无交集
+  assert.equal(commonTones('', 0, '', 6), 0, 'C→F# 无共音');
+  assert.equal(commonTones('maj7', 0, 'm7', 9), 3, 'Cmaj7{0,4,7,11} ∩ Am7{9,0,4,7} = 3');
+});
+
+test('fifthsDist: 五度圈环形距离（0..6，对称）', () => {
+  assert.equal(fifthsDist(0, 0), 0);
+  assert.equal(fifthsDist(0, 7), 1, 'C→G 五度圈相邻');
+  assert.equal(fifthsDist(0, 5), 1, 'C→F 五度圈相邻（反向）');
+  assert.equal(fifthsDist(0, 1), 5, 'C# 在五度圈上顺时针 7 步 / 逆时针 5 步，取近者 5');
+  assert.equal(fifthsDist(0, 2), 2, 'C→D 顺时针两步');
+  assert.equal(fifthsDist(0, 1), fifthsDist(1, 0), '对称');
+  for (let a = 0; a < 12; a++) for (let b = 0; b < 12; b++) {
+    const d = fifthsDist(a, b);
+    assert.ok(d >= 0 && d <= 6 && Number.isInteger(d), `fifthsDist(${a},${b})=${d} 越界`);
+  }
+});
+
+test('functionCandidates: 四功能齐备，D→T 与乐句尾→T 权重更高', () => {
+  const c = functionCandidates({ arc: 'arch' }, 'D', true, 7);
+  assert.deepEqual(Object.keys(c).sort(), ['D', 'S', 'T', 'Tp'], '四功能必须齐备');
+  assert.ok(c.T.w > c.D.w, `乐句尾属功能应向主功能回落 (T=${c.T.w} D=${c.D.w})`);
+  const mid = functionCandidates({ arc: 'arch' }, 'T', false, 3);
+  assert.ok(mid.S.w > mid.T.w && mid.D.w > mid.T.w, '主功能之后应走向下属或属');
+  // 乐句开头偏好主功能
+  assert.ok(functionCandidates({ arc: 'arch' }, 'S', false, 0).T.w > functionCandidates({ arc: 'arch' }, 'S', false, 4).T.w, '乐句头偏好主功能');
 });

@@ -1,11 +1,11 @@
-// composer.js — 编曲决策器：Jev 每小节一次请求（6 问并行），代码把选择渲染成音符。
+// composer.js — 编曲决策器：Jev 每小节一次请求（七问并行），代码把选择渲染成音符。
 // 真实 Jev 不可用时（无 key/CORS/断网），fixture 采样器用同一候选集与权重同构兜底，播放永不中断。
 import {
   STYLE_BY_ID, NOTE_NAMES,
-  chordLabel, chordMidis, scaleMidis, nearest, lhVoicing, midiName, keywordPlan,
+  chordLabel, chordMidis, scaleMidis, nearest, lhVoicing, midiName, keywordPlan, functionOf,
 } from './music.js';
 import { askJev, fixtureAnswer, expandPlan } from './jev.js';
-import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget } from './candidates.js';
+import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, functionCandidates } from './candidates.js';
 
 export function mulberry32(seed) {
   let a = seed >>> 0;
@@ -157,22 +157,46 @@ function insertPassing(notes, scale, rng) {
   return out.sort((x, y) => x.startBeats - y.startBeats);
 }
 
-/** 反重复护栏：与最近两小节指纹撞车时，依次尝试整句上移/下移/加装饰/倒影，直到避开全部已存指纹 */
-function mutateMelody(rh, { scale, rng, avoid = [] }) {
+/** 保底脱困：整体压缩节奏位置。签名 = onset:midi 序列，所以改变 onset 必然改变签名；
+ *  4 个互不相同的压缩比里，必然有 ≥2 个与已存的 2 个指纹都不同 → 存在性可证，不靠碰运气。 */
+function compressRhythm(notes, k) {
+  return notes.map((n) => ({ ...n, startBeats: n.startBeats * k }));
+}
+
+/** 反重复护栏：与最近两小节指纹撞车时，依次尝试整句上移/下移/加装饰/倒影/节奏压缩/音高扫掠，
+ *  直到避开全部已存指纹。**任何情况下都不得原样返回撞车的旋律**——那会让"绝不逐字重复"变成谎话。
+ *  post：候选的最终形态改写（乐句尾的末端锚定）。护栏必须在 post 之后的形态上判定，
+ *  否则会出现"逃出去了又被锚定改回撞车"——比对的是未锚定 vs 已锚定两种形态，语义不一致。 */
+function mutateMelody(rh, { scale, rng, avoid = [], post = (x) => x }) {
   const blocked = (cand) => avoid.some((s) => s === sigOf(cand));
-  if (!blocked(rh)) return rh;
+  // 试一个候选：先做最终形态改写，再判定；不撞车就把改写后的结果交出去
+  const attempt = (make) => {
+    const fin = post(make(rh));
+    return blocked(fin) ? null : fin;
+  };
+  if (!blocked(post(rh))) return post(rh);
   const m0 = rh[0]?.midi ?? 60;
   const tries = [
     (ns) => ns.map((n) => ({ ...n, midi: clamp(scaleNext(n.midi, 1, scale), 60, 84) })),
     (ns) => ns.map((n) => ({ ...n, midi: clamp(scaleNext(n.midi, -1, scale), 60, 84) })),
     (ns) => insertPassing(ns, scale, rng),
     (ns) => ns.map((n) => ({ ...n, midi: clamp(m0 - (n.midi - m0), 60, 84) })), // 围绕首音倒影
+    (ns) => compressRhythm(ns, 0.9),
+    (ns) => compressRhythm(ns, 0.8),
+    (ns) => compressRhythm(ns, 0.7),
+    (ns) => compressRhythm(ns, 0.6),
   ];
   for (const f of tries) {
-    const cand = f(rh);
-    if (!blocked(cand)) return cand;
+    const out = attempt(f);
+    if (out) return out;
   }
-  return rh;
+  // 节奏压缩对"所有音同一 onset"无效（乘任何系数都不变），改用音高绝对扫掠
+  for (const d of [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6]) {
+    const out = attempt((ns) => ns.map((n) => ({ ...n, midi: clamp(n.midi + d, 60, 84) })));
+    if (out) return out;
+  }
+  // 极端兜底：全体已被 clamp 压到同一音高时，删掉末音改变签名长度（仍不保证，但不再返回撞车原样）
+  return rh.length > 1 ? post(rh.slice(0, -1)) : post(rh);
 }
 
 /** 模进/倒影：以上一小节旋律素材为本，重锚定到当前和弦（jevthoven 的 motif development） */
@@ -385,6 +409,7 @@ export class Composer {
     this.directorNote = '';        // 用户自然语言演奏指示，实时生效
     this.pitchCenter = 72;         // 音区中心缓慢漂移，避免旋律总绕着同一个音域打转
     this.lastSigs = [];            // 最近两小节旋律指纹（反重复护栏）
+    this.lastLhSigs = [];          // 最近两小节左手指纹（renderLH 变体不足时的兜底）
     this.prevMelody = null;        // 上一小节旋律素材（供模进/倒影）
     this.developHistory = [];      // 发展手法历史
     this.lastPhraseFirst = null;   // 上一乐句开场的和弦（用于乐句间换进行）
@@ -434,6 +459,12 @@ export class Composer {
     const recentRoots = this.history.slice(-6).map((b) => b.chord.rootPc);
     const loopLocked = detectLoop(recentRoots).locked;
     const cands = chordCandidates(this.style, plan, this.currentSymRoman, pos.barInPhrase, pos.isPhraseEnd, this.lastPhraseFirst, recentRoots, this.rootFatigue);
+    // 第 7 问「和声功能」：模型先说下一小节要往哪个功能走（语义先于音名），
+    // 和弦仍在候选集内选——功能**不做硬过滤**（同一请求里无法先问功能再问和弦，
+    // 硬过滤会让模型自己的合法作答被前置问题判死）。它的三个用途：语义语境、
+    // 非法作答时的族内回落、UI 可读维度。
+    const curFn = this.currentSymRoman ? (functionOf(this.currentSymRoman, plan.mode) ?? 'T') : 'T';
+    const fnCands = functionCandidates(plan, curFn, pos.isPhraseEnd, pos.barInPhrase);
 
     // 左手：连续同织体衰减 + 导演指示偏置
     const lastLh = this.history.at(-1)?.decision.lh ?? null;
@@ -473,7 +504,7 @@ export class Composer {
         bar: pos.bar, bar_in_phrase: pos.barInPhrase + 1, phrase: pos.phrase + 1,
         is_phrase_end: pos.isPhraseEnd, progress: Number(pos.progress.toFixed(2)),
       },
-      harmony: { current: this.currentChord?.symbol ?? null, current_roman: this.currentSymRoman, recent: this.history.slice(-4).map((b) => b.chord.symbol), loop_locked: loopLocked },
+      harmony: { current: this.currentChord?.symbol ?? null, current_roman: this.currentSymRoman, current_function: curFn, recent: this.history.slice(-4).map((b) => b.chord.symbol), loop_locked: loopLocked },
       last_bar: this.history.length ? {
         lh: this.history.at(-1).decision.lh, contour: this.history.at(-1).decision.contour,
         tier: this.history.at(-1).decision.tier, ended_on: this.lastEndMidi ? midiName(this.lastEndMidi) : null,
@@ -488,9 +519,15 @@ export class Composer {
     };
     const honorNote = ' Honor `director_note` in state when present.';
     const questions = {
+      function: {
+        type: 'choice',
+        instructions: `You are the harmony planner. \`harmony.current_function\` is where the music is now. Choose the harmonic FUNCTION the NEXT bar should move toward; the chord in the parallel "chord" question will belong to this function.${honorNote} Answer ONLY with the Choice question "function".`,
+        criteria: Object.fromEntries(Object.entries(fnCands).map(([k, v]) => [k, v.desc])),
+        _fixture: { weights: Object.fromEntries(Object.entries(fnCands).map(([k, v]) => [k, v.w])) },
+      },
       chord: {
         type: 'choice',
-        instructions: `You are the harmony planner of a live piano improvisation. Choose the chord for the NEXT bar. Keep voice leading smooth from \`harmony.current\`, serve the style and mood, and respect phrase endings (prefer V or I at phrase ends, I at phrase starts). Answer ONLY with the Choice question "chord".`,
+        instructions: `You are the harmony planner of a live piano improvisation. Choose the chord for the NEXT bar, honouring the "function" you just chose. Keep voice leading smooth from \`harmony.current\`, serve the style and mood, and respect phrase endings (prefer V or I at phrase ends, I at phrase starts). Answer ONLY with the Choice question "chord".`,
         criteria: Object.fromEntries(cands.map((c) => [c.sym, c.desc])),
         _fixture: { weights: Object.fromEntries(cands.map((c) => [c.sym, c.weight])) },
       },
@@ -540,8 +577,14 @@ export class Composer {
     // jevthoven 铁律：候选集之外的答案一律拒绝（否则真实模型会用标签报出被排除的循环和弦）
     const chordSymRawRaw = String(ans.chord?.value ?? '');
     const picked = cands.find((c) => c.sym === chordSymRawRaw || c.label === chordSymRawRaw);
-    const chordSymRaw = picked ? picked.sym : cands[0].sym; // 非法作答 → 最高权重候选
-    const chordP = picked ?? cands[0];
+    // 模型声明的功能（非法作答则取转移权重最高的那个功能）
+    const fnAnswer = String(ans.function?.value ?? '');
+    const declaredFn = fnCands[fnAnswer] ? fnAnswer : (Object.entries(fnCands).sort((a, b) => b[1].w - a[1].w)[0]?.[0] ?? 'T');
+    // 非法作答 → 先回落到「模型声明的功能族」内权重最高的候选，再退到全局最高权重。
+    // 这比单纯取 cands[0] 更聪明：模型已经用一句话告诉了我们要往哪走。
+    const inFamily = cands.filter((c) => (c.fn ?? functionOf(c.sym, plan.mode)) === declaredFn);
+    const chordP = picked ?? inFamily.sort((a, b) => b.weight - a.weight)[0] ?? cands[0];
+    const chordSymRaw = picked ? picked.sym : chordP.sym;
     const chord = { symbol: chordLabel(chordP.rootPc, chordP.shape), ...chordP };
     if (pos.barInPhrase === 0) this.lastPhraseFirst = chordSymRaw;
     this.currentSymRoman = chordSymRaw;
@@ -568,11 +611,12 @@ export class Composer {
       : renderMelody({ plan, chord, contourId: contour, pattern: varied, breathe, intensity, isPhraseEnd: pos.isPhraseEnd, startHint, rng: this.rng });
     if (!usePrev && dev === 'ornament') rh = insertPassing(rh, scale, this.rng);
 
-    // 反重复护栏 + 乐句尾锚定
-    if (pos.isPhraseEnd) snapLastToChord(rh, chord);
+    // 反重复护栏 + 乐句尾锚定。post 交给护栏内部执行：护栏在「锚定之后」的最终形态上判定碰撞，
+    // 锚定不再发生在护栏之外——否则会「逃出去又被锚定改回撞车」（词句尾相邻重复的真实根因）。
+    const post = pos.isPhraseEnd ? (ns) => snapLastToChord(ns, chord) : (ns) => ns;
+    rh = post(rh);
     if (this.lastSigs.includes(sigOf(rh))) {
-      rh = mutateMelody(rh, { scale, rng: this.rng, avoid: this.lastSigs });
-      if (pos.isPhraseEnd) snapLastToChord(rh, chord);
+      rh = mutateMelody(rh, { scale, rng: this.rng, avoid: this.lastSigs, post });
     }
     this.lastSigs = [sigOf(rh), ...this.lastSigs].slice(0, 2);
 
@@ -583,10 +627,16 @@ export class Composer {
       intervals: rh.map((n, i, a) => (i ? n.midi - a[i - 1].midi : 0)).slice(1),
     };
 
-    const notes = [
-      ...renderLH({ plan, chord, patternId: lh, intensity, rng: this.rng }),
-      ...rh,
-    ];
+    // 左手指纹护栏：renderLH 内部靠随机变体（空拍/旋转/换序）避重，但没有硬保证——
+    // 色板词汇变宽后实测出现过 1/12 种子相邻左手复读。这里用"重渲染换一个变体"兜底，
+    // rng 会继续推进所以重渲染必然给出不同结果，且保持同 seed 可复现。
+    let lhNotes = renderLH({ plan, chord, patternId: lh, intensity, rng: this.rng });
+    for (let k = 0; k < 3 && this.lastLhSigs.includes(sigOf(lhNotes)); k++) {
+      lhNotes = renderLH({ plan, chord, patternId: lh, intensity, rng: this.rng });
+    }
+    this.lastLhSigs = [sigOf(lhNotes), ...this.lastLhSigs].slice(0, 2);
+
+    const notes = [...lhNotes, ...rh];
     this.lastEndMidi = rh.length ? rh.at(-1).midi : this.lastEndMidi;
     this.intensitySoFar = this.intensitySoFar * 0.7 + intensity * 0.3;
     this.currentChord = chord;
@@ -603,8 +653,10 @@ export class Composer {
         inputTokens: dec.inputTokens ?? 0, usd: dec.usd ?? 0,
         lh, contour, tier: rhythmEntry.tier ?? 1, breathe, develop: dev, roman: chordSymRaw,
         confidence: ans.chord?.confidence ?? ans.chord?.probability ?? null,
-        // 归因字段（ADR-0003）：断路器是否锁死、模型答案是否被候选集强制拒绝
+        // 归因字段（ADR-0003）：断路器是否锁死、模型答案是否被候选集强制拒绝、功能层结果
         loopLocked, rejected: !picked,
+        fn: declaredFn,
+        chordFn: chordP.fn ?? functionOf(chordSymRaw, plan.mode),
         answers: ans, candidates: Object.keys(questions.chord.criteria),
       },
     };

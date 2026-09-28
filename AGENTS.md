@@ -9,14 +9,14 @@
 
 ## 0. 30 秒认识这个项目
 
-jev-piano 是一个**零框架、零构建、零运行时依赖**的纯静态前端：用户给一句话，LLM（可选）扩写成乐章计划，**Jev 模型每小节做一次结构化决策**（6 问并行），确定性代码把决策渲染成音符，Web Audio 边决策边演奏。一条 `wrangler deploy` 部署到 Cloudflare Workers。
+jev-piano 是一个**零框架、零构建、零运行时依赖**的纯静态前端：用户给一句话，LLM（可选）扩写成乐章计划，**Jev 模型每小节做一次结构化决策**（7 问并行），确定性代码把决策渲染成音符，Web Audio 边决策边演奏。一条 `wrangler deploy` 部署到 Cloudflare Workers。
 
 核心架构模式（**不可动摇**）：**模型只做选择，代码只做渲染**——Jev 永远在代码生成的有限候选集里挑选，非法和声/非法着法不可表示。完整架构见 README「架构」一节与 [docs/adr/0001](docs/adr/0001-model-chooses-code-writes.md)。
 
 ```text
-public/js/music.js       乐理内核（候选集的来源：罗马数字/声位/音阶/曲风）
-public/js/candidates.js  候选集构造（给模型的可选域 + 两条反重复断路器）
-public/js/composer.js    决策器（六问 + 渲染内核 + 动机记忆）
+public/js/music.js       乐理内核（候选集的来源：罗马数字/声位/音阶/曲风/和声功能/调式色板）
+public/js/candidates.js  候选集构造（给模型的可选域 + 两条反重复断路器 + 声部进行加权）
+public/js/composer.js    决策器（七问 + 渲染内核 + 动机记忆 + 双声部指纹护栏）
 public/js/jev.js         Jev 客户端（4 渠道 + fixture 同构兜底）
 public/js/player.js      lookahead 调度器（提前 2 小节决策）
 public/js/audio.js       合成钢琴
@@ -51,10 +51,10 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 
 | 文件 | 行数 | 职责 | 修改高危区 |
 |---|---|---|---|
-| `music.js` | 278 | 罗马数字解析、和弦声位、音阶、8 种曲风预设、关键词计划 | `STYLES` 完整性被 `theory.test.mjs` 全量断言，改预设必跑测试 |
-| `candidates.js` | 171 | **候选集构造**（= 给模型的可选域）：`detectLoop` 循环锁死检测、`chordCandidates` 两条断路器（根音疲劳 / 循环锁死）、`lhCandidates`/`rhythmCandidates`/`contourWeights`/`intensityTarget` | 兜底判据是「候选够用 ≥3」不是「非空」；两条断路器的取舍顺序（先放疲劳、留锁死）不可调换 |
+| `music.js` | 344 | 罗马数字解析、和弦声位、音阶、8 种曲风预设、关键词计划、**和声功能分类 + 调式全色板**（`functionOf`/`modePalette`） | `STYLES` 完整性被 `theory.test.mjs` 全量断言，改预设必跑测试；`PALETTE_QUALITY` 决定色板的"质"，改它等于改全项目词汇 |
+| `candidates.js` | 231 | **候选集构造**（= 给模型的可选域）：`detectLoop` 循环锁死检测、`chordCandidates` 两条断路器（根音疲劳 / 循环锁死）+ 声部进行加权（共同音/五度圈）、`functionCandidates` 功能转移矩阵 | 兜底判据是「候选够用 ≥3」不是「非空」；`W_SMOOTH` 锁在 0.5（调低会让旋律指纹护栏失效）；断路器取舍先放疲劳、留锁死 |
 | `jev.js` | 211 | 四渠道客户端（fixture/typesafe/openrouter/proxy）、归一化、429/529 退避重试、fixture 采样、LLM 扩写 | `stripPrivate`：发送前剥离 `_` 前缀字段 |
-| `composer.js` | 616 | **核心**：`buildPlan`、`Composer.nextBar()`（六问 + 音符渲染 + 反重复五层机制）、动机记忆、决策归因字段 `loopLocked`/`rejected` | 候选集**不在**本文件（已拆到 `candidates.js`）；指纹护栏、跳进、音区漂移 |
+| `composer.js` | 668 | **核心**：`buildPlan`、`Composer.nextBar()`（七问 + 音符渲染 + 反重复机制）、动机记忆、归因字段 `loopLocked`/`rejected`/`fn`/`chordFn` | 候选集**不在**本文件（在 `candidates.js`）；旋律护栏必须在乐句尾锚定**之后**判定碰撞 |
 | `audio.js` | 133 | 合成钢琴（三角波+泛音+包络+低通+生成式混响）、录音 | `envFor` 纯函数有单测 |
 | `player.js` | 116 | lookahead 调度器（提前 2 小节），`now/setIntervalFn` 可注入 | 时钟注入契约被测试锁定 |
 | `midi.js` | 56 | SMF Type-1 双轨导出 | 字节格式有单测 |
@@ -70,7 +70,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | 路径 | 职责 |
 |---|---|
 | `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
-| `test/*.test.mjs` | `node --test`，共 55 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
+| `test/*.test.mjs` | `node --test`，共 70 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
 | `scripts/probe-jev.mjs` `scripts/probe-bar.mjs` | 真实 API 冒烟（需 key，计费） |
 | `scripts/analyze-repetition.mjs` | 重复度量化分析（`node scripts/analyze-repetition.mjs 32 <seed> random [--real]`）。**单种子噪声大，结论至少取 12 个种子求均值** |
 | `dev-proxy.py` | 本地开发：静态服务 + mock/真实转发（stdlib only） |
@@ -93,7 +93,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 2. 读 MEMORY.md 顶部 3 条 + 任务相关 memory 条目（最新在最上，先看有没有人踩过坑）
 3. 实现：先改/加测试，再改实现（本项目测试驱动传统，见 docs/adr/0004）
 4. 验证关卡（全部通过才算完成）：
-   a. npm test                        全绿（55 个，只增不减）
+   a. npm test                        全绿（70 个，只增不减）
    b. node --check 改动的新 .js        语法
    c. 涉及真实 API 的：scripts/probe-*.mjs 冒烟（可选，计费）
    d. 涉及听感/反重复的：analyze-repetition.mjs 对比指标不退化
@@ -160,7 +160,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 ## 6. 常用命令
 
 ```bash
-npm test                                  # 55 个单测（node --test）
+npm test                                  # 70 个单测（node --test）
 python dev-proxy.py --port 8000           # 本地开发（或 npm run dev）→ http://127.0.0.1:8000
 node scripts/analyze-repetition.mjs 32 2026 random   # 重复度指标（结论至少 12 种子求均值）
 node scripts/probe-jev.mjs                # 真实 API 冒烟（需 TYPESAFE_API_KEY）

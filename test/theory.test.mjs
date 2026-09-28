@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   parseRoman, chordMidis, chordPcs, lhVoicing, scaleMidis, nearest, chordLabel,
   STYLES, LH_DEFS, STYLE_BY_ID, keywordPlan,
+  HARMONIC_FUNCTIONS, functionOf, modePalette,
 } from '../public/js/music.js';
 import { mulberry32 } from './rng-shim.mjs';
 
@@ -90,4 +91,49 @@ test('keywordPlan: 关键词命中返回合法计划片段', () => {
   assert.ok(p.title.length > 0);
   assert.ok(['flat', 'rise', 'arch', 'fall'].includes(p.arc));
   assert.ok(Array.isArray(p.mood) && p.mood.length >= 2);
+});
+
+/* ---------------- 和声功能层：功能分类与调式色板 ---------------- */
+
+test('modePalette: 色板 = 调式音级的全部音级拼成的罗马数字（可被 parseRoman 解析）', () => {
+  for (const mode of ['major', 'minor', 'dorian', 'mixolydian', 'pentatonicMajor', 'pentatonicMinor']) {
+    const pal = modePalette(mode);
+    assert.ok(pal.length >= 5, `${mode} 色板过少: ${pal.length}`);
+    assert.equal(new Set(pal.map((p) => p.rootPc)).size, pal.length, `${mode} 色板有重复根音`);
+    for (const c of pal) {
+      assert.ok(parseRoman(c.sym), `${mode}/${c.sym} 不可解析`);
+      assert.ok(HARMONIC_FUNCTIONS[c.fn], `${mode}/${c.sym} 功能 ${c.fn} 不在四功能内`);
+    }
+  }
+  assert.equal(modePalette('major').length, 7, 'C 大调 7 个音级');
+  assert.equal(modePalette('pentatonicMinor').length, 5, '五声 5 个音级');
+});
+
+test('functionOf: 功能和弦映射到 T/S/D/Tp', () => {
+  assert.equal(functionOf('I', 'major'), 'T');
+  assert.equal(functionOf('V', 'major'), 'D');
+  assert.equal(functionOf('IV', 'major'), 'S');
+  assert.equal(functionOf('ii', 'major'), 'S');
+  assert.equal(functionOf('vi', 'major'), 'Tp');
+  assert.equal(functionOf('i', 'minor'), 'T');
+  assert.equal(functionOf('V', 'minor'), 'D');
+  assert.equal(functionOf('iv', 'minor'), 'S');
+  assert.equal(functionOf('bVI', 'minor'), 'Tp');
+  assert.equal(functionOf('不是罗马数字', 'major'), null, '不可解析应返回 null');
+});
+
+test('functionOf 与 modePalette 自洽（色板每项的 fn 都等于 functionOf(sym)）', () => {
+  for (const mode of ['major', 'minor', 'dorian', 'pentatonicMinor']) {
+    for (const c of modePalette(mode)) {
+      assert.equal(c.fn, functionOf(c.sym, mode), `${mode}/${c.sym} 功能不自洽`);
+    }
+  }
+});
+
+test('色板确实是进行池的上界扩充：romantic 小调色板根音多于其进行池', () => {
+  const pools = STYLE_BY_ID.romantic.progs.minor;
+  const poolRoots = new Set(pools.flat().map((s) => parseRoman(s).rootPc));
+  const palRoots = new Set(modePalette('minor').map((c) => c.rootPc));
+  assert.ok(palRoots.size > poolRoots.size, `色板 ${palRoots.size} 应多于池 ${poolRoots.size}`);
+  for (const r of poolRoots) assert.ok(palRoots.has(r), `池里的根音 ${r} 必须也在色板中（不回归既有风格色彩）`);
 });
