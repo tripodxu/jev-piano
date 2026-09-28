@@ -10,10 +10,11 @@ import { renderKeyboard, toast, sectionLabel } from './ui.js';
 import { loadSettings } from './settings.js';
 import { chordMidis, scaleMidis, nearest, NOTE_NAMES, functionOfPc } from './music.js';
 import { barTension } from './tension.js';
+import { barHarmonyFit } from './nct.js';
 
 const P_LO = 36, P_HI = 95, ROW = 8, ZOOM = 24, SNAP = 0.25, VEL_H = 54;
-// 卷帘头部自上而下：张力曲线 / 功能带 / 和弦名。对齐由共用 ZOOM 保证，无需任何同步代码。
-const H_TENSION = 24, H_FN = 12, H_CHORD = 18, HEADER = H_TENSION + H_FN + H_CHORD;
+// 卷帘头部自上而下：张力曲线 / 功能带 / 和弦名 / 契合度带。对齐由共用 ZOOM 保证，无需任何同步代码。
+const H_TENSION = 24, H_FN = 12, H_CHORD = 18, H_FIT = 12, HEADER = H_TENSION + H_FN + H_CHORD + H_FIT;
 const FN_COLOR = { T: '#d8ab5c', S: '#85b8ae', D: '#cf6a58', Tp: '#a8936f' };
 const STORE_KEY = 'jevpiano.studio.v1';
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -210,7 +211,7 @@ export function pieceTension(piece) {
 
 let tensionCache = null;
 /** 张力受音符编辑影响（密度/音域分量），任何改动后必须作废 */
-function invalidateTension() { tensionCache = null; }
+function invalidateTension() { tensionCache = null; nctCache = null; }
 function tensionOf(piece) {
   if (!piece) return [];
   if (!tensionCache) tensionCache = pieceTension(piece);
@@ -436,7 +437,25 @@ function bindVelLane() {
 
 function chordRoot(c) { return c.rootPc; }
 
-/** 画时间轴：张力面积（顶）+ 功能带（中）。与卷帘共用 ZOOM，横轴天然对齐。 */
+/** 旋律里的非和弦音的 id 集合（用于亮边）。左手不参与。缓存随音符编辑作废。 */
+let nctCache = null;
+function nonChordIds(piece) {
+  if (!piece) return new Set();
+  if (nctCache) return nctCache;
+  const ids = new Set();
+  const meter = piece.plan?.meterNum || 4;
+  for (const bc of piece.barChords ?? []) {
+    const i = Math.round(bc.startBeat / meter);
+    const mel = piece.notes.filter((n) => n.hand === 'R' && Math.floor(n.startBeats / meter) === i)
+      .sort((a, b) => a.startBeats - b.startBeats);
+    const { kinds } = barHarmonyFit({ chord: { rootPc: bc.rootPc, shape: bc.shape }, notes: mel });
+    kinds.forEach((t, k) => { if (t !== 'chord' && mel[k]) ids.add(mel[k].id); });
+  }
+  nctCache = ids;
+  return ids;
+}
+
+/** 画时间轴：张力面积（顶）+ 功能带 + 契合度带（底）。与卷帘共用 ZOOM，横轴天然对齐。 */
 function drawTimeline(g, W, piece) {
   if (!piece) return;
   const meter = piece.plan.meterNum;
@@ -485,6 +504,24 @@ function drawTimeline(g, W, piece) {
     g.fillText(sectionLabel(s), x + 3, 1);
     g.restore();
   }
+
+  // 4) 契合度带：每小节一根竖条，高度 = 和弦音占比。越高越「在调上」。
+  const fitTop = H_TENSION + H_FN + H_CHORD;
+  for (let i = 0; i < piece.barChords.length; i++) {
+    const bc = piece.barChords[i];
+    const meter2 = meter;
+    const mel = piece.notes.filter((n) => n.hand === 'R' && Math.floor(n.startBeats / meter2) === i);
+    const fit = mel.length ? barHarmonyFit({ chord: { rootPc: bc.rootPc, shape: bc.shape }, notes: mel }).fit : 1;
+    const h = Math.max(1, fit * H_FIT);
+    g.fillStyle = `rgba(216,171,92,${0.18 + fit * 0.5})`;
+    g.fillRect(bc.startBeat * ZOOM, fitTop + (H_FIT - h), Math.max(1, meter2 * ZOOM - 1), h);
+  }
+  g.save();
+  g.font = '8px var(--mono, monospace)';
+  g.fillStyle = 'rgba(154,144,120,0.8)';
+  g.textAlign = 'left'; g.textBaseline = 'top';
+  g.fillText('契合度', 2, fitTop + 1);
+  g.restore();
 }
 
 /* ---------------- 钢琴卷帘 ---------------- */
@@ -532,15 +569,17 @@ function drawRoll() {
     g.fillStyle = 'rgba(240,205,138,0.85)';
     for (const bc of piece.barChords) g.fillText(bc.symbol, bc.startBeat * ZOOM + 4, H_TENSION + H_FN + 13);
     drawTimeline(g, W, piece);
-    // 音符
+    // 音符。**一维一通道**：手别 = 填色，非和音 = 亮边（左手恒为纯色，不受此影响）
+    const nct = nonChordIds(piece);
     for (const n of piece.notes) {
       const x = n.startBeats * ZOOM, w = Math.max(4, n.durBeats * ZOOM - 1.5);
       const y = HEADER + (P_HI - n.midi) * ROW;
       const base = n.hand === 'L' ? '92,184,174' : '232,192,106';
       const dim = muted[n.hand] ? 0.35 : 1;
       g.fillStyle = `rgba(${base},${(0.35 + n.vel * 0.5) * dim})`;
-      g.strokeStyle = `rgba(${base},${0.9 * dim})`;
-      g.lineWidth = 1;
+      const isNct = n.hand === 'R' && nct.has(n.id);
+      g.strokeStyle = isNct ? `rgba(240,205,138,${0.95 * dim})` : `rgba(${base},${0.9 * dim})`;
+      g.lineWidth = isNct ? 1.6 : 1;
       g.beginPath();
       if (g.roundRect) g.roundRect(x + 0.5, y + 1, w, ROW - 2, 2); else g.rect(x + 0.5, y + 1, w, ROW - 2);
       g.fill(); g.stroke();

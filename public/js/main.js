@@ -8,6 +8,7 @@ import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
 import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast } from './ui.js';
 import { barTension, smooth, tensionStats } from './tension.js';
+import { barHarmonyFit, NCT_ZH } from './nct.js';
 import { planTargetSeries } from './candidates.js';
 
 const $ = (id) => document.getElementById(id);
@@ -166,8 +167,9 @@ async function start() {
       // 张力对照带：逐小节长出实际张力，并给出可读读数
       tensionGraph.push(barTension(bar));
       const st = tensionStats(tensionGraph.actual);
+      const fit = barHarmonyFit(bar).fit;
       els.tensionStat.textContent = tensionGraph.actual.length
-        ? `${st.mean.toFixed(2)} 均值 · ${st.min.toFixed(2)}–${st.max.toFixed(2)} 跨度 ${st.span.toFixed(2)}`
+        ? `${st.mean.toFixed(2)} 均值 · ${st.min.toFixed(2)}–${st.max.toFixed(2)} 跨度 ${st.span.toFixed(2)} · 和弦音 ${(fit * 100).toFixed(0)}%`
         : '';
       if (!bar.decision.fixture) {
         stats.tokens += bar.decision.inputTokens;
