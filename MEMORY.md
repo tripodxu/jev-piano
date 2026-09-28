@@ -7,6 +7,14 @@
 
 ---
 
+## [完成] 2026-09-28 · 仓库规范加固批次（9 任务，docs:agent-system 之后）
+
+- **做了什么**：按 docs/superpowers/plans/2026-09-28-repo-hardening.md 完成 9 任务——文档一致性（AGENTS.md 行数统一总行数口径、MEMORY 错别字、MVP 计划归档横幅）；仓库规范（LICENSE、engines>=18、CI workflow）；代码小修（studio autosave 失败 toast，TDD 47 测试；composer 死导出/未用 import 清理）；真实 Jev 重复度基线（熔断，见下条阻塞条目）。
+- **为什么**：修复多 agent 协作地基——CI 把"测试全绿"红线自动化；LICENSE 补上法律完备性；代码地图行数口径统一避免腐化。
+- **坑**：① .gitignore 对已追踪文件无效（上轮已处理 __pycache__）；② 计划文本的相对链接少一级（plans/ 到根是 ../../../，已修）；③ fixture 口径达标≠真实渠道达标（本次最大发现，见阻塞条目）；④ AGENTS.md 行数需随代码改动同 commit 同步（Task 6/7 各欠一笔，本任务补齐）。
+- **验证**：npm test 47/47；node --check 全过；CI（push 后 GitHub Actions 实测，结果见 Task 9 Step 5）；git 历史 9+ commit 按序。
+- **下一步**：① 阻塞条目——真实渠道和弦多样性加固（调根音疲劳参数，需先排除抽样波动）；② composer.js 769 行逼近 ADR-0004 自设 800 行上限，按计划 §A 独立拆分；③ P3：PR/issue 模板、dev-proxy 测试。
+
 ## [阻塞] 2026-09-28 · 真实 Jev 重复度基线：和弦多样性未达标（已熔断，待加固）
 
 - **目标**：`node scripts/analyze-repetition.mjs 32 2026 random --real` 建立真实 Jev 渠道重复度基线并记入 README 反重复表。
