@@ -15,8 +15,8 @@
 
   /* 文字：象牙与旧纸 */
   --text: #ece4d4;
-  --text-dim: #a99e88;
-  --text-faint: #8b8168;
+  --text-dim: #b3a892;
+  --text-faint: #9a9078;   /* 对 --ink-2 ≥4.5:1（原 #8b8168 只有 ~4.3:1） */
 
   /* 黄铜（唯一强调色） */
   --brass: #d8ab5c;
@@ -24,9 +24,14 @@
   --brass-lo: #a8813c;
   --brass-tint: rgba(216, 171, 92, 0.12);
 
-  /* 功能色：左手声部 / 录制 */
+  /* 功能色：左手声部 / 录制 / 和声功能四色 */
   --lh: #85b8ae;
   --crimson: #9e2f28;
+  --crimson-hi: #d4614f;
+  --fn-T: #d8ab5c;    /* 主：稳定归宿（黄铜） */
+  --fn-S: #85b8ae;    /* 下属：向外打开（冷青） */
+  --fn-D: #cf6a58;    /* 属：施力拉回（猩红族；须够亮，深字压其上（.fn-chip）才够 4.5:1） */
+  --fn-Tp: #a8936f;   /* 色彩：离调（黄铜降饱和，不与前三者争） */
 
   --serif: "Cormorant Garamond", "Noto Serif SC", "STSong", Georgia, serif;
   --sans: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
@@ -39,7 +44,19 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 
-:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+/* ---------- 浏览器表面：默认的选中/光标/滚动条不属于任何设计系统 ---------- */
+::selection { background: rgba(216, 171, 92, 0.28); color: var(--text); }
+html { caret-color: var(--brass); scrollbar-color: var(--ink-3) transparent; }
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: rgba(12, 10, 8, 0.5); }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #2c2419, #1b1611);
+  border: 1px solid rgba(214, 178, 110, 0.18);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #3a2f1d, #241c10); }
+
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; border-radius: 4px; }
 
 body {
   min-height: 100vh;
@@ -198,12 +215,13 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .btn.wfull { width: 100%; margin-top: 10px; }
 
 /* ============================ 计划卡 ============================ */
+/* 计划卡：不是"面板里的卡片"，而是面板内的一块内嵌区域（左侧黄铜细线 + 更紧的内边距） */
 .plan-card {
-  margin-top: 18px; padding: 14px 16px;
-  border: 1px solid var(--line); border-radius: var(--r-panel);
+  margin-top: 18px; padding: 12px 0 2px 14px;
+  border-left: 1px solid var(--line-strong);
   background:
-    radial-gradient(320px 90px at 0% 0%, rgba(216, 171, 92, 0.08), transparent),
-    rgba(12, 10, 8, 0.45);
+    radial-gradient(320px 90px at 0% 0%, rgba(216, 171, 92, 0.07), transparent),
+    linear-gradient(90deg, rgba(12, 10, 8, 0.4), transparent 70%);
 }
 .plan-card h3 {
   margin: 0 0 5px; font-family: var(--serif); font-style: italic; font-weight: 600;
@@ -241,6 +259,51 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   transition: opacity .18s;
 }
 .now-bar { color: var(--text-dim); font-size: 13px; letter-spacing: 0.14em; font-variant-numeric: tabular-nums; }
+
+/* ---------- 和声功能轨：第 2 轮的和声语义在这里第一次变得可见 ---------- */
+.fn-ribbon-wrap { flex: none; padding: 0 26px 8px; }
+.fn-ribbon {
+  list-style: none; margin: 0; padding: 0 0 1px;
+  display: flex; gap: 3px; align-items: flex-end;
+  height: 34px; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none;
+}
+.fn-ribbon::-webkit-scrollbar { height: 0; }
+.fnseg {
+  position: relative; flex: 1 0 26px; max-width: 54px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  gap: 2px; cursor: default;
+  animation: segIn .34s cubic-bezier(.16, 1, .3, 1);
+}
+@keyframes segIn { from { opacity: 0; transform: translateY(5px); } }
+.fnseg i { display: block; width: 100%; height: 12px; border-radius: 2px 2px 0 0; background: var(--seg-c, var(--brass)); }
+.fnseg b {
+  font: 500 10px/1 var(--sans); letter-spacing: .1em;
+  color: var(--text-faint); font-weight: 500;
+}
+.fnseg[aria-current] i { box-shadow: 0 0 0 1px var(--brass-hi), 0 0 12px rgba(216, 171, 92, 0.45); }
+.fnseg[aria-current] b { color: var(--brass-hi); }
+.fn-T i { --seg-c: var(--fn-T); }
+.fn-S i { --seg-c: var(--fn-S); }
+.fn-D i { --seg-c: var(--fn-D); }
+.fn-Tp i { --seg-c: var(--fn-Tp); }
+/* 循环锁死断路器触发：段顶一道细刻线——"这里被切断" */
+.fnseg.lock i::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: var(--brass-hi);
+}
+/* 候选集强制驳回：段右端一个小缺口——"模型越界被驳回" */
+.fnseg.rej i { clip-path: polygon(0 0, 100% 0, 100% 100%, 86% 100%, 86% 30%, 0 30%); }
+.fn-legend {
+  display: flex; gap: 12px; margin: 6px 0 0; padding: 0;
+  font: 400 10px/1 var(--sans); letter-spacing: .16em; color: var(--text-faint);
+}
+.fn-legend .k { display: inline-flex; align-items: center; gap: 5px; }
+.fn-legend .k::before { content: ""; width: 10px; height: 3px; border-radius: 2px; background: var(--seg-c); }
+.fn-legend .k-T::before { background: var(--fn-T); }
+.fn-legend .k-S::before { background: var(--fn-S); }
+.fn-legend .k-D::before { background: var(--fn-D); }
+.fn-legend .k-Tp::before { background: var(--fn-Tp); }
 #fallCanvas { width: 100%; flex: 1; display: block; min-height: 120px; }
 
 /* ---------- 写实钢琴 ---------- */
@@ -343,6 +406,29 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .log-no { font-family: var(--serif); font-style: italic; font-weight: 600; font-size: 19px; color: var(--brass); min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
 .log-no small { font-size: 11px; color: var(--text-faint); font-family: var(--sans); font-style: normal; margin-left: 3px; }
 .log-chord { font-family: var(--serif); font-weight: 700; font-size: 17px; color: var(--brass-hi); min-width: 52px; }
+/* 功能徽章：与功能轨同一套色，用户在日志与功能轨之间建立直觉 */
+.fn-chip {
+  display: inline-block; flex: none; min-width: 30px; text-align: center;
+  padding: 2px 7px; border-radius: 999px;
+  font: 500 10.5px/1.5 var(--sans); letter-spacing: .12em;
+  color: #1a140c; background: var(--seg-c, var(--brass));
+}
+.fn-chip.fn-T { --seg-c: var(--fn-T); }
+.fn-chip.fn-S { --seg-c: var(--fn-S); }
+.fn-chip.fn-D { --seg-c: var(--fn-D); }
+.fn-chip.fn-Tp { --seg-c: var(--fn-Tp); }
+/* 断路器/强制回落的归因标记 */
+.guard {
+  display: inline-block; padding: 1px 7px; border-radius: 999px;
+  font: 500 10.5px/1.6 var(--sans); letter-spacing: .1em; cursor: help;
+  border: 1px solid var(--line-strong); color: var(--brass-hi);
+}
+.guard.rej { color: var(--crimson-hi); border-color: rgba(212, 97, 79, 0.4); }
+.log-empty {
+  margin: 4px 0 0; padding: 22px 4px; color: var(--text-faint);
+  font-size: 12.5px; line-height: 1.9; letter-spacing: .04em;
+  border-left: 1px solid var(--line-strong); padding-left: 14px;
+}
 .log-detail { font-size: 12.5px; color: var(--text-dim); display: flex; gap: 12px; flex-wrap: wrap; flex: 1; }
 .log-detail b { color: var(--text); font-weight: 600; }
 .log-detail .q { color: var(--lh); }
@@ -429,6 +515,9 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   .statusbar { margin-left: 0; }
   .now-chord { font-size: 40px; min-width: 84px; }
   .chordbox { padding: 14px 18px 6px; }
+  .fn-ribbon-wrap { padding: 0 18px 6px; }
+  .fnseg { flex: 1 0 22px; }        /* 窄屏下更窄的一段，宁可横滚也不挤压 */
+  .fn-ribbon { justify-content: flex-end; }
   .keyboard { height: 100px; }
   .stage { height: clamp(400px, calc(100vh - 190px), 560px); }
   .console { padding: 16px 16px; }
@@ -444,5 +533,6 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 @media (prefers-reduced-motion: reduce) {
   .reveal { animation: none; opacity: 1; transform: none; }
   .dlog li { animation: none; }
+  .fnseg { animation: none; }
   * { transition-duration: 0.01ms !important; }
 }

@@ -132,6 +132,19 @@ export class Fall {
 
 /** 决策日志：节目单式，一行一个小节 */
 const DEV_ZH = { repeat: '承袭', sequence: '模进', inversion: '倒影', ornament: '装饰', new: '新句' };
+const FN_ZH = { T: '主', S: '下属', D: '属', Tp: '色彩' };
+
+/** 功能轨某一格的可读描述（纯函数，便于单测；无障碍与 title 共用） */
+export function fnLabel(fn) {
+  return FN_ZH[fn] ?? fn ?? '';
+}
+
+/** 功能轨一格的类名：颜色与断路器标记都挂在 data 属性上，样式全在 CSS */
+export function fnSegClass(bar) {
+  const fn = bar?.decision?.chordFn ?? 'T';
+  return ['fnseg', `fn-${FN_ZH[fn] ? fn : 'T'}`, bar?.decision?.loopLocked ? 'lock' : '', bar?.decision?.rejected ? 'rej' : '']
+    .filter(Boolean).join(' ');
+}
 
 export function addDecision(ul, bar) {
   const d = bar.decision;
@@ -141,9 +154,15 @@ export function addDecision(ul, bar) {
   const stats = d.fixture
     ? `<span class="fixture">离线随机</span>`
     : `<span>${d.ms}ms</span><span>${d.inputTokens}tok</span><span>$${d.usd.toFixed(6)}</span>${d.confidence != null ? `<span>置信 ${Number(d.confidence).toFixed(2)}</span>` : ''}`;
+  // 断路器/候选集强制的归因标记：把 ADR-0003 的"剔除即强制"从代码搬到人眼前
+  const guards = [
+    d.loopLocked ? '<span class="guard lock" title="循环锁死断路器触发：循环根音已从本小节候选中剔除">断路</span>' : '',
+    d.rejected ? '<span class="guard rej" title="模型答案不在候选集内，已按候选集强制回落">驳回</span>' : '',
+  ].join('');
   li.innerHTML =
     `<span class="log-no">${bar.index + 1}<small>${bar.label}</small></span>` +
     `<span class="log-chord">${escapeHtml(bar.chord.symbol)}</span>` +
+    `<span class="fn-chip fn-${d.chordFn && FN_ZH[d.chordFn] ? d.chordFn : 'T'}" title="和声功能：${escapeHtml(fnLabel(d.chordFn))}">${escapeHtml(fnLabel(d.chordFn))}</span>` +
     `<span class="log-detail">` +
     `<span>左手 <b>${escapeHtml(d.lh)}</b></span>` +
     `<span>走向 <span class="q">${escapeHtml(d.contour)}</span></span>` +
@@ -151,11 +170,32 @@ export function addDecision(ul, bar) {
     `<span>密度 ${d.tier}</span>` +
     `<span>强度 <b>${bar.intensity.toFixed(1)}</b></span>` +
     `${d.breathe ? '<span class="q">呼吸</span>' : ''}` +
+    `${guards}` +
     `</span>` +
     `<span class="log-stats">${stats}</span>`;
   ul.prepend(li);
   ul.scrollTop = 0; // 最新一条始终在顶部可见（抵消浏览器滚动锚定）
   while (ul.children.length > 60) ul.lastChild.remove();
+}
+
+/**
+ * 和声功能轨：每个已演奏小节一格，按功能着色，标记断路器触发与候选集驳回。
+ * 保留最近 RIBBON_MAX 格；最早的一格是"正在响"的那一小节，用 aria-current 标出。
+ * DOM 而非 canvas：一屏十几段，DOM 免费换来可访问性、hover 提示与 CSS 变量配色。
+ */
+export const RIBBON_MAX = 18;
+
+export function pushFnSegment(ribbon, bar) {
+  if (!ribbon) return;
+  const seg = document.createElement('span');
+  seg.className = fnSegClass(bar) + ' fresh';
+  const fn = bar.decision.chordFn ?? 'T';
+  seg.innerHTML = `<i></i><b>${escapeHtml(fnLabel(fn))}</b>`;
+  seg.title = `第 ${bar.index + 1} 小节 ${bar.label} · ${bar.chord.symbol} · ${fnLabel(fn)}功能`;
+  ribbon.prepend(seg);
+  while (ribbon.children.length > RIBBON_MAX) ribbon.lastChild.remove();
+  ribbon.querySelectorAll('[aria-current]').forEach((el) => el.removeAttribute('aria-current'));
+  ribbon.firstElementChild?.setAttribute('aria-current', 'true');
 }
 
 /** 计划卡 */

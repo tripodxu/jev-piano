@@ -6,7 +6,7 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, addDecision, renderPlan, setStatus, toast } from './ui.js';
+import { renderKeyboard, Fall, addDecision, pushFnSegment, renderPlan, setStatus, toast } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -16,6 +16,7 @@ const els = {
   playBtn: $('playBtn'), pauseBtn: $('pauseBtn'), stopBtn: $('stopBtn'), newBtn: $('newBtn'), midiBtn: $('midiBtn'), recBtn: $('recBtn'),
   planCard: $('planCard'), nowChord: $('nowChord'), nowBar: $('nowBar'),
   fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), decisionLog: $('decisionLog'),
+  fnRibbon: $('fnRibbon'), logEmpty: $('logEmpty'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
   settingsBtn: $('settingsBtn'), settingsDrawer: $('settingsDrawer'), settingsClose: $('settingsClose'),
   tabLive: $('tabLive'), tabStudio: $('tabStudio'), viewLive: $('viewLive'), viewStudio: $('viewStudio'),
@@ -108,6 +109,8 @@ async function start() {
   }
   audio.setVolume(0.9);
   els.decisionLog.innerHTML = '';
+  els.fnRibbon.innerHTML = '';
+  els.logEmpty.classList.remove('hidden');
   els.playBtn.disabled = true;
   els.playBtn.textContent = '… 编曲中';
 
@@ -140,6 +143,8 @@ async function start() {
       els.nowChord.textContent = bar.chord.symbol;
       els.nowBar.textContent = `第 ${bar.index + 1} 小节 ${bar.label} · 强度 ${bar.intensity.toFixed(1)}${bar.loop > 0 ? `，第 ${bar.loop + 1} 遍` : ''}`;
       addDecision(els.decisionLog, bar);
+      pushFnSegment(els.fnRibbon, bar);
+      els.logEmpty.classList.add('hidden');
       if (!bar.decision.fixture) {
         stats.tokens += bar.decision.inputTokens;
         stats.usd += bar.decision.usd;

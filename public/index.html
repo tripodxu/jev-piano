@@ -144,6 +144,12 @@
           <div class="now-chord" id="nowChord">—</div>
           <div class="now-bar" id="nowBar" aria-live="polite">准备就绪</div>
         </div>
+        <div class="fn-ribbon-wrap">
+          <ol id="fnRibbon" class="fn-ribbon" aria-label="和声功能轨：每格一小节，按主/下属/属/色彩着色"></ol>
+          <p class="fn-legend" aria-hidden="true">
+            <span class="k k-T">主</span><span class="k k-S">下属</span><span class="k k-D">属</span><span class="k k-Tp">色彩</span>
+          </p>
+        </div>
         <canvas id="fallCanvas" height="240" aria-hidden="true"></canvas>
         <div class="piano">
           <div class="fascia">
@@ -158,6 +164,7 @@
 
       <section class="programme reveal" style="--d:.25s">
         <h2 class="programme-title">演奏记录 <span class="programme-sub">每小节一次 Jev 决策，七问并行</span></h2>
+        <p id="logEmpty" class="log-empty">尚未开演——写下灵感，按下「开始演奏」，这里会逐小节目录 Jev 的每一个决定。</p>
         <ul id="decisionLog" class="dlog"></ul>
       </section>
     </section>

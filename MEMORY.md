@@ -7,6 +7,15 @@
 
 ---
 
+## [完成] 2026-09-28 · 和声功能轨 + 前端精修（迭代轮次 3 · 前端）
+
+- **做了什么**（详见 [docs/memory/2026-09-28-harmonic-ribbon-frontend.md](docs/memory/2026-09-28-harmonic-ribbon-frontend.md)，设计 [spec](docs/superpowers/specs/2026-09-28-harmonic-ribbon-design.md)）：新增**和声功能轨**——和弦区与下落音符之间一条横向轨，每小节一格按 T/S/D/Tp 着色，断路器直接画在格上（`loopLocked` 顶部细刻线、`rejected` 右端缺口），日志每行加同色功能徽章。让第 2 轮的和声语义第一次在界面上可见。精修：浏览器表面（`::selection`/`caret-color`/滚动条）、决策日志空状态、嵌套卡片降级为内嵌区域、对比度提亮、移动端适配。测试 70→**74**（新 `test/ui.test.mjs`）。skill：`frontend-design` + `impeccable`（`SCOPED_EXISTING_ALLOWED` → 精修不重做）。
+- **为什么**：第 2 轮加了一整层和声语义但 UI 零展示，违反项目"每个音符可溯源"的自我承诺。
+- **坑**：① `impeccable detect` 报的 37 条 `low-contrast` 是 CSS 变量解析的**假配对**（`--text` 与 `--text-dim` 真实渲染中从不同层出现），但它**漏掉了我自己 `.fn-chip` 的真 FAIL**（深字压 `--fn-D` 仅 4.37:1）——检测器给线索，结论得自己算；② 修 FAIL 时先压暗了背景，更糟（4.37→3.53），深字配深背景必然更差，应提亮；③ baseline-diff 第一次前后都是 53 条，我差点直接下结论，是告警里的十六进制值（旧文件却报新值）暴露了我脚本把 AFTER 读了���遍。
+- **验证**：npm test 74/74；元素 id 契约 74 个全在 `index.html`；`impeccable detect` 改动前后均 53 条、分布相同（**引入 0 条新告警**）；自写脚本核实 40 组真实「文字×背景」配对全 PASS（5.1:1~16:1）。
+- **保留不改的 52 条**（写明理由）：琴毡木纹的 repeating-gradient 是木头本身；和弦字上的零偏移黄铜光晕是**舞台顶光**（craft-floor 明确已确立的视觉世界优先）；面板 `1px 边框 + 40px 模糊` 判为通用启发式误报。
+- **下一步**（迭代轮次 4 · 优化）：候选/待办见任务板；工作室界面的功能可视化（钢琴卷帘上的功能分段）尚未做。
+
 ## [完成] 2026-09-28 · 和声功能层（迭代轮次 2 · 创意）
 
 - **做了什么**（详见 [docs/memory/2026-09-28-harmonic-function-layer.md](docs/memory/2026-09-28-harmonic-function-layer.md)，设计 [spec](docs/superpowers/specs/2026-09-28-harmonic-function-layer-design.md)、[计划](docs/superpowers/plans/2026-09-28-harmonic-function-layer.md)）：候选集来源从「进行池并集」换成「**调式全调内色板 ∪ 进行池**」。`music.js` 加四和声功能分类（T/S/D/Tp）与带调式性质的色板（小调出 iiø、大调出 viiø、dorian 出 bVII）；`candidates.js` 加**共同音 + 五度圈距离**的声部进行打分与功能转移矩阵；`composer.js` 加 Jev **第 7 问「和声功能」**（不做硬过滤，只作语义提示 + 功能族内回落 + UI 轴）。测试 55→**70**。
@@ -93,11 +102,12 @@
 
 | 状态 | 任务 | 领地 | 验收 |
 |---|---|---|---|
-| 待办 | **前端展示 4 个归因字段** `fn`/`chordFn`/`loopLocked`/`rejected`：和声功能轴 + 断路器指示 | `ui.js` / `index.html` / `styles.css` | 手工冒烟 + 测试全绿 |
-| 待办 | 和弦显示升/降号美化（C minor 的 Ab 现显示 G#） | `music.js` `chordLabel` + 测试 | 测试全绿 + 试听无回归 |
+| 待办 | 工作室界面的和声功能可视化（钢琴卷帘上的功能分段/色带）——实时即兴已有功能轨，工作室还没有 | `studio.js` + `test/studio.test.mjs` | 测试全绿 + 手工冒烟 |
+| 待办 | 和弦显示升/降号美化（C minor 的 Ab 现显示 G#）——功能层已产出 bVI/bVII 等符号，此项更显眼了 | `music.js` `chordLabel` + 测试 | 测试全绿 + 试听无回归 |
 | 待办 | 音质升级评估：@tonejs/piano 采样（数 MB，违背轻量，需 ADR） | — | ADR 结论 |
 | 待办 | 钢琴卷帘量化与力度编辑 | `studio.js` + `test/studio.test.mjs` | 测试全绿 |
-| ~~待办~~ | ~~扩 `STYLES[*].progs` 根音词汇量~~ → 轮次 2 已用**调式色板**解决，优先级下降 | — | 已由色板替代 |
+| ~~待办~~ | ~~前端展示 4 个归因字段~~ → 轮次 3 已完成（功能轨 + 徽章 + 断路器标记） | — | 已完成 |
+| ~~待办~~ | ~~扩 `STYLES[*].progs` 根音词汇量~~ → 轮次 2 已用**调式色板**解决 | — | 已由色板替代 |
 
 > 格式约定：完成任务 → 条目移入上部「完成」区（最新在上）；新接任务 → 按下条格式写接力条：
 > `[进行中] 任务名 · 日期` + 目标/进度/下一步/已知坑/验收/领地（完整格式见 AGENTS.md §4.2）。
