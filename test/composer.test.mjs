@@ -1,7 +1,7 @@
 // composer.test.mjs — 决策器：确定性、音域、终止式、呼吸、buildPlan、fixture 兜底
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPlan, Composer, mulberry32 } from '../public/js/composer.js';
+import { buildPlan, Composer, mulberry32, detectLoop, chordCandidates } from '../public/js/composer.js';
 import { chordPcs, STYLE_BY_ID, STYLES } from '../public/js/music.js';
 
 async function makeComposer(overrides = {}, cfg = { channel: 'fixture' }) {
@@ -129,16 +129,41 @@ test('真实渠道失败时同构兜底：typesafe 无 key → fixture 决策，
   assert.ok(bar.notes.length >= 2);
 });
 
-test('强度曲线：rise 弧线后段强度高于前段', async () => {
-  const plan = await buildPlan({ prompt: '春日', goal: '欢快庆典', styleId: 'classical', seed: 5 }, {});
-  assert.equal(plan.arc, 'rise');
-  const c = new Composer(plan, { channel: 'fixture' });
-  const first = [];
-  const last = [];
-  for (let i = 0; i < 32; i++) {
-    const bar = await c.nextBar();
-    (i < 8 ? first : last).push(bar.intensity);
+test('强度曲线：rise 弧线的强度随进度上升（多种子相关性）', async () => {
+  let cov = 0, n = 0;
+  for (const seed of [5, 6, 7, 8, 9]) {
+    const plan = await buildPlan({ prompt: '春日', goal: '欢快庆典', styleId: 'classical', seed }, {});
+    assert.equal(plan.arc, 'rise');
+    const c = new Composer(plan, { channel: 'fixture' });
+    for (let i = 0; i < 32; i++) {
+      const bar = await c.nextBar();
+      const p = i / 32;
+      cov += (p - 0.5) * (bar.intensity - 1.5);
+      n++;
+    }
   }
-  const avg = (a) => a.reduce((s, x) => s + x, 0) / a.length;
-  assert.ok(avg(last) > avg(first), `rise 弧线应后强前弱: first=${avg(first).toFixed(2)} last=${avg(last).toFixed(2)}`);
+  const corr = cov / n;
+  assert.ok(corr > 0.05, `rise 弧线强度应随进度上升: cov=${corr.toFixed(3)} (${n} 小节)`);
 });
+
+test('detectLoop: 按根音检测，members 为数字（防字符串 Set 回归）', () => {
+  const r = detectLoop([0, 5, 7, 0, 5, 7]);
+  assert.equal(r.locked, true);
+  for (const m of r.members) assert.equal(typeof m, 'number', 'members 必须是数字');
+  assert.ok(r.members.has(0) && r.members.has(5) && r.members.has(7));
+  assert.equal(detectLoop([0, 5, 7, 3]).locked, false, '不足窗口不锁');
+  assert.equal(detectLoop([0, 5, 7, 3, 8, 10]).locked, false, '根音丰富不锁');
+});
+
+test('chordCandidates: 疲劳根音被剔除、替换和弦入场，且不会剔空', () => {
+  const plan = { mode: 'minor', meterNum: 4, barsPerPhrase: 8, density: 0.5, totalBars: 32 };
+  const style = STYLE_BY_ID.romantic;
+  const fatigue = { 0: 3, 5: 3, 7: 3 };
+  const cands = chordCandidates(style, plan, 'i', 3, false, null, [0, 5, 7, 0, 5, 7], fatigue);
+  for (const c of cands) assert.ok(![0, 5, 7].includes(c.rootPc), `疲劳根音 ${c.rootPc} 不应出现在候选`);
+  assert.ok(cands.length >= 3, '剔除后仍有候选');
+  // 疲劳衰减后重新可用
+  const decayed = chordCandidates(style, plan, 'i', 3, false, null, [0, 5, 7, 0, 5, 7], { 0: 0.5, 5: 0.4, 7: 0.3 });
+  assert.ok(decayed.some((c) => c.rootPc === 0), '疲劳衰减后主和弦应回归候选');
+});
+

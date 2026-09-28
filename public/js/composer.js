@@ -116,11 +116,26 @@ export async function buildPlan({ prompt = '', goal = '随机冒险', styleId = 
 
 /* ---------------------------- 候选集构造 ---------------------------- */
 
-/** 下一和弦候选：风格进行池全集 + 进行延续/乐句位置加权 */
-export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEnd) {
+const ROMAN_BY_PC = { 0: 'I', 1: 'bII', 2: 'II', 3: 'bIII', 4: 'III', 5: 'IV', 6: 'bV', 7: 'V', 8: 'bVI', 9: 'VI', 10: 'bVII', 11: 'VII' };
+
+/** 和声循环检测（按根音）：最近 window 小节内 ≤maxDistinct 个不同根音即视为锁死，members = 循环根音集合。
+ *  按根音而非罗马数字匹配：G / V7sus4 / G7 是同一功能，防止换后缀绕过断路器 */
+export function detectLoop(recentRoots, window = 6, maxDistinct = 3) {
+  const recent = recentRoots.slice(-window);
+  if (recent.length < window) return { locked: false, members: new Set() };
+  const counts = {};
+  for (const r of recent) counts[r] = (counts[r] ?? 0) + 1;
+  const members = new Set(Object.keys(counts).filter((k) => counts[k] >= 2).map(Number));
+  return { locked: new Set(recent).size <= maxDistinct, members };
+}
+
+/** 下一和弦候选：风格进行池全集 + 进行延续/乐句位置加权 + 替换和弦（副属/借用/悬挂）
+ *  recentRomans 用于循环检测：循环锁死时循环成员直接从候选中剔除（jevthoven：代码策划候选集） */
+export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEnd, lastPhraseFirst = null, recentRoots = [], fatigue = {}) {
   const pools = style.progs[plan.mode] ?? Object.values(style.progs)[0];
   const norm = (s) => String(s).replace(/\s+/g, '');
   const cand = new Map();
+  let poolNext = null;
   for (const pool of pools) {
     const nexts = new Set();
     let matched = false;
@@ -132,24 +147,70 @@ export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEn
     }
     for (const sym of pool) {
       const s = norm(sym);
-      const w = (cand.get(s)?.w ?? 1.0) + (matched && nexts.has(s) ? 1.2 : 0);
-      cand.set(s, { w, cont: matched && nexts.has(s) });
+      const prev = cand.get(s) ?? { w: 0, cont: false, pools: 0 };
+      cand.set(s, { w: prev.w + 1.0 + (matched && nexts.has(s) ? 1.2 : 0), cont: prev.cont || (matched && nexts.has(s)), pools: prev.pools + 1 });
+    }
+    if (matched) poolNext = [...nexts][0] ?? null;
+  }
+  // 替换候选：让 Jev 有进行池之外的和声选择，打破 4 和弦循环
+  const curSym = currentSym ? parseRoman(currentSym) : null;
+  const subs = [];
+  if (curSym) {
+    if (poolNext) {
+      const p2 = parseRoman(poolNext);
+      if (p2 && p2.rootPc !== curSym.rootPc && p2.rootPc !== 0) {
+        const sec = (p2.rootPc + 7) % 12;
+        subs.push({ sym: ROMAN_BY_PC[sec] + '7', weight: 1.3, sub: true, desc: `secondary dominant driving into ${poolNext}` });
+      }
+    }
+    if (plan.mode === 'major' && curSym.rootPc === 5 && curSym.shape === '') {
+      subs.push({ sym: 'iv', weight: 1.1, sub: true, desc: 'borrowed minor subdominant, poignant color' });
+    }
+    if (!isPhraseEnd && (curSym.shape === '' || curSym.shape === 'm')) {
+      subs.push({ sym: ROMAN_BY_PC[curSym.rootPc] + '7sus4', weight: 1.0, sub: true, desc: 'suspend the current harmony, floating tension' });
+    }
+    if (barInPhrase <= 1 && plan.mode === 'major') {
+      subs.push({ sym: 'VIIø', weight: 0.9, sub: true, desc: 'leading-tone half-diminished, pulling to the tonic' });
     }
   }
-  const out = [];
-  for (const [sym, { w, cont }] of cand) {
-    const p = parseRoman(sym);
-    if (!p) continue;
-    let weight = w;
-    if (barInPhrase === 0 && p.rootPc === 0) weight += 0.6;
-    if (isPhraseEnd && (p.rootPc === 7 || p.rootPc === 0)) weight += 1.0;
-    if (currentSym && norm(currentSym) === sym) weight -= 0.4;
-    const role = ROOT_ROLE[p.rootPc] ?? '色彩和弦';
-    const desc = `${role}${p.shape.includes('7') || p.shape.includes('9') ? '（延伸音色）' : ''}${cont ? '；进行计划的延续' : ''}`;
-    out.push({ sym, weight, desc, ...p });
-  }
+  const fatigued = (rootPc) => (fatigue?.[rootPc] ?? 0) > 2.0;
+  // 两段构建：先剔除疲劳根音；若全部被剔（长曲常见）则忽略疲劳重建，保证候选非空
+  const build = (respectFatigue) => {
+    const list = [];
+    for (const [sym, { w, cont, pools }] of cand) {
+      const p = parseRoman(sym);
+      if (!p) continue;
+      if (respectFatigue && fatigued(p.rootPc)) continue; // 根音疲劳：近期用滥的根音不可表示
+      let weight = w;
+      if (barInPhrase === 0 && p.rootPc === 0) weight += 0.6;
+      if (isPhraseEnd && (p.rootPc === 7 || p.rootPc === 0)) weight += 1.0;
+      if (currentSym && norm(currentSym) === sym) weight -= 1.2 * pools; // 连续同和弦：按池数放大罚分
+      if (barInPhrase === 0 && lastPhraseFirst && sym !== norm(lastPhraseFirst) && [0, 5, 9].includes(p.rootPc)) {
+        weight += 0.5; // 乐句开头换进行：换个起点，别每段都一样开场
+      }
+      const role = ROOT_ROLE[p.rootPc] ?? '色彩和弦';
+      const desc = `${role}${p.shape.includes('7') || p.shape.includes('9') ? '（延伸音色）' : ''}${cont ? '；进行计划的延续' : ''}`;
+      list.push({ sym, weight, desc, label: chordLabel(p.rootPc, p.shape), ...p });
+    }
+    for (const s of subs) {
+      const p = parseRoman(s.sym);
+      if (!p || list.some((c) => c.sym === s.sym)) continue;
+      if (respectFatigue && fatigued(p.rootPc)) continue;
+      list.push({ ...s, ...p });
+    }
+    return list;
+  };
+  let out = build(true);
+  if (!out.length) out = build(false);
   out.sort((a, b) => b.weight - a.weight);
-  return out.slice(0, 8);
+  const poolTop = out.filter((c) => !c.sub).slice(0, 6);
+  const subTop = out.filter((c) => c.sub).slice(0, 2);
+  const merged = [...poolTop, ...subTop].sort((a, b) => b.weight - a.weight).slice(0, 8);
+  if (merged.length < 3) { // 安全兜底：排除过度时按权重回填
+    const rest = out.filter((c) => !merged.includes(c)).slice(0, 3 - merged.length);
+    return [...merged, ...rest];
+  }
+  return merged;
 }
 
 /** 和弦音功能描述（Jev criteria / fixture 共用） */
@@ -175,7 +236,7 @@ export function rhythmCandidates(plan, motif, phraseNo) {
   const pool = RHYTHM_POOLS[plan.meterNum] ?? RHYTHM_POOLS[4];
   const targetTier = Math.round(plan.density * 2);
   const all = Object.values(pool).flat();
-  const scored = all.map((pat) => ({ pat, w: 1 / (1 + Math.abs(pat.tier - targetTier)) }))
+  const scored = all.map((pat) => ({ pat, w: 0.55 + 1 / (1 + Math.abs(pat.tier - targetTier)) }))
     .sort((a, b) => b.w - a.w).slice(0, 3);
   const out = {};
   scored.forEach(({ pat, w }, i) => { out[`r${i}`] = { w, pat, tier: pat.tier }; });
@@ -256,17 +317,20 @@ function insertPassing(notes, scale, rng) {
   return out.sort((x, y) => x.startBeats - y.startBeats);
 }
 
-/** 反重复护栏：与最近两小节指纹撞车时，整句上移/下移一个音级或加装饰，直到指纹不同 */
-function mutateMelody(rh, { scale, rng }) {
-  const base = sigOf(rh);
+/** 反重复护栏：与最近两小节指纹撞车时，依次尝试整句上移/下移/加装饰/倒影，直到避开全部已存指纹 */
+function mutateMelody(rh, { scale, rng, avoid = [] }) {
+  const blocked = (cand) => avoid.some((s) => s === sigOf(cand));
+  if (!blocked(rh)) return rh;
+  const m0 = rh[0]?.midi ?? 60;
   const tries = [
     (ns) => ns.map((n) => ({ ...n, midi: clamp(scaleNext(n.midi, 1, scale), 60, 84) })),
     (ns) => ns.map((n) => ({ ...n, midi: clamp(scaleNext(n.midi, -1, scale), 60, 84) })),
     (ns) => insertPassing(ns, scale, rng),
+    (ns) => ns.map((n) => ({ ...n, midi: clamp(m0 - (n.midi - m0), 60, 84) })), // 围绕首音倒影
   ];
   for (const f of tries) {
     const cand = f(rh);
-    if (sigOf(cand) !== base) return cand;
+    if (!blocked(cand)) return cand;
   }
   return rh;
 }
@@ -311,6 +375,10 @@ function varyPattern(pat, rng, meterNum) {
     if (cand.length) { on.push(cand[Math.floor(rng() * cand.length)]); on.sort((a, b) => a - b); }
   }
   if (rng() < 0.25 && on.length > 2) on.splice(1 + Math.floor(rng() * (on.length - 1)), 1);
+  if (rng() < 0.25 && on.length >= 3) {
+    const shifted = on.map((g) => (g + 2) % steps).sort((a, b) => a - b); // 整体位移两格：切分感
+    on.splice(0, on.length, ...shifted);
+  }
   return { on, tier: pat.tier };
 }
 
@@ -333,14 +401,16 @@ export function renderMelody({ plan, chord, contourId, pattern, breathe, intensi
   for (let k = 0; k < n; k++) {
     const i = onsets[k];
     const strong = i % 4 === 0 || k === n - 1;
-    let target = cur + seq[(off + k) % seq.length] * 2;
+    let step = seq[(off + k) % seq.length];
+    if (!strong && rng() < 0.25) step = (rng() < 0.5 ? 1 : -1) * (3 + Math.floor(rng() * 4)); // 真跳进（±6~12 半音），跳后由轮廓自然收回
+    let target = cur + step * 2;
     target = nearest(target, strong ? chordPool : scale);
     target = clamp(target, 60, 84);
     let startBeats = i / 4;
     if (i % 4 === 2) startBeats += plan.swing * 1.0;
     else if (i % 2 === 1) startBeats += plan.swing * 0.5;
     const nextOnset = k < n - 1 ? onsets[k + 1] : steps;
-    let durBeats = ((nextOnset - i) / 4) * 0.9;
+    let durBeats = ((nextOnset - i) / 4) * (0.7 + rng() * 0.35); // 时长人味：不再等长机械
     if (k === n - 1 && isPhraseEnd) durBeats *= 2;
     notes.push({ midi: target, startBeats, durBeats, vel: velFor(i, intensity, rng), hand: 'R' });
     cur = target;
@@ -348,7 +418,7 @@ export function renderMelody({ plan, chord, contourId, pattern, breathe, intensi
   return notes;
 }
 
-/** 左手织体：11 种模式逐字实现（音域强制 36..64） */
+/** 左手织体：11 种模式 × 逐小节变体（重击/呼吸空拍/方向翻转/色彩换位/经过音/音区抬升），同一和弦不再弹出同一个小节 */
 export function renderLH({ plan, chord, patternId, intensity, rng }) {
   const { bass, upper } = lhVoicing(chord.rootPc, chord.shape);
   const pool = chordMidis(chord.rootPc, chord.shape, 36, 64);
@@ -362,49 +432,97 @@ export function renderLH({ plan, chord, patternId, intensity, rng }) {
     });
   };
   const chordHit = (start, dur, vel) => upper.forEach((m, j) => push(m, start, dur, vel - j * 0.03));
-  const seventh = nearest(bass + 10, pool.filter((m) => m >= 40));
+  const light = intensity < 1.2 && rng() < 0.3;  // 轻乐句：低音上移八度，更透明
+  const bassNote = light ? bass + 12 : bass;
+  const restSlot = rng() < 0.25 ? Math.floor(rng() * plan.meterNum * 2) : -1; // 织体呼吸：随机空一个八分位
+
   switch (patternId) {
-    case 'block':
-      push(bass, 0, plan.meterNum, 0.5); chordHit(0, plan.meterNum, 0.4); break;
-    case 'ballad':
-      push(bass, 0, 2, 0.5); chordHit(0, 2, 0.35); chordHit(2, plan.meterNum - 2, 0.4); break;
+    case 'block': {
+      const rehit = intensity >= 1.5 && rng() < 0.4;
+      const half = plan.meterNum / 2;
+      push(bassNote, 0, rehit ? half : plan.meterNum, 0.5);
+      chordHit(0, rehit ? half : plan.meterNum, 0.4);
+      if (rehit) { push(bassNote, half, half, 0.46); chordHit(half, half, 0.36); }
+      break;
+    }
+    case 'ballad': {
+      const off = plan.meterNum >= 4 && rng() < 0.4 ? 1 : 2; // 和弦落在第二拍或第三拍
+      push(bassNote, 0, off, 0.5); chordHit(0, off, 0.35);
+      chordHit(off, plan.meterNum - off, 0.4);
+      break;
+    }
     case 'alberti': {
-      const seq = rng() < 0.3 ? [bass, upper[1], upper[0], upper[1]] : [bass, upper[0], upper[1], upper[0]];
-      for (let k = 0; k < plan.meterNum * 2; k++) push(seq[k % 4], k * 0.5, 0.45, 0.32 + (k % 4 === 0 ? 0.06 : 0));
+      const variants = [[bass, upper[0], upper[1], upper[0]], [bass, upper[1], upper[0], upper[1]], [upper[0], bass, upper[1], upper[0]]];
+      const seq = variants[Math.floor(rng() * variants.length)];
+      for (let s2 = 0; s2 < plan.meterNum * 2; s2++) {
+        if (s2 === restSlot) continue;
+        push(seq[s2 % seq.length], s2 * 0.5, 0.45, 0.32 + (s2 % 4 === 0 ? 0.06 : 0));
+      }
       break;
     }
     case 'arp': {
-      const seq = rng() < 0.3 ? [upper[2], upper[1], upper[0], bass] : [bass, upper[0], upper[1], upper[2]];
-      for (let k = 0; k < plan.meterNum * 2; k++) push(seq[k % 4], k * 0.5, 0.48, 0.34 + (k % 4 === 0 ? 0.05 : 0));
+      const base = rng() < 0.3 ? [upper[2], upper[1], upper[0], bass] : [bass, upper[0], upper[1], upper[2]];
+      const rot = Math.floor(rng() * 4);
+      for (let s2 = 0; s2 < plan.meterNum * 2; s2++) {
+        if (s2 === restSlot) continue;
+        push(base[(s2 + rot) % 4], s2 * 0.5, 0.48, 0.34 + (s2 % 4 === 0 ? 0.05 : 0));
+      }
       break;
     }
     case 'broken': {
       const seq = [bass, upper[0], upper[1], upper[2], upper[1], upper[0], upper[1], upper[2]];
-      for (let k = 0; k < plan.meterNum * 4; k++) push(seq[k % 8], k * 0.25, 0.24, 0.28);
+      const rot = Math.floor(rng() * 8);
+      for (let s2 = 0; s2 < plan.meterNum * 4; s2++) {
+        if (s2 === restSlot) continue;
+        push(seq[(s2 + rot) % 8], s2 * 0.25, 0.24, 0.28);
+      }
       break;
     }
-    case 'waltz':
-      push(bass, 0, 1, 0.55); chordHit(1, 1, 0.4); chordHit(2, 1, 0.35); break;
-    case 'shell':
-      push(bass, 0, 3, 0.45); push(seventh, 0, 3, 0.4); push(bass, 2, 2, 0.4); push(seventh, 2, 2, 0.36); break;
-    case 'stride':
-      push(bass, 0, 0.5, 0.5); push(nearest(bass + 7, pool), 1, 0.5, 0.42);
-      chordHit(1, 0.5, 0.38); push(bass, 2, 0.5, 0.48); push(nearest(bass + 5, pool), 3, 0.5, 0.4); chordHit(3, 0.5, 0.36);
+    case 'waltz': {
+      push(bassNote, 0, 1, 0.55);
+      const alt = rng();
+      if (alt < 0.25) { push(nearest(bass + 7, pool), 2, 1, 0.32); chordHit(1, 1, 0.4); }
+      else if (alt < 0.45) { push(nearest(bass + 7, pool), 1.5, 0.5, 0.28); chordHit(1, 1, 0.4); chordHit(2, 1, 0.35); }
+      else { chordHit(1, 1, 0.4); chordHit(2, 1, 0.35); }
       break;
+    }
+    case 'shell': {
+      const color = nearest(bass + (rng() < 0.5 ? 10 : 4), pool.filter((m) => m >= 40)); // 七音或三音换色
+      const rehit = rng() < 0.5;
+      push(bassNote, 0, rehit ? 2 : 3, 0.45); push(color, 0, rehit ? 2 : 3, 0.4);
+      if (rehit) { push(bassNote, 2, 2, 0.4); push(color, 2, 2, 0.36); }
+      break;
+    }
+    case 'stride': {
+      const fifth = nearest(bass + 7, pool), third = nearest(bass + 5, pool);
+      push(bassNote, 0, 0.5, 0.5); push(fifth, 1, 0.5, 0.42); chordHit(1, 0.5, 0.38);
+      if (rng() < 0.3) { push(fifth, 2, 0.5, 0.48); push(bassNote, 3, 0.5, 0.4); }
+      else { push(bassNote, 2, 0.5, 0.48); push(third, 3, 0.5, 0.4); }
+      chordHit(3, 0.5, 0.36);
+      break;
+    }
     case 'walk': {
-      const line = [bass, nearest(bass + 4, pool) ?? bass + 4, nearest(bass + 7, pool) ?? bass + 7, nearest(bass + 10, pool) ?? bass + 10];
+      const approach = rng() < 0.35 ? bassNote + (rng() < 0.5 ? -1 : 1) : nearest(bassNote + 10, pool); // 半音经过音导入下一小节
+      const line = [bassNote, nearest(bassNote + 4, pool), nearest(bassNote + 7, pool), approach];
       line.forEach((m, k) => push(m, k, 0.9, 0.45));
       break;
     }
-    case 'octave':
-      for (let k = 0; k < plan.meterNum * 2; k++) {
-        push(bass, k * 0.5, 0.48, 0.4 + (intensity / 3) * 0.15);
-        push(bass + 12, k * 0.5, 0.48, 0.36 + (intensity / 3) * 0.12);
+    case 'octave': {
+      for (let s2 = 0; s2 < plan.meterNum * 2; s2++) {
+        if (s2 === restSlot) continue;
+        push(bass, s2 * 0.5, 0.48, 0.4 + (intensity / 3) * 0.15);
+        push(bass + 12, s2 * 0.5, 0.48, 0.36 + (intensity / 3) * 0.12);
       }
       break;
+    }
     case 'pad':
-    default:
-      push(bass, 0, plan.meterNum, 0.35); chordHit(0, plan.meterNum, 0.33); break;
+    default: {
+      push(bassNote, 0, plan.meterNum, 0.35); chordHit(0, plan.meterNum, 0.33);
+      if (rng() < 0.4 && upper.length) { // pad 内声部半程移动到邻音
+        push(nearest(upper[upper.length - 1] + (rng() < 0.5 ? 2 : -2), pool), plan.meterNum / 2, plan.meterNum / 2, 0.3);
+      }
+      break;
+    }
   }
   return notes;
 }
@@ -429,6 +547,9 @@ export class Composer {
     this.lastSigs = [];            // 最近两小节旋律指纹（反重复护栏）
     this.prevMelody = null;        // 上一小节旋律素材（供模进/倒影）
     this.developHistory = [];      // 发展手法历史
+    this.lastPhraseFirst = null;   // 上一乐句开场的和弦（用于乐句间换进行）
+    this.currentSymRoman = null;   // 当前和弦的罗马数字（候选集延续/惩罚匹配用）
+    this.rootFatigue = {};         // 根音疲劳表：用多衰减少，>2.2 的根音暂时不可选
   }
 
   _position() {
@@ -461,7 +582,8 @@ export class Composer {
   async nextBar() {
     const plan = this.plan;
     const pos = this._position();
-    this.pitchCenter = clamp(this.pitchCenter + (this.rng() * 2 - 1) * 3, 62, 80); // 音区漂移
+    this.pitchCenter = clamp(this.pitchCenter + (this.rng() * 2 - 1) * 3 + (72 - this.pitchCenter) * 0.08, 62, 80);
+    if (pos.barInPhrase === 0 && this.rng() < 0.25) this.pitchCenter = Math.min(80, this.pitchCenter + 10); // 1/4 的乐句整体换音区
     const intensityCurve = clamp(
       intensityTarget(plan, pos.progress, pos.isPhraseEnd)
       + (/强|响|climax|louder|爆发/i.test(this.directorNote) ? 0.7 : 0)
@@ -469,7 +591,9 @@ export class Composer {
       0, 3,
     );
 
-    const cands = chordCandidates(this.style, plan, this.currentChord?.symbol, pos.barInPhrase, pos.isPhraseEnd);
+    const recentRoots = this.history.slice(-6).map((b) => b.chord.rootPc);
+    const loopLocked = detectLoop(recentRoots).locked;
+    const cands = chordCandidates(this.style, plan, this.currentSymRoman, pos.barInPhrase, pos.isPhraseEnd, this.lastPhraseFirst, recentRoots, this.rootFatigue);
 
     // 左手：连续同织体衰减 + 导演指示偏置
     const lastLh = this.history.at(-1)?.decision.lh ?? null;
@@ -509,7 +633,7 @@ export class Composer {
         bar: pos.bar, bar_in_phrase: pos.barInPhrase + 1, phrase: pos.phrase + 1,
         is_phrase_end: pos.isPhraseEnd, progress: Number(pos.progress.toFixed(2)),
       },
-      harmony: { current: this.currentChord?.symbol ?? null, recent: this.history.slice(-4).map((b) => b.chord.symbol) },
+      harmony: { current: this.currentChord?.symbol ?? null, current_roman: this.currentSymRoman, recent: this.history.slice(-4).map((b) => b.chord.symbol), loop_locked: loopLocked },
       last_bar: this.history.length ? {
         lh: this.history.at(-1).decision.lh, contour: this.history.at(-1).decision.contour,
         tier: this.history.at(-1).decision.tier, ended_on: this.lastEndMidi ? midiName(this.lastEndMidi) : null,
@@ -570,11 +694,19 @@ export class Composer {
 
     const dec = await this._decide(state, questions);
 
+
     // 解析答案（越界/非法一律回退到本地期望值）
     const ans = dec.answers ?? {};
-    const chordSymRaw = String(ans.chord?.value ?? '');
-    const chordP = parseRoman(chordSymRaw) ?? (this.currentChord ?? parseRoman(cands[0].sym));
+    // jevthoven 铁律：候选集之外的答案一律拒绝（否则真实模型会用标签报出被排除的循环和弦）
+    const chordSymRawRaw = String(ans.chord?.value ?? '');
+    const picked = cands.find((c) => c.sym === chordSymRawRaw || c.label === chordSymRawRaw);
+    const chordSymRaw = picked ? picked.sym : cands[0].sym; // 非法作答 → 最高权重候选
+    const chordP = picked ?? cands[0];
     const chord = { symbol: chordLabel(chordP.rootPc, chordP.shape), ...chordP };
+    if (pos.barInPhrase === 0) this.lastPhraseFirst = chordSymRaw;
+    this.currentSymRoman = chordSymRaw;
+    for (const k of Object.keys(this.rootFatigue)) this.rootFatigue[k] *= 0.93; // 全体衰减：休整约 2 小节后可回归
+    this.rootFatigue[chord.rootPc] = (this.rootFatigue[chord.rootPc] ?? 0) + 1;
     const lh = lhs[ans.lh?.value] ? ans.lh.value : this.style.lh[0];
     const rhythmEntry = rhythms[ans.rhythm?.value] ?? rhythms.r0;
     const contour = CONTOURS[ans.contour?.value] ? ans.contour.value : 'wave';
@@ -599,7 +731,7 @@ export class Composer {
     // 反重复护栏 + 乐句尾锚定
     if (pos.isPhraseEnd) snapLastToChord(rh, chord);
     if (this.lastSigs.includes(sigOf(rh))) {
-      rh = mutateMelody(rh, { scale, rng: this.rng });
+      rh = mutateMelody(rh, { scale, rng: this.rng, avoid: this.lastSigs });
       if (pos.isPhraseEnd) snapLastToChord(rh, chord);
     }
     this.lastSigs = [sigOf(rh), ...this.lastSigs].slice(0, 2);
@@ -629,7 +761,7 @@ export class Composer {
       decision: {
         provider: dec.provider, fixture: !!dec.fixture, ms: dec.ms ?? 0,
         inputTokens: dec.inputTokens ?? 0, usd: dec.usd ?? 0,
-        lh, contour, tier: rhythmEntry.tier ?? 1, breathe, develop: dev,
+        lh, contour, tier: rhythmEntry.tier ?? 1, breathe, develop: dev, roman: chordSymRaw,
         confidence: ans.chord?.confidence ?? ans.chord?.probability ?? null,
         answers: ans, candidates: Object.keys(questions.chord.criteria),
       },

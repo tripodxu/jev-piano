@@ -61,20 +61,23 @@ export function fixtureAnswer(questions, rng) {
   const out = {};
   for (const [id, q] of Object.entries(questions)) {
     const w = q._fixture?.weights ?? {};
+    const uniformOver = (keys) => Object.fromEntries(keys.map((k) => [k, 1]));
     if (q.type === 'noul') {
       const pTrue = Math.min(1, Math.max(0, w.true ?? 0.5));
       const value = rng() < pTrue;
       out[id] = { value, probability: pTrue };
     } else if (q.type === 'score') {
       const levels = Array.isArray(q.criteria) ? q.criteria : Object.keys(q.criteria ?? {});
-      const weights = {};
-      levels.forEach((_, i) => { weights[String(i)] = w[String(i)] ?? 1; });
+      // 尊重稀疏权重：只采样调用方提供的键（缺键=不可选），全空才均匀——否则独热会被稀释成均匀分布
+      const provided = levels.map((_, i) => String(i)).filter((k) => w[k] != null);
+      const weights = provided.length ? Object.fromEntries(provided.map((k) => [k, w[k]])) : uniformOver(levels.map((_, i) => String(i)));
       const pick = weightedPick(weights, rng);
       const sum = Object.values(weights).reduce((s, x) => s + x, 0);
       out[id] = { value: Number(pick), confidence: (weights[pick] ?? 1) / sum };
     } else {
       const base = q.criteria ?? {};
-      const weights = Object.fromEntries(Object.keys(base).map((k) => [k, w[k] ?? 1]));
+      const keys = Object.keys(base).filter((k) => w[k] != null);
+      const weights = keys.length ? Object.fromEntries(keys.map((k) => [k, w[k]])) : uniformOver(Object.keys(base));
       const pick = weightedPick(weights, rng) ?? Object.keys(base)[0];
       const sum = Object.values(weights).reduce((s, x) => s + x, 0);
       out[id] = { value: pick, confidence: (weights[pick] ?? 1) / sum };
