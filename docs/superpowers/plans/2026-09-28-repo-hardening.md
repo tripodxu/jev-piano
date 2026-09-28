@@ -1,6 +1,6 @@
 # jev-piano 仓库规范加固实施计划
 
-> **For agentic workers:** 本计划按 superpowers:writing-plans 规范撰写，复选框 `- [ ]` 跟踪进度。执行方式：**inline（本会话逐任务执行）或 subagent 逐任务，每任务一次 git commit**。配套 skill：superpowers:executing-plans / superpowers:subagent-driven-development。执行前必读 [AGENTS.md](../../AGENTS.md)（项目宪法）与 [MEMORY.md](../../MEMORY.md)（最新记忆）。
+> **For agentic workers:** 本计划按 superpowers:writing-plans 规范撰写，复选框 `- [ ]` 跟踪进度。执行方式：**inline（本会话逐任务执行）或 subagent 逐任务，每任务一次 git commit**。配套 skill：superpowers:executing-plans / superpowers:subagent-driven-development。执行前必读 [AGENTS.md](../../../AGENTS.md)（项目宪法）与 [MEMORY.md](../../../MEMORY.md)（最新记忆）。
 
 **Goal:** 修复文档一致性问题（行数口径/错别字/计划归档），补齐仓库规范缺口（LICENSE / engines / CI），完成两处低风险代码修正（自动保存失败提示、死导出清理），并建立真实 Jev 的重复度基线——全部改动不动决策内核与音频链路。
 
@@ -98,7 +98,7 @@ git commit -m "docs: unify code-map line-count basis (total lines) and fix MEMOR
 
 ```markdown
 
-> **状态：已完成并归档（2026-09-28，42/42 项复选框已勾选）。** 本文档是 MVP 的设计契约历史存档；新任务从 [AGENTS.md](../../AGENTS.md) 与 [MEMORY.md](../../MEMORY.md) 出发，不要把本文当活动计划执行。
+> **状态：已完成并归档（2026-09-28，42/42 项复选框已勾选）。** 本文档是 MVP 的设计契约历史存档；新任务从 [AGENTS.md](../../../AGENTS.md) 与 [MEMORY.md](../../../MEMORY.md) 出发，不要把本文当活动计划执行。
 ```
 
 - [ ] **Step 2: 验证 + 提交**
