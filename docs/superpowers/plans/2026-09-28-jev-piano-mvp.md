@@ -2,6 +2,8 @@
 
 > **For agentic workers:** 本计划按 superpowers:writing-plans 规范撰写，复选框 `- [ ]` 跟踪进度。执行方式：**inline（本会话逐任务执行）+ 每任务一次 git commit**。配套 skill：superpowers:executing-plans。
 
+> **状态：已完成并归档（2026-09-28，42/42 项复选框已勾选）。** 本文档是 MVP 的设计契约历史存档；新任务从 [AGENTS.md](../../../AGENTS.md) 与 [MEMORY.md](../../../MEMORY.md) 出发，不要把本文当活动计划执行。
+
 **Goal:** 一个零框架、零构建的轻量前端：用户输入一句话 + 选风格/目标 → LLM 扩写成乐章计划（可选，BYO key）→ **Jev 每小节实时决策（和声/织体/节奏/走向/力度/呼吸），代码渲染成音符，边决策边演奏钢琴**；可导出 MIDI，可部署到 Cloudflare Workers。
 
 **Architecture:** jevthoven 的"模型选、代码写"模式（见 `research/jevthoven-调研.md`）：乐理内核生成有限候选集，Jev 每小节一次请求并行回答 6 个类型化问题（choice×4 + score×1 + noul×1），确定性代码把选择渲染成 NoteEvent；Web Audio lookahead 调度器边排音边播放；无 API 时用种子随机 fixture 决策器（同 jevthoven 的 fixture mode），保证零成本可玩。
