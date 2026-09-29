@@ -7,6 +7,15 @@
 
 ---
 
+## [完成] 2026-09-28 · 呼吸取消全部变形手法（迭代轮次 19 · 优化）
+
+- **做了什么**（详见 [docs/memory/2026-09-28-breathe-cancels-all-transforms.md](docs/memory/2026-09-28-breathe-cancels-all-transforms.md)，计划 [docs/superpowers/plans/2026-09-28-breathe-cancels-all-transforms.md](docs/superpowers/plans/2026-09-28-breathe-cancels-all-transforms.md)）：把第 16 轮的修复**从「只覆盖承袭」推广到全部变形手法**。`usePrev = !breathe && …` 把呼吸当成了**门禁**而不是**时值**，导致 `sequence`/`inversion`/`ornament` 与呼吸同现时同样被静默取消、走 `fresh()` 生成全新旋律，而**日志照旧写着「模进/倒影/装饰」**。核心抽象：**呼吸是时值指令（延后进入），不是否决指令（不许用素材）**，延后量取自动机自己的最小节奏间距。测试 121→**122**。
+- **效果**（与素材的平均音程差）：`sequence` 3.60→**0.70** · `ornament` 3.86→**0.70** · `repeat` 1.43→**0.97** · `inversion` 用镜像判据定向校验 **平均 |r+p| = 1.01 半音**（20/30 符合镜像）。
+- **判据歧义（诚实记录）**：倒影后音程取反，「逐音差」判据会把修好的倒影判成坏的（数字从 3.94 涨到 5.16，而那是对的）。正确判据是镜像关系；测试里对 inversion 只验量级（≤6）并把强校验交给「归因不说谎」。
+- **顺带修了第 2 轮埋的雷**：推广修复让旋律序列变化，把左手护栏顶出原形（`seed 7 出现 1 处相邻左手字面重复`）。旧实现只重试 3 次就用尽、然后直接返回撞车的那一份。改为重试 6 次 + 仍撞车时去掉末音。
+- **验证**：npm test 122/122；12 种子回归门全过——`chords 9.17→9.42`（升）· `entropy 2.39→2.40` · `lh 28.25` · `melody 29.25` · `madj 0` · `ladj 0`。
+- **反思**：① **教训的价值在于被使用，不在于被记录**——第 16 轮那条「两个模型决策同时成立时怎么办」若只写进记忆就只是一句话，用它审计另外三个手法才变成 4 个修复；② **修 bug 时该问「还有哪些路径走同样的逻辑」**，而不是只问「当前这条对不对」——我第 16 轮的归因兜底只写了 `dev === 'repeat'`，当时看是对的，却给本轮埋了雷。
+
 ## [完成] 2026-09-28 · 图例与首用引导（迭代轮次 18 · 前端）
 
 - **做了什么**（详见 [docs/memory/2026-09-28-legend-onboarding.md](docs/memory/2026-09-28-legend-onboarding.md)，计划 [docs/superpowers/plans/2026-09-28-legend-onboarding.md](docs/superpowers/plans/2026-09-28-legend-onboarding.md)）：顶栏加「?」**标记图例抽屉**（数据驱动 `LEGEND_ITEMS`，列出界面上每一个标记的含义）；功能轨行内图例**就地补上**发展手法；工作室空状态补「为什么值得」；收紧提示文案。skill `impeccable/onboard`。测试 118→**121**。

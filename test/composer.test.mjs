@@ -219,6 +219,33 @@ test('呼吸不再取消承袭：breathe 时动机整体延后，轮廓不变', 
   assert.ok(checked >= 4, `样本太少（${checked}）——若为 0 说明这条路径没被覆盖`);
 });
 
+test('呼吸不再取消任何变形手法：模进/倒影/装饰都要用上素材（只是延后进入）', async () => {
+  const stat = { sequence: [], inversion: [], ornament: [] };
+  for (const seed of [2026, 2027, 2028, 2029, 2030, 2031]) {
+    const { composer } = await makeComposer({ styleId: 'romantic', seed, bars: 32 });
+    const bars = [];
+    for (let i = 0; i < 32; i++) bars.push(await composer.nextBar());
+    const intOf = (b) => b.notes.filter((n) => n.hand === 'R').map((n, k, a) => (k ? n.midi - a[k - 1].midi : 0)).slice(1);
+    for (let i = 1; i < bars.length; i++) {
+      const b = bars[i];
+      if (!b.decision.breathe || !stat[b.decision.develop]) continue;
+      const r = intOf(b), p = intOf(bars[i - 1]);
+      const L = Math.min(r.length, p.length);
+      if (!L) continue;
+      let d = 0; for (let k = 0; k < L; k++) d += Math.abs(r[k] - p[k]);
+      stat[b.decision.develop].push(d / L);
+    }
+  }
+  for (const [op, arr] of Object.entries(stat)) {
+    assert.ok(arr.length >= 3, `${op} 样本太少（${arr.length}）——若为 0 说明该路径没被覆盖`);
+    const mean = arr.reduce((s, x) => s + x, 0) / arr.length;
+    // 模进是移一个音级（≤2）；装饰是加经过音（接近 0）；倒影是镜像，逐音必然差很大，
+    // 所以对它只验「仍来自素材」的量级，真正的强校验由下面的「归因不说谎」守着
+    const limit = op === 'inversion' ? 6 : op === 'ornament' ? 1.6 : 2.4;
+    assert.ok(mean <= limit, `${op} 与素材的平均音程差 ${mean.toFixed(2)} 超过 ${limit} —— 该手法仍被呼吸取消`);
+  }
+});
+
 test('归因不说谎：记为「承袭」的小节必须真的有旋律', async () => {
   for (const seed of [2026, 2027, 2028]) {
     const { composer } = await makeComposer({ styleId: 'romantic', seed, bars: 32 });

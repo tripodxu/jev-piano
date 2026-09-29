@@ -274,6 +274,18 @@ function buildFromPrev(prev, { dir, invert, chord, scale, meterNum, intensity, i
  *  transpose: 整体移调（音级数，正=上移）；invert: 音程取反；ornament: 加经过音。
  *  强拍与末音仍锚定到当前和弦——「同一想法，新的和声」正是这样成立的。
  */
+/**
+ * 呼吸的延后量：取这组音自己的最小节奏间距，夹在 [0.125, 0.5] 拍。
+ * 「呼吸」是**时值指令**（延后进入），不是**否决指令**（不许用素材）。
+ * 第 16 轮只把 repeat 挪出 `!breathe` 这道门，sequence/inversion/ornament 仍被挡在外面，
+ * 于是它们在有呼吸的小节里被静默取消，而日志照旧写着「模进/倒影/装饰」。
+ */
+function breatheDelay(notes) {
+  const ons = (notes ?? []).map((n) => n.startBeats).filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+  const gaps = ons.slice(1).map((o, i) => o - ons[i]).filter((d) => d > 1e-9);
+  return Math.max(0.125, Math.min(0.5, ...(gaps.length ? gaps : [0.5])));
+}
+
 function buildFromMotif(motif, { chord, scale, meterNum, intensity, isPhraseEnd, rng, transpose = 0, invert = false, ornament = false, breathe = false }) {
   const midis = motif?.midis ?? [];
   if (!midis.length) return null;
@@ -281,10 +293,8 @@ function buildFromMotif(motif, { chord, scale, meterNum, intensity, isPhraseEnd,
   const base = motif.onsets?.length === midis.length
     ? motif.onsets
     : midis.map((_, i) => Math.round((i * steps) / midis.length));
-  // 「呼吸」不该**取消**承袭，而该让动机**整体延后**——主题延迟进入是真实手法，
-  // 而丢掉首音会破坏动机身份。延后量取动机自身的最小音程间距（从它自己的节奏里来，没有就用半拍）。
-  const gaps = base.slice(1).map((o, i) => o - base[i]).filter((d) => d > 1e-9);
-  const shift = breathe ? Math.max(0.125, Math.min(0.5, ...(gaps.length ? gaps : [0.5]))) : 0;
+  // 主题延迟进入是真实手法，而丢掉首音会破坏动机身份
+  const shift = breathe ? breatheDelay(base.map((o, i) => ({ startBeats: o }))) : 0;
   const onsets = base.map((o) => o + shift);
   const pool = chordMidis(chord.rootPc, chord.shape, 58, 86);
   const sgn = invert ? -1 : 1;
@@ -711,12 +721,10 @@ export class Composer {
     //  repeat（承袭）必须作用在**动机**上——它承载主题身份；此前它走的是 renderMelody（与 new 同一条路），等于什么都没承袭。
     //  sequence（模进）/ inversion（倒影）字面意思就是「对**刚才那句**做模进/倒影」，作用在 prevMelody 上。
     //  ornament（装饰）同理：作曲里的装饰是装饰**当前乐句**（颤音、邻音围绕），不是把整首主题装饰一遍。
-    //  「呼吸」不再取消承袭：它只让动机延后进入（breathe 传进 buildFromMotif）。
-    //  此前 `motifReady` 要求 !breathe，导致 develop='repeat' && breathe 的小节走全新渲染——
-    //  实测这占全部「承袭」的 24.2%：四分之一的所谓主题重述什么��重述，而日志/功能轨/动机卡
-    //  仍按「承袭」展示与计数，**归因在撒谎**。
+    //  呼吸是**时值指令**（延后进入），不是**否决指令**（不许用素材）：这里不再用 !breathe 挡门，
+    //  而是让每条素材路径在末尾各自施加延后量。两者都被兑现，而不是挑一个赢。
     const motifReady = !!this.motif?.midis?.length;
-    const usePrev = !breathe && !!this.prevMelody && (dev === 'sequence' || dev === 'inversion' || dev === 'ornament');
+    const usePrev = !!this.prevMelody && (dev === 'sequence' || dev === 'inversion' || dev === 'ornament');
     let rh = null;
     let effectiveDev = dev;
     if (motifReady && dev === 'repeat') {
@@ -726,11 +734,17 @@ export class Composer {
     } else if (usePrev) {
       rh = buildFromPrev(this.prevMelody, { dir: dev === 'sequence' ? (this.rng() < 0.5 ? 1 : -1) : 0, invert: dev === 'inversion', chord, scale, meterNum: plan.meterNum, intensity, isPhraseEnd: pos.isPhraseEnd, rng: this.rng });
       if (dev === 'ornament') rh = insertPassing(rh, scale, this.rng);
+      if (breathe && rh.length) { const d = breatheDelay(rh); rh = rh.map((n) => ({ ...n, startBeats: n.startBeats + d })); }
     }
     if (!rh || !rh.length) {
       rh = fresh();
-      // 兜底走了全新渲染 → 归因必须说真话，不能继续记成「承袭」
-      if (dev === 'repeat') { effectiveDev = 'new'; this.developHistory[this.developHistory.length - 1] = 'new'; }
+      // 兜底走了全新渲染 → 归因必须说真话。本应使用素材的四种手法
+      // （承袭/模进/倒影/装饰）若真的没拿到素材，一律改记为「新句」——
+      // 日志/功能轨/动机卡都读这一个字段，说谎的代价是整个溯源承诺失效。
+      if (dev === 'repeat' || dev === 'sequence' || dev === 'inversion' || dev === 'ornament') {
+        effectiveDev = 'new';
+        this.developHistory[this.developHistory.length - 1] = 'new';
+      }
     }
 
     // 反重复护栏 + 乐句尾锚定。post 交给护栏内部执行：护栏在「锚定之后」的最终形态上判定碰撞，
@@ -749,12 +763,17 @@ export class Composer {
       intervals: rh.map((n, i, a) => (i ? n.midi - a[i - 1].midi : 0)).slice(1),
     };
 
-    // 左手指纹护栏：renderLH 内部靠随机变体（空拍/旋转/换序）避重，但没有硬保证——
-    // 色板词汇变宽后实测出现过 1/12 种子相邻左手复读。这里用"重渲染换一个变体"兜底，
-    // rng 会继续推进所以重渲染必然给出不同结果，且保持同 seed 可复现。
+    // 左手指纹护栏：renderLH 内部靠随机变体（空拍/旋转/换序）避重，但没有硬保证。
+    // 兜底分两级：① 重渲染换一个变体（rng 继续推进，同 seed 仍可复现）；
+    // ② 重试仍撞车时**去掉末音**——必然改变签名，且只削掉一个收尾音，代价极小。
+    // 旧实现只重试 3 次就用尽、然后直接返回撞车的那一份，等于没有护栏：
+    // 本轮把 motif 路径修好、旋律序列一变，就把它顶了出来（seed 7 出现相邻复读）。
     let lhNotes = renderLH({ plan, chord, patternId: lh, intensity, rng: this.rng });
-    for (let k = 0; k < 3 && this.lastLhSigs.includes(sigOf(lhNotes)); k++) {
+    for (let k = 0; k < 6 && this.lastLhSigs.includes(sigOf(lhNotes)); k++) {
       lhNotes = renderLH({ plan, chord, patternId: lh, intensity, rng: this.rng });
+    }
+    if (lhNotes.length > 1 && this.lastLhSigs.includes(sigOf(lhNotes))) {
+      lhNotes = lhNotes.slice(0, -1);
     }
     this.lastLhSigs = [sigOf(lhNotes), ...this.lastLhSigs].slice(0, 2);
 
