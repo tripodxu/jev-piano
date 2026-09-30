@@ -5,6 +5,13 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-09-30 · 工作室卷帘 hover 读数（迭代轮次 34 · 前端）
+
+- **做了什么**（计划 [docs/superpowers/plans/2026-09-30-studio-hover.md](docs/superpowers/plans/2026-09-30-studio-hover.md)）：轮次 21 给实时界面的 hover 读数，本轮对齐到**编辑主战场**——工作室卷帘头部（张力/功能/和弦/契合度共用区）pointermove 画 crosshair + 文字读数 `第 N 小节 · Cm · 张力 0.63 · 契合度 71% · 速度 86`。**数据管道零新增**：chordAt/tensionOf 缓存/barHarmonyFit/tempoMultAt 全部现成；crosshair 用段落虚线同款（视觉语言不新增）。新纯函数 `barIndexAt(beat, meter, totalBars)` 导出单测。测试 153→**154**。
+- **验证**：npm test 154/154；id 契约不新增；12 种子指标不变（纯展示层）。
+- **反思**：**界面间的能力对齐是最便宜的前端轮**——数据管道、视觉语言、hover 交互模式全是现成的，成本只有接线；第 6 轮「共用 ZOOM」、轮次 21 的 hoverBarAt、本轮的复用，三次都是同一课：**能力做一次，界面各自认领**。editors 与 players 的差异在交互不在数据。
+- **下一步**（迭代轮次 35 · 优化）：文档对齐——README「已知限制」补 records 无上限与真渠道不确定性（轮次 32/29 的审计结论落档）。
+
 ## [完成] 2026-09-30 · 决策概率可视化（迭代轮次 33 · 创意）
 
 - **做了什么**：Jev 的真渠道回答**自带完整概率分布**（实测：chord `{i:0.93, iiø:0.02, bVI:0.02, …}`、develop `{new:0.46, repeat:0.45}`——模型真的在 1 个百分点里犹豫），但 `decision.answers` 里从未展示。`probabilityStrip(probabilities, picked)` 纯函数：按概率降序取前三的微型条形（条宽=百分数、选中项亮标、sym 一律转义、脏输入空串），挂在决策日志条目下（li 的 `flex-wrap` 第二行，零布局侵入）。**离线随机渠道没有分布——整行不输出**，只有真渠道能看到模型的「犹豫」。

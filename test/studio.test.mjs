@@ -212,3 +212,18 @@ test('pieceTension: 旧项目 JSON（无 fn / 无 intensity）与空输入都不
   assert.deepEqual(pieceTension({ barChords: [], notes: [] }), []);
   assert.equal(pieceTension({ plan: {}, barChords: [{}], notes: [] })[0], 0, '空小节张力为 0');
 });
+
+/* ---------------- 卷帘 hover 读数（轮次 34 · 前端） ---------------- */
+
+test('barIndexAt: 拍点 → 小节序号；越界/脏输入安全降级', async () => {
+  const { barIndexAt } = await import('../public/js/studio.js');
+  assert.equal(barIndexAt(0, 4, 32), 0);
+  assert.equal(barIndexAt(3.9, 4, 32), 0, '小节内');
+  assert.equal(barIndexAt(4, 4, 32), 1, '小节线归后一小节');
+  assert.equal(barIndexAt(127.9, 4, 32), 31);
+  assert.equal(barIndexAt(999, 4, 32), -1, '越界返回 -1');
+  assert.equal(barIndexAt(-1, 4, 32), -1);
+  assert.equal(barIndexAt(NaN, 4, 32), -1);
+  assert.equal(barIndexAt(5, 4, 0), -1, '无小节');
+  assert.equal(barIndexAt(5, 0, 32), -1, '非法 meter');
+});

@@ -182,6 +182,14 @@ export function validatePiece(data) {
 
 /* ==================== 纯函数：时间轴分析（与 DOM 无关，可单测） ==================== */
 
+/** 拍点 → 小节序号（卷帘 hover 用）；越界/脏输入返回 -1，绝不抛错 */
+export function barIndexAt(beat, meter, totalBars) {
+  const b = Number(beat), m = Number(meter), n = Number(totalBars);
+  if (!Number.isFinite(b) || !Number.isFinite(m) || m <= 0 || !Number.isInteger(n) || n < 1) return -1;
+  const i = Math.floor(b / m);
+  return i >= 0 && i < n ? i : -1;
+}
+
 /** 某小节的和声功能：优先用 composer 记下的决策归因，旧项目 JSON 没有则由根音回推 */
 export function barFunction(bc, mode = 'major') {
   if (!bc) return 'T';
@@ -570,6 +578,28 @@ function drawRoll() {
     g.fillStyle = 'rgba(240,205,138,0.85)';
     for (const bc of piece.barChords) g.fillText(bc.symbol, bc.startBeat * ZOOM + 4, H_TENSION + H_FN + 13);
     drawTimeline(g, W, piece);
+    // hover 读数：crosshair + 文字（数据全现成：和弦/张力缓存/契合度/速度）
+    if (hoverBar != null && hoverBar < piece.barChords.length) {
+      const bc = piece.barChords[hoverBar];
+      const t = tensionOf(piece)[hoverBar];
+      const meterH = piece.plan.meterNum;
+      const mel = piece.notes.filter((n) => n.hand === 'R' && Math.floor(n.startBeats / meterH) === hoverBar);
+      const fit = mel.length ? barHarmonyFit({ chord: { rootPc: bc.rootPc, shape: bc.shape }, notes: mel }).fit : 1;
+      const mult = tempoMultAt(piece.plan, hoverBar);
+      const x = bc.startBeat * ZOOM + 0.5;
+      g.save();
+      g.strokeStyle = 'rgba(240,205,138,0.4)';
+      g.lineWidth = 1;
+      g.setLineDash([2, 3]);
+      g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
+      g.setLineDash([]);
+      g.font = '600 10px Georgia, serif';
+      g.textAlign = 'left'; g.textBaseline = 'top';
+      g.fillStyle = 'rgba(240,205,138,0.95)';
+      const speed = Math.round((Number(els.bpm.value) || piece.plan.bpm) * mult);
+      g.fillText(`第 ${hoverBar + 1} 小节 · ${bc.symbol} · 张力 ${Number.isFinite(t) ? t.toFixed(2) : '—'} · 契合度 ${Math.round(fit * 100)}% · 速度 ${speed}`, 6, H_TENSION + 1);
+      g.restore();
+    }
     // 音符。**一维一通道**：手别 = 填色，非和音 = 亮边（左手恒为纯色，不受此影响）
     const nct = nonChordIds(piece);
     for (const n of piece.notes) {
@@ -608,6 +638,9 @@ function noteAt(beat, pitch) {
   }
   return null;
 }
+
+// 卷帘 hover（轮次 34）：光标所在小节的读数（编辑主战场的逐小节检视，与实时界面的张力带 hover 同源）
+let hoverBar = null;
 
 function bindRoll() {
   let drag = null;
@@ -652,6 +685,14 @@ function bindRoll() {
     drawRoll();
   });
   els.roll.addEventListener('pointerup', () => { if (drag) { drag = null; commit(); } });
+  els.roll.addEventListener('pointermove', (e) => {
+    if (!piece) return;
+    const { beat } = rollPos(e);
+    const i = barIndexAt(beat, piece.plan.meterNum, piece.totalBars);
+    const next = i >= 0 ? i : null;
+    if (next !== hoverBar) { hoverBar = next; drawRoll(); }
+  });
+  els.roll.addEventListener('pointerleave', () => { if (hoverBar != null) { hoverBar = null; drawRoll(); } });
   els.roll.addEventListener('dblclick', (e) => {
     if (!piece || playing()) return;
     const { beat, pitch } = rollPos(e);
