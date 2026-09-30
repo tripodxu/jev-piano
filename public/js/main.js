@@ -316,7 +316,9 @@ els.midiBtn.addEventListener('click', () => {
   if (!player?.records?.length) return;
   // 速度弧线写入分段 set_tempo：导出的 MIDI 保留「尾段渐慢」的演奏意图
   const tempoMults = Array.from({ length: plan.totalBars }, (_, i) => tempoMultAt(plan, i));
-  const bytes = exportMidi(player.records, { bpm: plan.bpm, meterNum: plan.meterNum, tempoMults });
+  // 每小节一次和声变化 → 每小节换一次踏板（钢琴家在换和声处重踏是惯例）
+  const pedalBars = Array.from({ length: plan.totalBars }, (_, i) => i);
+  const bytes = exportMidi(player.records, { bpm: plan.bpm, meterNum: plan.meterNum, tempoMults, pedalBars });
   download(new Blob([bytes], { type: 'audio/midi' }), `${plan.title}.mid`);
 });
 els.recBtn.addEventListener('click', async () => {

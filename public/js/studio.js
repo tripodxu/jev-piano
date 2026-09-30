@@ -731,7 +731,12 @@ function bindControls() {
     if (!piece) return;
     // 速度弧线写入分段 set_tempo（旧 JSON 无 sections 时 tempoMultAt 走兼容路径，尾部缓降）
     const tempoMults = Array.from({ length: piece.totalBars }, (_, i) => tempoMultAt(piece.plan, i));
-    const bytes = exportMidi(piece.notes, { bpm: Number(els.bpm.value), meterNum: piece.plan.meterNum, tempoMults });
+    // 换踏只发生在和声真正变化的小节（相邻同名和弦不重复踏）
+    const pedalBars = (piece.barChords ?? [])
+      .filter((bc, i) => i === 0 || bc.symbol !== piece.barChords[i - 1].symbol)
+      .map((bc) => barIndexAt(bc.startBeat, piece.plan.meterNum, piece.totalBars))
+      .filter((i) => i >= 0);
+    const bytes = exportMidi(piece.notes, { bpm: Number(els.bpm.value), meterNum: piece.plan.meterNum, tempoMults, pedalBars });
     const blob = new Blob([bytes], { type: 'audio/midi' });
     download(blob, `${piece.plan.title}.mid`);
   });

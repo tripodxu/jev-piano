@@ -15,9 +15,10 @@ export function vlq(n) {
 const u32 = (n) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
 const u16 = (n) => [(n >>> 8) & 255, n & 255];
 
-/** 一串 (tick, 状态字节, 音高, 力度) → delta 编码的音轨字节 */
+/** 一串 (tick, 状态字节, 音高, 力度[, prio]) → delta 编码的音轨字节。
+ *  prio 允许同 tick 自定义次序（踏板序列要排在音符之前）；不带 prio 时行为与旧版逐位一致 */
 function trackBytes(events) {
-  events.sort((a, b) => a.tick - b.tick || a.status - b.status || a.midi - b.midi); // 同 tick 先 off(0x80) 后 on(0x90)
+  events.sort((a, b) => a.tick - b.tick || (a.prio ?? a.status) - (b.prio ?? b.status) || a.status - b.status || a.midi - b.midi);
   const out = [];
   let last = 0;
   for (const ev of events) {
@@ -36,7 +37,7 @@ const clampMult = (m) => Math.min(2, Math.max(0.5, Number(m) || 1));
  * 省略时与旧版字节逐位一致；给定时在 track0 按小节写 set_tempo（FF 51），
  * plateau（与上一小节同乘数）不重复写，文件更小。
  */
-export function exportMidi(records, { bpm = 90, meterNum = 4, tempoMults = null } = {}) {
+export function exportMidi(records, { bpm = 90, meterNum = 4, tempoMults = null, pedalBars = null } = {}) {
   const byHand = { R: [], L: [] };
   for (const r of records) {
     const hand = r.hand === 'L' ? 'L' : 'R';
@@ -44,6 +45,16 @@ export function exportMidi(records, { bpm = 90, meterNum = 4, tempoMults = null 
     const offTick = Math.max(onTick + 1, Math.round((r.startBeats + r.durBeats) * TPQN));
     byHand[hand].push({ tick: onTick, status: 0x90, midi: r.midi, vel: Math.max(1, Math.min(127, Math.round(r.vel * 127))) });
     byHand[hand].push({ tick: offTick, status: 0x80, midi: r.midi, vel: 0 });
+  }
+  // sustain 踏板（轮次 39）：每个和声变化处松踏→立即重踏（钢琴家的标准换踏动作）。
+  // prio 让同 tick 的次序为 off(0x80) < cc松 < cc踏 < on(0x90)——共鸣先释放再重建，音符最后进来。
+  if (Array.isArray(pedalBars)) {
+    byHand.R.push(...pedalBars.flatMap((bar, idx) => {
+      const tick = bar * meterNum * TPQN;
+      const ev = [{ tick, status: 0xB0, prio: 0x86, midi: 64, vel: 127 }];
+      if (idx > 0) ev.unshift({ tick, status: 0xB0, prio: 0x85, midi: 64, vel: 0 });
+      return ev;
+    }));
   }
   const tempoBytes = (us) => [0xff, 0x51, 0x03, (us >> 16) & 255, (us >> 8) & 255, us & 255];
   const m0 = Array.isArray(tempoMults) && Number.isFinite(tempoMults[0]) ? clampMult(tempoMults[0]) : 1;

@@ -83,3 +83,25 @@ test('exportMidi: 不带 tempoMults 时字节与现行为逐位一致', () => {
   const c = exportMidi(records, { bpm: 96, meterNum: 4, tempoMults: null });
   assert.deepEqual([...a], [...c]);
 });
+
+/* ---------------- sustain 踏板（轮次 39 · 创意）：和声变化处 CC64 重踏 ---------------- */
+
+test('exportMidi: pedalBars 在右手轨写 CC64（同 tick 顺序：松踏→重踏→音符）', () => {
+  const records = [{ midi: 60, startBeats: 0, durBeats: 1, vel: 0.8, hand: 'R' }];
+  const b = exportMidi(records, { bpm: 96, meterNum: 4, pedalBars: [0, 1] });
+  const hex = [...b].map((x) => x.toString(16).padStart(2, '0')).join(' ');
+  // CC64 = 0xb0 0x40，val 0x7f / 0x00
+  assert.ok(hex.includes('b0 40 7f'), '应有踏板按下 CC64=127');
+  assert.ok(hex.includes('b0 40 00'), '应有松踏 CC64=0');
+  // 第一小节只有按下（无松踏）；第二小节先松后踏
+  const onCount = hex.split('b0 40 7f').length - 1, offCount = hex.split('b0 40 00').length - 1;
+  assert.equal(onCount, 2, '两个和声点各按下一次');
+  assert.equal(offCount, 1, '重踏点先松一次');
+});
+
+test('exportMidi: 不带 pedalBars 时字节与现行为逐位一致', () => {
+  const records = [{ midi: 60, startBeats: 0, durBeats: 1, vel: 0.8, hand: 'R' }];
+  const a = exportMidi(records, { bpm: 96, meterNum: 4 });
+  const c = exportMidi(records, { bpm: 96, meterNum: 4, pedalBars: null });
+  assert.deepEqual([...a], [...c]);
+});
