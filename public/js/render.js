@@ -43,6 +43,23 @@ export function sigOf(rh) {
   return rh.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
 }
 
+/** 曲终末音（轮次 36）：锚定到**调性主三和弦**（根/三/五，三音随调式）——
+ *  比乐句尾的「锚当前和弦」更强的收束：曲终要落在「家」上，而不是停在路过的地方。 */
+export function snapLastToTonic(notes, plan) {
+  const last = notes.at(-1);
+  if (!last) return notes;
+  const tonic = ((plan.keyPc % 12) + 12) % 12;
+  const minorish = ['minor', 'dorian', 'pentatonicMinor', 'harmonicMinor'].includes(plan.melodyScale);
+  const third = minorish ? 3 : 4;
+  const pool = [];
+  for (let m = 58; m <= 86; m++) {
+    const rel = ((m - tonic) % 12 + 12) % 12;
+    if (rel === 0 || rel === third || rel === 7) pool.push(m);
+  }
+  last.midi = nearest(last.midi, pool);
+  return notes;
+}
+
 /** 乐句尾末音锚定到根音/五音 */
 export function snapLastToChord(notes, chord) {
   const last = notes.at(-1);

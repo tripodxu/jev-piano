@@ -7,8 +7,8 @@ import {
 import { askJev, fixtureAnswer, expandPlan } from './jev.js';
 import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, functionCandidates, deriveSections, sectionAt, developCandidates } from './candidates.js';
 import {
-  CONTOUR_STEPS as CONTOURS, DEVELOP_OPS, sigOf, snapLastToChord, insertPassing, mutateMelody, melodyIntervals,
-  buildFromPrev, buildFromMotif, breatheDelay, varyPattern, renderMelody, renderLH,
+  CONTOUR_STEPS as CONTOURS, DEVELOP_OPS, sigOf, snapLastToChord, snapLastToTonic, insertPassing, mutateMelody,
+  melodyIntervals, buildFromPrev, buildFromMotif, breatheDelay, varyPattern, renderMelody, renderLH,
 } from './render.js';
 
 /**
@@ -416,7 +416,12 @@ export class Composer {
     // 指纹记忆分两层（轮次 26）：lastSigs（最近 2 小节）是**硬**层——相邻字面重复绝不允许；
     // allSigs（全曲，含循环的前几遍）是**软**层——远距离复读尽量避开（64 小节里 10.2% 的旋律
     // 小节曾与远处小节字面相同），变形空间耗尽时保留原样，不为远距离去破坏小节本身。
-    const post = pos.isPhraseEnd ? (ns) => snapLastToChord(ns, chord) : (ns) => ns;
+    // 曲终手势（轮次 36）：每遍最后小节，旋律末音收束到**调性主三和弦**——
+    // 乐句尾锚的是「当前和弦」，曲终锚的是「家」；时间维度的收束由速度弧线的 rit. 承担。
+    const isPieceEnd = pos.bar % plan.totalBars === plan.totalBars - 1;
+    const post = isPieceEnd
+      ? (ns) => snapLastToTonic(ns, plan)
+      : pos.isPhraseEnd ? (ns) => snapLastToChord(ns, chord) : (ns) => ns;
     rh = post(rh);
     if (this.lastSigs.includes(sigOf(rh)) || this.allSigs.has(sigOf(rh))) {
       rh = mutateMelody(rh, { scale, rng: this.rng, avoid: [...this.lastSigs, ...this.allSigs], post });
@@ -450,6 +455,13 @@ export class Composer {
     // 6 次重渲染可能全部撞全曲指纹——逐音裁剪（保留低音+至少一个上声部）必然改变签名。
     while (lhNotes.length > 2 && lhClash(lhNotes)) {
       lhNotes = lhNotes.slice(0, -1);
+    }
+    // 曲终踏板：左手确保**主音低音**贯穿整小节（终止式的最后一块拼图）。
+    // 已有同音（终和弦恰为主和弦）则不重复；追加后若与全曲指纹撞车则放弃——软层纪律。
+    if (isPieceEnd && !lhNotes.some((n) => n.midi === 36 + plan.keyPc)) {
+      const withPedal = [...lhNotes, { midi: 36 + plan.keyPc, startBeats: 0, durBeats: plan.meterNum, vel: 0.42, hand: 'L' }];
+      const pedalSig = sigOf(withPedal);
+      if (!this.lastLhSigs.includes(pedalSig) && !this.allLhSigs.has(pedalSig)) lhNotes = withPedal;
     }
     this.lastLhSigs = [sigOf(lhNotes), ...this.lastLhSigs].slice(0, 2);
     const lhFarRepeat = this.allLhSigs.has(sigOf(lhNotes));

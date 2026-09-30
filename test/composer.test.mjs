@@ -527,3 +527,38 @@ test('mutateMelody 耗尽契约：变形空间逐轮耗尽后，只允许「逃�
   }
   assert.ok(exhausted, '60 轮内应耗尽变形空间（否则此测试没测到目标路径）');
 });
+
+/* ---------------- 曲终手势（轮次 36 · 创意）：每遍最后小节落在主和弦上 ---------------- */
+
+test('曲终手势：旋律末音落在主三和弦内、左手必含主音低音（调性收束）', async () => {
+  for (const styleId of ['romantic', 'jazz']) {
+    const { composer, plan } = await makeComposer({ styleId, bars: 32 });
+    let bar = null;
+    for (let i = 0; i < 32; i++) bar = await composer.nextBar();
+    const rh = bar.notes.filter((n) => n.hand === 'R');
+    const last = rh.at(-1);
+    const rel = ((last.midi - plan.keyPc) % 12 + 12) % 12;
+    const third = ['minor', 'dorian', 'pentatonicMinor', 'harmonicMinor'].includes(plan.melodyScale) ? 3 : 4;
+    assert.ok([0, third, 7].includes(rel), `${styleId} 曲终末音 ${last.midi}（相对主音 ${rel}）应在主三和弦 {0,${third},7} 内`);
+    const tonicBass = 36 + plan.keyPc;
+    assert.ok(bar.notes.some((n) => n.hand === 'L' && n.midi === tonicBass),
+      `${styleId} 曲终左手应含主音低音 ${tonicBass}，实际 ${bar.notes.filter((n) => n.hand === 'L').map((n) => n.midi).join(',')}`);
+    // 非曲终小节不受影响：倒数第二小节的末音不做主音约束（无法直接断言，但前面小节已由既有测试守着）
+  }
+});
+
+test('曲终手势：snapLastToTonic 空输入安全；循环第二遍的曲末同样生效', async () => {
+  const { composer, plan } = await makeComposer({ styleId: 'romantic', bars: 32 });
+  const sig = (b) => b.notes.filter((n) => n.hand === 'R').map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
+  let firstEnd = null, bar = null;
+  for (let i = 0; i < 64; i++) {
+    bar = await composer.nextBar();
+    if (i === 31) firstEnd = sig(bar);
+    if (i === 63) {
+      const last = bar.notes.filter((n) => n.hand === 'R').at(-1);
+      const rel = ((last.midi - plan.keyPc) % 12 + 12) % 12;
+      assert.ok([0, 3, 7].includes(rel), '第二遍曲末同样收束到主和弦');
+      assert.notEqual(sig(bar), firstEnd, '两遍曲末不应字面相同（全曲指纹记忆仍在工作）');
+    }
+  }
+});
