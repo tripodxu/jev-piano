@@ -64,15 +64,34 @@ for (const input of [els.channelSel, els.keySelect, els.typesafeKey, els.openrou
 }
 els.channelSel.value = settings.channel;
 
-els.settingsBtn.addEventListener('click', () => els.settingsDrawer.classList.remove('hidden'));
+// 抽屉的焦点管理：打开移入关闭钮、Esc 关闭、关闭后焦点回到触发钮——键盘用户不被丢在页首
+function wireDrawer({ btn, drawer, close }) {
+  const open = () => {
+    drawer.classList.remove('hidden');
+    btn.setAttribute('aria-expanded', 'true');
+    close.focus();
+  };
+  const shut = () => {
+    drawer.classList.add('hidden');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.focus();
+  };
+  btn.addEventListener('click', () => (drawer.classList.contains('hidden') ? open() : shut()));
+  close.addEventListener('click', shut);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !drawer.classList.contains('hidden')) shut();
+  });
+  return { open, shut };
+}
+const legendDrawerCtl = wireDrawer({ btn: els.legendBtn, drawer: els.legendDrawer, close: els.legendClose });
+wireDrawer({ btn: els.settingsBtn, drawer: els.settingsDrawer, close: els.settingsClose });
 
 /* ---------------- 图例：可选、可重开、关闭被记住（impeccable/onboard） ---------------- */
 // 一进来就弹窗 = 一上来倾倒信息。这里只在用户没勾过「不再提示」且从未演奏时轻点一下。
 (function initLegend() {
   els.legendBody.innerHTML = renderLegend(LEGEND_ITEMS);
-  const open = () => { els.legendDrawer.classList.remove('hidden'); els.legendBtn.setAttribute('aria-expanded', 'true'); };
-  const close = () => { els.legendDrawer.classList.add('hidden'); els.legendBtn.setAttribute('aria-expanded', 'false'); };
-  els.legendBtn.addEventListener('click', () => (els.legendDrawer.classList.contains('hidden') ? open() : close()));
+  const open = legendDrawerCtl.open;
+  const close = legendDrawerCtl.shut;
   els.legendMore.addEventListener('click', open);
   els.legendClose.addEventListener('click', close);
   els.legendNoHint.addEventListener('change', () => {
@@ -91,7 +110,10 @@ els.settingsClose.addEventListener('click', () => els.settingsDrawer.classList.a
 els.styleChips.addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
-  for (const c of els.styleChips.children) c.classList.toggle('sel', c === chip);
+  for (const c of els.styleChips.children) {
+    c.classList.toggle('sel', c === chip);
+    c.setAttribute('aria-checked', c === chip ? 'true' : 'false'); // radiogroup 的 radio 语义要与视觉选中态同步
+  }
   settings.styleId = chip.dataset.style;
   settings.touched = true;
   saveSettings();

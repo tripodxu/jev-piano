@@ -259,7 +259,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   min-width: 120px;
   transition: opacity .18s;
 }
-.now-bar { color: var(--text-dim); font-size: 13px; letter-spacing: 0.14em; font-variant-numeric: tabular-nums; }
+.now-bar { color: var(--text-dim); font-size: 13px; letter-spacing: 0.05em; font-variant-numeric: tabular-nums; }
 
 /* ---------- 动机卡：曲子的主题长什么样 ---------- */
 .motif-box { flex: none; padding: 0 26px 6px; }
@@ -578,9 +578,10 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   overflow: hidden;
 }
 .progress-bar {
-  height: 100%; width: 0%;
+  height: 100%; width: 100%;
+  transform: scaleX(0); transform-origin: 0 50%;
   background: linear-gradient(90deg, var(--brass-lo), var(--brass-hi));
-  transition: width .25s;
+  transition: transform .25s;
 }
 .progress-text {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;

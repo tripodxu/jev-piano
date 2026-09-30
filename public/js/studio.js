@@ -324,7 +324,7 @@ async function compose(newSeed) {
       const off = i * plan.meterNum;
       for (const n of bar.notes) p.notes.push({ id: p.nid++, midi: n.midi, startBeats: off + n.startBeats, durBeats: n.durBeats, vel: n.vel, hand: n.hand });
       p.barChords.push({ startBeat: off, symbol: bar.chord.symbol, rootPc: chordRoot(bar.chord), shape: bar.chord.shape, fn: bar.decision.chordFn, intensity: bar.intensity });
-      els.progress.style.width = `${Math.round(((i + 1) / bars) * 100)}%`;
+      els.progress.style.transform = `scaleX(${(i + 1) / bars})`; // scaleX 而非 width：进度动画不触发布局
       els.progressText.textContent = `第 ${i + 1}/${bars} 小节 · ${bar.chord.symbol}`;
       updateInfo();
       drawRoll(); drawVelLane(); // jevthoven 式 complete-bar preview：边生成边可见
