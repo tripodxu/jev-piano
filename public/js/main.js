@@ -6,7 +6,9 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary } from './ui.js';
+import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle } from './ui.js';
+import { STYLE_BY_ID } from './music.js';
+import { GOAL_HINTS } from './composer.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { barHarmonyFit, NCT_ZH } from './nct.js';
 import { planTargetSeries, tempoMultAt } from './candidates.js';
@@ -120,7 +122,13 @@ els.styleChips.addEventListener('click', (e) => {
   settings.touched = true;
   saveSettings();
 });
-for (const c of els.styleChips.children) c.classList.toggle('sel', c.dataset.style === settings.styleId);
+for (const c of els.styleChips.children) {
+  c.classList.toggle('sel', c.dataset.style === settings.styleId);
+  // 信息前置（轮次 44）：领域描述与速度区间在选择那一刻可见
+  const st = STYLE_BY_ID[c.dataset.style];
+  if (st) c.title = styleChipTitle(st);
+}
+for (const opt of els.goal.options) opt.title = goalTitle(GOAL_HINTS[opt.value]);
 
 els.bpmAuto.addEventListener('change', () => {
   els.bpmRange.disabled = els.bpmAuto.checked;

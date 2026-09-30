@@ -369,6 +369,26 @@ export function stageLightFor(tension) {
   return { warm: Math.round((0.05 + v * 0.16) * 1000) / 1000, cool: Math.round((0.16 - v * 0.10) * 1000) / 1000 };
 }
 
+/** 曲风 chip 的 tooltip（轮次 44）：领域描述与速度区间在选择的那一刻可见，而不是埋在代码里。 */
+export function styleChipTitle(style) {
+  if (!style || !style.desc) return '';
+  const [lo, hi] = Array.isArray(style.bpm) ? style.bpm : [];
+  return Number.isFinite(lo) && Number.isFinite(hi)
+    ? `${style.desc} · ${lo}-${hi} BPM`
+    : String(style.desc);
+}
+
+const fmtBias = (v, unit, plus = '+') => `${unit} ${v >= 0 ? plus : '−'}${Math.abs(v)}`;
+/** 目标 select 的 tooltip（轮次 44）：把 GOAL_HINTS 的实际偏置说人话——选择会影响什么，当场可见。 */
+export function goalTitle(hint) {
+  if (!hint) return '每次随机生成，不偏置任何参数';
+  const parts = [];
+  if (hint.arc) parts.push(`弧线 ${hint.arc}`);
+  if (hint.density) parts.push(fmtBias(hint.density, '密度'));
+  if (hint.brightness) parts.push(fmtBias(hint.brightness, '亮度'));
+  return parts.length ? `影响：${parts.join(' · ')}` : '每次随机生成，不偏置任何参数';
+}
+
 /** 双遍张力对照（轮次 42）：把已演奏序列按遍长切成「上一遍」与「当前遍」。
  *  再即兴的可视化——同一曲式，两条不同的形状。totalBars ≤ 0 表示未启用分遍（total=0，调用方回退旧行为）。 */
 export function chorusView(actual, totalBars) {

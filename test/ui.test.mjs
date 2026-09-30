@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -263,4 +263,21 @@ test('chorusView: 脏输入降级（无 totalBars / 空序列）', () => {
   assert.equal(v.current.length, 2);
   assert.equal(v.total, 0, '0 = 未启用分遍（调用方回退旧行为）');
   assert.deepEqual(chorusView([], 32), { past: [], current: [], base: 0, total: 32 });
+});
+
+/* ---------------- 选择控件的信息前置（轮次 44 · 前端） ---------------- */
+
+test('styleChipTitle: 曲风描述 + BPM 区间一行可读；未知风格空串', () => {
+  const t = styleChipTitle({ name: '爵士 · 摇摆', desc: 'ii-V-I，七九和弦', bpm: [88, 132] });
+  assert.ok(t.includes('ii-V-I'), '含领域描述');
+  assert.ok(t.includes('88-132 BPM'), '含速度区间');
+  assert.equal(styleChipTitle(null), '');
+  assert.equal(styleChipTitle({ name: 'x' }), '', '无 desc 不输出');
+});
+
+test('goalTitle: 目标的实际偏置透明化；无偏置说明随机', () => {
+  assert.equal(goalTitle({ arc: 'rise', brightness: 0.15 }), '影响：弧线 rise · 亮度 +0.15');
+  assert.equal(goalTitle({ arc: 'flat', density: -0.15 }), '影响：弧线 flat · 密度 −0.15');
+  assert.equal(goalTitle({}), '每次随机生成，不偏置任何参数');
+  assert.equal(goalTitle(undefined), '每次随机生成，不偏置任何参数');
 });
