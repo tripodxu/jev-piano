@@ -337,6 +337,15 @@ export function uniquenessLine(melSeen, lhSeen, bars) {
   return `旋律唯一 ${m}/${n} · 左手唯一 ${l}/${n}`;
 }
 
+/** 舞台灯光（轮次 31）：张力 → 暖顶光/冷地光的不透明度。
+ *  纯氛围层——不承载任何必须读到的信息（信息仍走文字/形状通道），上界 0.21 的克制
+ *  来自 delight 判据（重复一百次还讨喜）。脏输入降级中性 0.5，绝不抛错。 */
+export function stageLightFor(tension) {
+  const t = Number(tension);
+  const v = Number.isFinite(t) ? Math.min(1, Math.max(0, t)) : 0.5;
+  return { warm: Math.round((0.05 + v * 0.16) * 1000) / 1000, cool: Math.round((0.16 - v * 0.10) * 1000) / 1000 };
+}
+
 /** 张力带 hover：指针横坐标 px → 最近小节序号；绘图区外/脏输入/无数据返回 -1。
  *  hover 只是增强（ui-ux-pro-max："relying on hover only" 是反模式）——
  *  无 hover 的读法是 tensionStat 文本行与 aria-label，二者始终存在。 */

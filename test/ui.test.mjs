@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -189,4 +189,24 @@ test('uniquenessLine: 唯一性读数是纯文本；0 小节时不输出', () =>
   assert.equal(uniquenessLine(0, 0, 0), '');
   assert.equal(uniquenessLine(0, 0, -3), '');
   assert.equal(uniquenessLine(3, 2, NaN), '');
+});
+
+/* ---------------- 舞台灯光（轮次 31 · 创意） ---------------- */
+
+test('stageLightFor: 张力升→暖光升冷光降（氛围不抢戏，上界 ≤0.21）', () => {
+  const low = stageLightFor(0), high = stageLightFor(1);
+  assert.ok(high.warm > low.warm, '暖光随张力单调升');
+  assert.ok(high.cool < low.cool, '冷光随张力单调降');
+  assert.ok(Math.abs(low.warm - 0.05) < 1e-9);
+  assert.ok(Math.abs(high.warm - 0.21) < 1e-9);
+  assert.ok(stageLightFor(0.5).warm <= 0.21 && stageLightFor(1).cool >= 0.05, '两层都保持克制的不透明度');
+});
+
+test('stageLightFor: 越界夹取、脏输入降级中性', () => {
+  assert.equal(stageLightFor(-1).warm, stageLightFor(0).warm);
+  assert.equal(stageLightFor(2).warm, stageLightFor(1).warm);
+  const mid = stageLightFor(0.5);
+  assert.deepEqual(stageLightFor(NaN), mid, 'NaN → 中性');
+  assert.deepEqual(stageLightFor(undefined), mid);
+  assert.deepEqual(stageLightFor('x'), mid);
 });

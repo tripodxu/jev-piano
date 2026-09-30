@@ -6,7 +6,7 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine } from './ui.js';
+import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor } from './ui.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { barHarmonyFit, NCT_ZH } from './nct.js';
 import { planTargetSeries, tempoMultAt } from './candidates.js';
@@ -21,7 +21,7 @@ const els = {
   fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), decisionLog: $('decisionLog'),
   fnRibbon: $('fnRibbon'), logEmpty: $('logEmpty'),
   tensionCanvas: $('tensionCanvas'), tensionStat: $('tensionStat'),
-  motifCanvas: $('motifCanvas'), repStat: $('repStat'),
+  motifCanvas: $('motifCanvas'), repStat: $('repStat'), stageWarm: $('stageWarm'), stageCool: $('stageCool'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
   settingsBtn: $('settingsBtn'), settingsDrawer: $('settingsDrawer'), settingsClose: $('settingsClose'),
   legendBtn: $('legendBtn'), legendDrawer: $('legendDrawer'), legendClose: $('legendClose'),
@@ -218,7 +218,12 @@ async function start() {
       pushFnSegment(els.fnRibbon, bar, plan.sections);
       els.logEmpty.classList.add('hidden');
       // 张力对照带：逐小节长出实际张力，并给出可读读数
-      tensionGraph.push(barTension(bar));
+      const tension = barTension(bar);
+      tensionGraph.push(tension);
+      // 舞台灯光随张力呼吸（纯氛围层，信息仍有文字/形状通道）
+      const light = stageLightFor(tension);
+      els.stageWarm.style.opacity = light.warm;
+      els.stageCool.style.opacity = light.cool;
       // hover 读数的元数据：当前小节的和弦与实际速度
       tensionGraph.pushMeta({ chord: bar.chord.symbol, speed: barSpeed });
       const st = tensionStats(tensionGraph.actual);

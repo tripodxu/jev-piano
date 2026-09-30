@@ -239,7 +239,14 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .badge.dim, .badge.dim * { color: var(--text-faint); border-color: var(--line); }
 
 /* ============================ 舞台 ============================ */
+.stage-light {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  transition: opacity 1.4s ease;
+}
+.stage-light.warm { background: radial-gradient(120% 80% at 50% -12%, rgba(216, 171, 92, 0.55), transparent 58%); mix-blend-mode: screen; }
+.stage-light.cool { background: radial-gradient(130% 90% at 50% 118%, rgba(133, 184, 174, 0.45), transparent 55%); mix-blend-mode: screen; }
 .stage {
+  position: relative; /* 灯光层（.stage-light）的定位基准 */
   border: 1px solid var(--line); border-radius: var(--r-panel); overflow: hidden;
   background:
     radial-gradient(90% 120% at 50% 0%, rgba(216, 171, 92, 0.1), transparent 55%),
@@ -626,7 +633,13 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   .fnseg { flex: 1 0 22px; }        /* 窄屏下更窄的一段，宁可横滚也不挤压 */
   .fn-ribbon { justify-content: flex-end; }
   .keyboard { height: 100px; }
-  .stage { height: clamp(400px, calc(100vh - 190px), 560px); }
+  .stage-light {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  transition: opacity 1.4s ease;
+}
+.stage-light.warm { background: radial-gradient(120% 80% at 50% -12%, rgba(216, 171, 92, 0.55), transparent 58%); mix-blend-mode: screen; }
+.stage-light.cool { background: radial-gradient(130% 90% at 50% 118%, rgba(133, 184, 174, 0.45), transparent 55%); mix-blend-mode: screen; }
+.stage { height: clamp(400px, calc(100vh - 190px), 560px); }
   .console { padding: 16px 16px; }
   .programme { padding: 14px 16px 8px; max-height: 400px; }
 }

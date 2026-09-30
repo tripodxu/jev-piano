@@ -5,6 +5,14 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-09-30 · 舞台灯光随张力呼吸（迭代轮次 31 · 创意）
+
+- **做了什么**（计划 [docs/superpowers/plans/2026-09-30-stage-light.md](docs/superpowers/plans/2026-09-30-stage-light.md)）：午夜音乐厅的**舞台本身**第一次对音乐起反应——张力升起时顶部黄铜顶光变暖变亮（warm 0.05→0.21），回落时底部冷青地光透出（cool 0.16→0.06），小节间 1.4s 的透明度渐变就是「呼吸」。`stageLightFor(tension)` 纯函数（脏输入降级中性 0.5）；两个 `aria-hidden` 灯光层 `mix-blend-mode: screen` 叠在舞台上（id 契约 87→**89**）；main.js 复用已算的 `barTension` 设透明度——**零新增计算**。测试 148→**150**。
+- **克制**（delight 判据）：上界 ≤0.21（氛围不抢戏）；不承载任何必须读到的信息（张力数值仍走张力带+hover 文字通道）；`prefers-reduced-motion` 由既有全局豁免覆盖。
+- **坑**：`.stage` 没有 `position: relative`——绝对定位的灯光层会锚到错误的祖先。**给容器加绝对定位子元素前，先确认容器自己是定位基准**。
+- **反思**：氛围层与信息层的分界线是「闭上眼睛少一半信息吗」——灯光闭眼后什么都不丢，所以它是纯氛围；张力数值闭眼后丢了，所以它必须留在文字通道里。这个判据比「会不会好看」更可操作。
+- **下一步**（迭代轮次 32 · 优化）：性能/内存审计（Fall notes 上限、audio voices、tensionCache、undo 栈的 JSON.stringify）。
+
 ## [完成] 2026-09-30 · 响应式/可访问性审计（迭代轮次 30 · 前端）
 
 - **做了什么**（skill `impeccable detect` 全量扫描 51 条告警 → 甄别修复 5 处真实问题，49 条保留）：① 进度条 `transition: width` → `transform: scaleX`（布局抖动→合成器动画，studio.js 同步改 transform）；② 抽屉焦点管理——打开移焦到关闭钮、**Esc 关闭**、关闭后焦点回到触发钮（此前键盘用户关闭抽屉后焦点凭空消失）；③ 风格 chips 的 `role="radiogroup"` 补齐 `role="radio"` + `aria-checked`（点击时与视觉选中态同步）；④ `.now-bar` 长读数行的 0.14em 宽字距降到 0.05em（宽字距按规则只留给短标签；`.tab`/`.lbl`/`.badge` 的短标签用例合法保留）；⑤ 其余 44 条按轮次 3 的甄别保留（40 条 CSS 变量假配对、黄铜光晕=舞台顶光、琴毡木纹）。
