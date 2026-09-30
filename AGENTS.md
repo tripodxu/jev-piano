@@ -66,13 +66,14 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | `midi.js` | 77 | SMF Type-1 双轨导出 | 字节格式有单测 |
 | `ui.js` | 681 | 键盘 DOM、下落音符 canvas、**和声功能轨**、**张力对照带**（`TensionGraph`）、**段落标注**、**动机卡**（`MotifCard`/`motifShape`）、**图例**（`LEGEND_ITEMS`/`renderLegend`）、决策日志、计划卡、toast | 功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；**颜色归功能、形态归手法**；段落/手法标注都必须有文字通道；**`LEGEND_ITEMS` 必须与真实标记同源**（标记改了图例没改，比没图例更糟，有测试守）；canvas 渲染用 setInterval 而非 rAF |
 | `main.js` | 396 | 实时即兴接线：设置持久化、渠道探测、开始/停止/导出、张力/功能轨/动机卡喂数、**图例抽屉开合与「不再提示」记忆** | 元素 id 契约见 `index.html` |
-| `studio.js` | 952 | 工作室界面：批量生成 job、钢琴卷帘编辑（**头部含张力曲线 + 功能带 + 契合度带**）、量化 + 力度轨、Jev 路由的自然语言修改、JSON 导入导出 | 确定性编辑纯函数有单测；卷帘头部四段与音符区**共用 `ZOOM`**；**力度轨与卷帘同在 `.rollwrap` 内，播放头 `top:0/bottom:0` 自动覆盖两条轨——不要另建同步**；张力与 `nonChordIds` 两份缓存都在 `invalidateTension()` 里作废 |
+| `studio.js` | 773 | 工作室界面：批量生成 job、钢琴卷帘编辑（**头部含张力曲线 + 功能带 + 契合度带**）、量化 + 力度轨、Jev 路由的自然语言修改、JSON 导入导出 | 确定性编辑纯函数有单测；卷帘头部四段与音符区**共用 `ZOOM`**；**力度轨与卷帘同在 `.rollwrap` 内，播放头 `top:0/bottom:0` 自动覆盖两条轨——不要另建同步**；张力与 `nonChordIds` 两份缓存都在 `invalidateTension()` 里作废 |
 | `settings.js` | 21 | localStorage 设置读写（含 `legendHintOff`：图例提示记不记） | — |
 
 ### 分析层
 
 | 文件 | 行数 | 职责 | 修改高危区 |
 |---|---|---|---|
+| `studio-core.js` | 209 | **工作室纯函数层**（轮次 38 拆出）：确定性编辑变换、自然语言→编辑命令、项目 JSON 校验、时间轴分析；studio.js 对其再导出（对外契约不变） |
 | `tension.js` | 76 | **音乐张力分析**（只读已生成的小节，不参与决策）：`shapeTension` 音程不协和度、`barTension` 五分量加权、`smooth`/`tensionStats` | 与决策层**无耦合**——`FUNCTION_TENSION` 是分析用的另一张表，别和 `candidates.js` 的 `FN_NEXT`（决策用）混；脏输入必须降级而非抛错。**「计划弧线」由 `candidates.js` 的 `planTargetSeries` 提供**（它描述计划而非已生成的音乐，放在这里会造成反向耦合） |
 | `nct.js` | 53 | **非和声音分析**（只读）：`classifyNote` 按「进出方式」分和弦音/经过音/邻音/倚音（Kostka-Payne 判据）、`barHarmonyFit`、`harmonySummary` | **pc 是音级类 0..11 不是 midi**——传错会让「和弦音 0%」这种荒谬结果出现；首尾音无邻居一律 `other`（把「4→5」判成经过音是错的）；脏输入降级为 `other` 绝不抛错 |
 
