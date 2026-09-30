@@ -55,10 +55,12 @@ const W_FN = 0.8;
 // 色板条目的基础权重：低于进行池的 1.0（保住曲风身份），但高到能凭平滑度/功能加分挤进候选
 const W_PALETTE = 0.8;
 
-/** 第 7 问的候选：下一小节该选哪个和声功能（不硬过滤和弦，只作语义提示与回落依据） */
-export function functionCandidates(plan, curFn, isPhraseEnd, barInPhrase) {
+/** 第 7 问的候选：下一小节该选哪个和声功能（不硬过滤和弦，只作语义提示与回落依据）
+ *  opts.openEnd = 问句尾（antecedent 的半终止）：偏属开放、缓收主——「停在看家的路上」。 */
+export function functionCandidates(plan, curFn, isPhraseEnd, barInPhrase, opts = {}) {
   const base = { ...(FN_NEXT[curFn] ?? FN_NEXT.T) };
-  if (isPhraseEnd) { base.T += 1.0; base.D += 0.5; base.S *= 0.4; base.Tp *= 0.4; }
+  if (opts.openEnd) { base.D += 0.8; base.T += 0.2; base.S *= 0.5; } // 问句尾：停在路上（独立于 isPhraseEnd）
+  else if (isPhraseEnd) { base.T += 1.0; base.D += 0.5; base.S *= 0.4; base.Tp *= 0.4; } // 答句尾：回家
   if (barInPhrase === 0) base.T += 0.6;
   const out = {};
   for (const [k, v] of Object.entries(base)) if (v > 0) out[k] = { w: v, desc: HARMONIC_FUNCTIONS[k] };
@@ -126,6 +128,11 @@ export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEn
     if (!isPhraseEnd && (curSym.shape === '' || curSym.shape === 'm')) {
       subs.push({ sym: ROMAN_BY_PC[curSym.rootPc] + '7sus4', weight: 1.0, sub: true, desc: 'suspend the current harmony, floating tension' });
     }
+    if (opts.openEnd) {
+      // 问句尾的替换候选（轮次 14 的结论：池内加权撬不动风格身份，替换候选才进得了场）：
+      // 属悬挂是古典半终止的「问号」——它停在属功能上、又不给出解决，等答句来收。
+      subs.push({ sym: 'V7sus4', weight: 2.5, sub: true, desc: 'half cadence: dominant suspension, the question mark before the answer' });
+    }
     if (barInPhrase <= 1 && plan.mode === 'major') {
       subs.push({ sym: 'VIIø', weight: 0.9, sub: true, desc: 'leading-tone half-diminished, pulling to the tonic' });
     }
@@ -145,7 +152,14 @@ export function chordCandidates(style, plan, currentSym, barInPhrase, isPhraseEn
       if (banned(p.rootPc)) continue; // 根音疲劳 / 循环锁死：近期用滥或在环上的根音不可表示
       let weight = w;
       if (barInPhrase === 0 && p.rootPc === 0) weight += 0.6;
-      if (isPhraseEnd && (p.rootPc === 7 || p.rootPc === 0)) weight += 1.0;
+      // 乐句问答（轮次 23）：问句尾（openEnd，乐句中点 barInPhrase===3）半终止——属加分、主罚分，
+      // 「停在看家的路上」；答句尾（乐句末）全终止——V/I 收束（原行为）。
+      // 注意 openEnd 必须独立于 isPhraseEnd 判定：问句尾不在乐句末，套在 isPhraseEnd 里就是死参数。
+      // 力度经重放模拟扫描（V+2/I−2/sub3 可达 31.7% 但机械化风险大，取折中）。
+      if (opts.openEnd) {
+        if (p.rootPc === 7) weight += 1.5;
+        else if (p.rootPc === 0) weight -= 1.5;
+      } else if (isPhraseEnd && (p.rootPc === 7 || p.rootPc === 0)) weight += 1.0;
       // 段落边界比乐句边界更强：新段落重新立足（T），段落收束用更确定的终止式
       if (opts.sectionStart && p.rootPc === 0) weight += 1.0;
       if (opts.sectionEnd && (p.rootPc === 7 || p.rootPc === 0)) weight += 0.8;

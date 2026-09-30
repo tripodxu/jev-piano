@@ -319,3 +319,21 @@ test('tempoMultAt: 脏输入降级不抛错（旧计划/越界/NaN）', () => {
   assert.equal(tempoMultAt(secs, 99), tempoMultAt(secs, 31), '越界夹取到末小节');
   assert.ok(Number.isFinite(tempoMultAt({ totalBars: 'x', sections: 'y' }, 'z')));
 });
+
+/* ---------------- 乐句问答（轮次 23 · antecedent/consequent） ---------------- */
+
+test('chordCandidates: 问句尾（openEnd）偏向属和弦、压制主和弦——半终止可以表示', () => {
+  const recent = [0, 3, 8, 5, 10, 2]; // 6 个不同根音，不触发锁死
+  const base = chordCandidates(STYLE_BY_ID.romantic, MINOR_PLAN, 'i', 7, true, null, recent, {});
+  const open = chordCandidates(STYLE_BY_ID.romantic, MINOR_PLAN, 'i', 7, true, null, recent, {}, { openEnd: true });
+  const wOf = (list, root) => list.find((c) => c.rootPc === root)?.weight ?? -99;
+  assert.ok(wOf(open, 7) > wOf(base, 7), '问句尾属和弦权重应更高');
+  assert.ok(wOf(open, 0) < wOf(base, 0), '问句尾主和弦权重应更低');
+});
+
+test('functionCandidates: 问句尾偏属开放，答句尾偏主收束', () => {
+  const q = functionCandidates(MINOR_PLAN, 'T', true, 7, { openEnd: true });
+  const a = functionCandidates(MINOR_PLAN, 'T', true, 7, {});
+  assert.ok(q.D.w > a.D.w, '问句尾 D 权重更高');
+  assert.ok(q.T.w < a.T.w, '问句尾 T 权重更低（不急着回家）');
+});

@@ -559,13 +559,20 @@ export class Composer {
     const secHere = sectionAt(plan.sections, this.index);
     const sectionStart = !!secHere && secHere.start === this.index;
     const sectionEnd = !!secHere && secHere.start + secHere.bars - 1 === this.index;
-    const cands = chordCandidates(this.style, plan, this.currentSymRoman, pos.barInPhrase, pos.isPhraseEnd, this.lastPhraseFirst, recentRoots, this.rootFatigue, { sectionStart, sectionEnd });
+    // 乐句问答（轮次 23，古典 period 结构）：每个 8 小节乐句 = **前四小节问 + 后四小节答**。
+    // barInPhrase===3 是问句尾（半终止：偏属开放、「停在看家的路上」）；barInPhrase===7 是答句尾
+    // （全终止：V/I 收束，原行为）。段落语义与之分层：段落末（乐句尾）收束更强，段落首照常立足。
+    // 32 小节的曲式是 4 段 × 1 乐句，问句只可能住在乐句内部——这正是把它放在 bar 3 而不是
+    // 「奇数乐句尾」的原因：那样它与段落收束在每一段都撞车（首轮实现被自己的测试抓住）。
+    const isQuestionEnd = pos.barInPhrase === plan.barsPerPhrase / 2 - 1;
+    const openEnd = isQuestionEnd;
+    const cands = chordCandidates(this.style, plan, this.currentSymRoman, pos.barInPhrase, pos.isPhraseEnd, this.lastPhraseFirst, recentRoots, this.rootFatigue, { sectionStart, sectionEnd, openEnd });
     // 第 7 问「和声功能」：模型先说下一小节要往哪个功能走（语义先于音名），
     // 和弦仍在候选集内选——功能**不做硬过滤**（同一请求里无法先问功能再问和弦，
     // 硬过滤会让模型自己的合法作答被前置问题判死）。它的三个用途：语义语境、
     // 非法作答时的族内回落、UI 可读维度。
     const curFn = this.currentSymRoman ? (functionOf(this.currentSymRoman, plan.mode) ?? 'T') : 'T';
-    const fnCands = functionCandidates(plan, curFn, pos.isPhraseEnd, pos.barInPhrase);
+    const fnCands = functionCandidates(plan, curFn, pos.isPhraseEnd, pos.barInPhrase, { openEnd });
 
     // 左手：连续同织体衰减 + 导演指示偏置
     const lastLh = this.history.at(-1)?.decision.lh ?? null;
@@ -808,6 +815,7 @@ export class Composer {
         // 归因字段（ADR-0003）：断路器是否锁死、模型答案是否被候选集强制拒绝、功能层结果
         loopLocked, rejected: !picked,
         fn: declaredFn,
+        phraseRole: isQuestionEnd ? 'question' : pos.isPhraseEnd ? 'answer' : null,
         chordFn: chordP.fn ?? functionOf(chordSymRaw, plan.mode),
         answers: ans, candidates: Object.keys(questions.chord.criteria),
       },
