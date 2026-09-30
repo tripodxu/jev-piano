@@ -1,7 +1,8 @@
 // src/worker.js — Cloudflare Worker：静态资产 + 三个 API。
 // Jev 决策后端按序链式降级：Workers AI 绑定（env.AI，零 key）→ TYPESAFE_API_KEY → OPENROUTER_API_KEY。
 // /api/llm 只转发服务端 env 配置的端点（刻意不做开放中继，防 SSRF）。
-// 两个 API 共享每 IP 限流（isolate 内存，尽力而为）：RATE_LIMIT_PER_MIN，默认 30。
+// 两个 API 共享每 IP 限流（isolate 内存，尽力而为）：RATE_LIMIT_PER_MIN，默认 90——
+// 实时演奏每小节一次请求（140 BPM ≈ 35 次/分钟），30 没有余量。
 
 const json = (obj, status = 200, extra = {}) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json', ...extra } });
@@ -60,7 +61,7 @@ export default {
       return json({ ok: true, jev, llm });
     }
     const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-    const limit = Number(env.RATE_LIMIT_PER_MIN ?? 30);
+    const limit = Number(env.RATE_LIMIT_PER_MIN ?? 90);
     if (limiter.check(ip, limit)) return json({ error: 'rate limited, retry in a minute' }, 429, { 'Retry-After': '60' });
 
     if (url.pathname === '/api/jev' && request.method === 'POST') return handleJev(request, env);
@@ -69,7 +70,9 @@ export default {
   },
 };
 
-/** Workers AI 绑定；失败抛错由调用方链式降级 */
+/** Workers AI 绑定；失败抛错由调用方链式降级。
+ *  aiBroken：本 isolate 内已知该账号没有 jev 模型（部署账号实测 5007），跳过以免每拍白撞 */
+let aiBroken = false;
 async function jevViaAI(env, body) {
   const raw = await env.AI.run('@cf/typesafe/jev', { state: body.state, questions: body.questions });
   return { model: raw?.model ?? 'jev', answers: raw?.answers ?? raw, usage: raw?.usage ?? {} };
@@ -92,7 +95,7 @@ async function handleJev(request, env) {
   if (invalid) return json({ error: invalid }, invalid.includes('过大') ? 413 : 422);
 
   const backends = [];
-  if (env.AI) backends.push(['workers-ai', () => jevViaAI(env, body)]);
+  if (env.AI && !aiBroken) backends.push(['workers-ai', () => jevViaAI(env, body)]);
   if (env.TYPESAFE_API_KEY) backends.push(['typesafe', () => jevViaHTTP('https://api.typesafe.ai/v1/systemone', 'jev-latest', env.TYPESAFE_API_KEY, body)]);
   if (env.OPENROUTER_API_KEY) backends.push(['openrouter', () => jevViaHTTP('https://openrouter.ai/api/v1/systemone', 'typesafe/jev-1.13', env.OPENROUTER_API_KEY, body)]);
 
@@ -106,6 +109,9 @@ async function handleJev(request, env) {
       return json({ ...out, backend: name });
     } catch (e) {
       lastErr = e;
+      // AI 失败记忆（2026-09-30 线上实弹）：模型不存在（5007）时每个 isolate 记住，
+      // 不再逐小节白撞一次——失败调用既加延迟也烧限流配额
+      if (name === 'workers-ai' && /no such model|5007/i.test(String(e?.message ?? ''))) aiBroken = true;
     }
   }
   return json({ error: 'all jev backends failed: ' + String(lastErr?.message ?? lastErr) }, 502);
