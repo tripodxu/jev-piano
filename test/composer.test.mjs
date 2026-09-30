@@ -455,7 +455,8 @@ const sigOfBarL = (b) => b.notes.filter((n) => n.hand === 'L').map((n) => Math.r
 
 test('全曲级指纹记忆：64 小节内旋律/左手不再有远距离字面复读（护栏记忆扩展到全曲）', async () => {
   let melDup = 0, lhDup = 0, total = 0;
-  for (const seed of [2026, 2027, 2028]) {
+  // 首音锚定（真渠道修复）级联后 3 颗种子测得 3.1%，压着 3% 门槛——6 颗稳住均值
+  for (const seed of [2026, 2027, 2028, 2029, 2030, 2031]) {
     const { composer } = await makeComposer({ styleId: 'romantic', seed, bars: 64 });
     const mel = new Map(), lh = new Map();
     for (let i = 0; i < 64; i++) {
@@ -470,4 +471,59 @@ test('全曲级指纹记忆：64 小节内旋律/左手不再有远距离字面�
   // 基线（护栏只记最近 2 小节）：12 种子实测 旋律 10.2% / 左手 21.0%；修复后应趋近 0
   assert.ok(melDup / total < 0.03, `远距离旋律字面重复 ${(melDup / total * 100).toFixed(1)}% 应 <3%`);
   assert.ok(lhDup / total < 0.03, `远距离左手字面重复 ${(lhDup / total * 100).toFixed(1)}% 应 <3%`);
+});
+
+/* ---------------- 真渠道回归（轮次 29 前的实地测试发现）：连续承袭不产生相邻字面重复 ---------------- */
+
+test('真渠道回归复现：连续 repeat+breathe+换和弦（无强拍动机）绝不产生相邻字面重复', async () => {
+  // 2026-09-30 实地测试：真实 Jev 连续 6 小节回答 repeat+breathe，动机无强拍 →
+  // buildFromMotif 完全不锚定、逐小节原样输出，变形空间耗尽后兜底「删末音」
+  // 返回的已是存档形式 → 4 个相邻小节字面相同（melody_adjacent_repeat=6）。
+  const { composer } = await makeComposer({ styleId: 'romantic', seed: 5 });
+  await composer.nextBar(); await composer.nextBar(); // 动机诞生
+    // 渲染后 onsets = [1.25, 1.75, 3, 3.5]（真渠道形状，加 shift 0.5 后无一落在强拍）
+  composer.motif = { rhythmId: 'r1', contourId: 'fall', pattern: { on: [5, 7, 12, 14], tier: 0 }, midis: [80, 77, 75, 72], onsets: [0.75, 1.25, 2.5, 3] };
+  const chords = ['G7sus4', 'G', 'Fm', 'D7', 'Cm', 'Ab'];
+  let k = 0;
+  composer._decide = async () => ({
+    answers: {
+      function: { value: 'D' }, chord: { value: chords[k % chords.length] },
+      lh: { value: 'arp' }, rhythm: { value: 'r1' }, contour: { value: 'fall' },
+      intensity: { value: 2 }, breathe: { value: true }, develop: { value: 'repeat' },
+    }, inputTokens: 0, usd: 0, ms: 1, fixture: false, provider: 'stub',
+  });
+  const sig = (ns) => ns.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
+  let prev = null, adjDup = 0;
+  for (let i = 0; i < 20; i++, k++) {
+    const b = await composer.nextBar();
+    const s = sig(b.notes.filter((n) => n.hand === 'R'));
+    if (prev === s) adjDup++;
+    prev = s;
+  }
+  assert.equal(adjDup, 0, `连续承袭下出现 ${adjDup} 个相邻字面重复`);
+});
+
+test('mutateMelody 耗尽契约：变形空间逐轮耗尽后，只允许「逃逸」或「返回原样」，绝不返回其他已存变体', async () => {
+  const { mutateMelody } = await import('../public/js/render.js');
+  const { scaleMidis } = await import('../public/js/music.js');
+  const sig = (ns) => ns.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
+  const rh = [
+    { midi: 80, startBeats: 1.25 }, { midi: 77, startBeats: 1.75 },
+    { midi: 75, startBeats: 3 }, { midi: 72, startBeats: 3.5 },
+  ];
+  const scale = scaleMidis(0, 'minor', 58, 86);
+  const seen = new Set([sig(rh)]); // 原形式已存档（这正是真渠道的场景：连续承袭逐轮耗尽变形空间）
+  let rng = 0.31;
+  let exhausted = false;
+  for (let r = 0; r < 60; r++) {
+    const out = mutateMelody(rh, { scale, rng: () => (rng = (rng * 9301 + 49297) % 233280 / 233280), avoid: [...seen], post: (x) => x });
+    if (seen.has(sig(out))) {
+      // 耗尽：只允许诚实返回原样——返回任何「其他已存变体」都是旧实现的静默撞车
+      assert.equal(sig(out), sig(rh), `第 ${r} 轮耗尽时返回了非原样的已存变体 ${sig(out)}`);
+      exhausted = true;
+      break;
+    }
+    seen.add(sig(out));
+  }
+  assert.ok(exhausted, '60 轮内应耗尽变形空间（否则此测试没测到目标路径）');
 });

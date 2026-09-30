@@ -110,8 +110,15 @@ export function mutateMelody(rh, { scale, rng, avoid = [], post = (x) => x }) {
     const out = attempt((ns) => ns.map((n) => ({ ...n, midi: clamp(n.midi + d, 60, 84) })));
     if (out) return out;
   }
-  // 极端兜底：全体已被 clamp 压到同一音高时，删掉末音改变签名长度（仍不保证，但不再返回撞车原样）
-  return rh.length > 1 ? post(rh.slice(0, -1)) : post(rh);
+  // 极端兜底（2026-09-30 实地测试修正）：变形空间被全曲指纹耗尽时——
+  // 旧实现固定「删末音」，但那个形式可能早已存档（真渠道连续承袭 6 小节后，
+  // 4 个相邻小节都返回了同一个已存档的删末音形式）。现在逐音枚举删除，
+  // 取第一个不撞已存指纹的；全部撞车则诚实返回原样（由 farRepeat 归因标记）。
+  for (let i = rh.length - 1; i > 0; i--) {
+    const cand = post(rh.slice(0, i).concat(rh.slice(i + 1)));
+    if (!blocked(cand)) return cand;
+  }
+  return post(rh);
 }
 
 /** 音高序列 → 相邻音程序列（给模型看的动机描述） */
@@ -183,7 +190,10 @@ export function buildFromMotif(motif, { chord, scale, meterNum, intensity, isPhr
     // 强拍锚到和弦音，但**本来就在和弦里的音不动**——没必要为了"合规"改掉动机的轮廓。
     // 末音只在**乐句尾**锚定（第 1 轮的设计如此）：每小节都锚会把动机的最后一个音拽走 7 个半音，
     // 「呼吸」延后之后尤其明显——那正是"承袭却不像动机"的元凶。
-    const anchor = onsets[k] % 4 === 0 || (isPhraseEnd && k === midis.length - 1);
+    // 首音锚定（2026-09-30 实地测试补的第三种锚点）：动机无任何强拍时（如带呼吸延后的短句），
+    // 承袭会逐小节原样输出同一旋律——「同一想法，新的和声」退化成「同一想法，句号」。
+    // 延后进入的第一音就是重述的落点，锚到当前和弦让承袭真正跟随和声。
+    const anchor = onsets[k] % 4 === 0 || k === 0 || (isPhraseEnd && k === midis.length - 1);
     if (anchor && !pool.includes(midi)) midi = nearest(midi, pool);
     return { midi, startBeats: onsets[k], durBeats: 0, vel: velFor(Math.round(onsets[k] * 4), intensity, rng), hand: 'R' };
   });
