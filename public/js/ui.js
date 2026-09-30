@@ -430,6 +430,24 @@ export function fnSegClass(bar) {
 export const PHRASE_ROLE_ZH = { question: '问', answer: '答' };
 const PHRASE_ROLE_FULL = { question: '问句·半终止（悬而未决）', answer: '答句·全终止（收束回家）' };
 
+/** 决策概率条（轮次 33）：把 Jev 对某个 choice 问题的概率分布画成微型条形。
+ *  「每个音符可溯源」的延伸——溯源不止「它选了什么」，还有「它在什么之间犹豫」。
+ *  脏输入/缺省返回空串（整行不输出）；sym 一律转义；取概率最高的前 max 个。 */
+export function probabilityStrip(probabilities, picked, { max = 3 } = {}) {
+  if (!probabilities || typeof probabilities !== 'object') return '';
+  const entries = Object.entries(probabilities)
+    .filter(([, p]) => Number.isFinite(p))
+    .map(([sym, p]) => ({ sym: String(sym), p: Math.min(1, Math.max(0, p)) }))
+    .sort((a, b) => b.p - a.p)
+    .slice(0, Math.max(1, max));
+  if (!entries.length) return '';
+  return entries.map(({ sym, p }) => {
+    const pct = Math.round(p * 100);
+    const pick = sym === picked ? ' prob-pick' : '';
+    return `<span class="pb${pick}" title="${escapeHtml(sym)} ${pct}%"><i style="width:${pct}%"></i><b>${escapeHtml(sym)}</b><small>${pct}%</small></span>`;
+  }).join('');
+}
+
 export function addDecision(ul, bar) {
   const d = bar.decision;
   ul.querySelectorAll('.fresh').forEach((el) => el.classList.remove('fresh'));
@@ -460,6 +478,9 @@ export function addDecision(ul, bar) {
     `${guards}` +
     `</span>` +
     `<span class="log-stats">${stats}</span>`;
+  // 概率条：真渠道返回分布时展示「模型在什么之间犹豫」；离线随机渠道没有分布，整行不输出
+  const strip = probabilityStrip(d.answers?.chord?.probabilities, d.answers?.chord?.value);
+  li.innerHTML = li.innerHTML + (strip ? `<div class="prob-strip">${strip}</div>` : ''); // 靠 li 的 flex-wrap 换行
   ul.prepend(li);
   ul.scrollTop = 0; // 最新一条始终在顶部可见（抵消浏览器滚动锚定）
   while (ul.children.length > 60) ul.lastChild.remove();

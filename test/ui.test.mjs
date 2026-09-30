@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -209,4 +209,25 @@ test('stageLightFor: 越界夹取、脏输入降级中性', () => {
   assert.deepEqual(stageLightFor(NaN), mid, 'NaN → 中性');
   assert.deepEqual(stageLightFor(undefined), mid);
   assert.deepEqual(stageLightFor('x'), mid);
+});
+
+/* ---------------- 决策概率可视化（轮次 33 · 创意） ---------------- */
+
+test('probabilityStrip: 按概率降序取前三，选中项带标记，条宽是百分数', () => {
+  const html = probabilityStrip({ i: 0.93, V: 0.01, 'iiø': 0.02, bVI: 0.02, bIII: 0.01, bVII: 0, iv: 0.01 }, 'i');
+  assert.ok(html.includes('i'), '应含最高候选');
+  assert.ok(html.indexOf('iiø') < html.indexOf('bVI'), '同概率按原序稳定');
+  assert.ok(!html.includes('bIII'), '只取前三');
+  assert.ok(html.includes('93%'), '百分比文本');
+  assert.ok(html.includes('width:93%'), '条宽=百分数');
+  assert.ok(html.includes('prob-pick'), '选中项有标记');
+});
+
+test('probabilityStrip: 脏输入降级为空串（整行不输出）；sym 一律转义', () => {
+  assert.equal(probabilityStrip(null, 'i'), '');
+  assert.equal(probabilityStrip({}, 'i'), '');
+  assert.equal(probabilityStrip({ a: NaN }), '');
+  const html = probabilityStrip({ '<img>': 0.5, b: 0.3 }, '<img>');
+  assert.ok(!html.includes('<img>'), 'sym 必须转义');
+  assert.ok(html.includes('&lt;img&gt;'));
 });

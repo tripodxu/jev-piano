@@ -445,7 +445,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .programme-sub { font: 400 12px/1 var(--sans); color: var(--text-faint); letter-spacing: 0.1em; }
 .dlog { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: var(--ink-3) transparent; }
 .dlog li {
-  display: flex; align-items: baseline; gap: 13px;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 13px;
   padding: 8px 10px 8px 14px; position: relative;
   border-left: 2px solid transparent;
   animation: logIn .4s cubic-bezier(.16,1,.3,1);
@@ -648,6 +648,20 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   .pill { padding: 2px 9px; font-size: 11px; }
   .log-stats { display: none; }
 }
+
+/* 决策概率条：模型在什么之间犹豫（微型条形 + 文本，不依赖颜色） */
+.prob-strip {
+  display: flex; flex-basis: 100%; gap: 10px; margin: 2px 0 0; padding-left: 44px;
+  font: 400 9px/1 var(--mono); color: var(--text-faint);
+}
+.prob-strip .pb { position: relative; display: inline-flex; align-items: center; gap: 4px; }
+.prob-strip .pb i {
+  display: block; height: 4px; min-width: 1px; border-radius: 1px;
+  background: var(--brass-lo); opacity: .55;
+}
+.prob-strip .pb.prob-pick i { background: var(--brass-hi); opacity: 1; }
+.prob-strip .pb.prob-pick b { color: var(--brass-hi); }
+.prob-strip .pb small { letter-spacing: .04em; }
 
 /* ============================ 动效豁免 ============================ */
 @media (prefers-reduced-motion: reduce) {
