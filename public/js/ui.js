@@ -361,6 +361,8 @@ export const LEGEND_ITEMS = [
   { group: '发展手法（功能轨上的字）', label: '倒', swatch: '', desc: '倒影：把刚才那句的音程镜像' },
   { group: '发展手法（功能轨上的字）', label: '装', swatch: '', desc: '装饰：给刚才那句加经过音' },
   { group: '发展手法（功能轨上的字）', label: '新句', swatch: '', desc: '全新想法——唯一不使用动机的手法，所以没有标记' },
+  { group: '乐句语气（功能轨上的字）', label: '问', swatch: 'qa', desc: '问句·半终止——和声停在属功能和弦上悬而未决，等下一句来回答' },
+  { group: '乐句语气（功能轨上的字）', label: '答', swatch: '', desc: '答句·全终止——乐句在此收束、回到主和弦' },
   { group: '断路器与守卫（功能轨上的形状）', label: '断路', swatch: 'lock', desc: '循环锁死断路器触发：这一小节把在绕圈的根音剔出了候选' },
   { group: '断路器与守卫（功能轨上的形状）', label: '驳回', swatch: 'rej', desc: '模型答了候选集之外的和弦，已按候选集强制回落' },
   { group: '结构（各处的虚线与名字）', label: '段落', swatch: 'sec', desc: 'A 陈述 / B 对比 / A′ 再现 / Coda 收束，虚线竖线是段落边界' },
@@ -396,12 +398,18 @@ export function fnLabel(fn) {
   return FN_ZH[fn] ?? fn ?? '';
 }
 
-/** 功能轨一格的类名：颜色与断路器标记都挂在 data 属性上，样式全在 CSS */
+/** 功能轨一格的类名：颜色与断路器标记都挂在 data 属性上，样式全在 CSS。
+ *  qa-q/qa-a = 乐句语气（轮次 23 的 phraseRole）：问=半终止悬而未决，答=全终止收束。 */
 export function fnSegClass(bar) {
   const fn = bar?.decision?.chordFn ?? 'T';
-  return ['fnseg', `fn-${FN_ZH[fn] ? fn : 'T'}`, bar?.decision?.loopLocked ? 'lock' : '', bar?.decision?.rejected ? 'rej' : '']
+  const qa = bar?.decision?.phraseRole === 'question' ? 'qa-q' : bar?.decision?.phraseRole === 'answer' ? 'qa-a' : '';
+  return ['fnseg', `fn-${FN_ZH[fn] ? fn : 'T'}`, qa, bar?.decision?.loopLocked ? 'lock' : '', bar?.decision?.rejected ? 'rej' : '']
     .filter(Boolean).join(' ');
 }
+
+/** 乐句语气的短字（功能轨第三槽）与完整说法（title/日志共用一份，别处禁止再写中文字面量） */
+export const PHRASE_ROLE_ZH = { question: '问', answer: '答' };
+const PHRASE_ROLE_FULL = { question: '问句·半终止（悬而未决）', answer: '答句·全终止（收束回家）' };
 
 export function addDecision(ul, bar) {
   const d = bar.decision;
@@ -424,6 +432,7 @@ export function addDecision(ul, bar) {
     `<span>左手 <b>${escapeHtml(d.lh)}</b></span>` +
     `<span>走向 <span class="q">${escapeHtml(d.contour)}</span></span>` +
     `<span>手法 <span class="q">${DEV_ZH[d.develop] ?? escapeHtml(d.develop ?? '')}</span></span>` +
+    `${d.phraseRole ? `<span class="q">${PHRASE_ROLE_FULL[d.phraseRole]}</span>` : ''}` +
     `<span>密度 ${d.tier}</span>` +
     `<span>强度 <b>${bar.intensity.toFixed(1)}</b></span>` +
     `${d.breathe ? '<span class="q">呼吸</span>' : ''}` +
@@ -571,8 +580,9 @@ export function pushFnSegment(ribbon, bar, sections) {
   const isTheme = dev === 'repeat';           // 「主题回来了」用形状+文字，不靠颜色
   seg.className = fnSegClass(bar) + ' fresh' + (isTheme ? ' theme' : '');
   const fn = bar.decision.chordFn ?? 'T';
-  seg.innerHTML = `<i></i><b>${escapeHtml(fnLabel(fn))}</b><em>${escapeHtml(DEVELOP_ZH[dev] ?? '')}</em>`;
-  seg.title = `第 ${bar.index + 1} 小节 ${bar.label} · ${bar.chord.symbol} · ${fnLabel(fn)}功能 · ${DEV_ZH[dev] ?? dev}`;
+  const qa = PHRASE_ROLE_ZH[bar.decision.phraseRole] ?? '';
+  seg.innerHTML = `<i></i><b>${escapeHtml(fnLabel(fn))}</b><em>${escapeHtml(DEVELOP_ZH[dev] ?? '')}</em><span class="qa">${escapeHtml(qa)}</span>`;
+  seg.title = `第 ${bar.index + 1} 小节 ${bar.label} · ${bar.chord.symbol} · ${fnLabel(fn)}功能 · ${DEV_ZH[dev] ?? dev}${bar.decision.phraseRole ? ` · ${PHRASE_ROLE_FULL[bar.decision.phraseRole]}` : ''}`;
   ribbon.prepend(seg);
   while (ribbon.children.length > RIBBON_MAX + sectionsAt(sections)) ribbon.lastChild.remove();
   ribbon.querySelectorAll('[aria-current]').forEach((el) => el.removeAttribute('aria-current'));

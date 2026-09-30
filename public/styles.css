@@ -306,6 +306,13 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   border: 1px solid var(--brass-hi); border-bottom: none; border-radius: 3px 3px 0 0;
 }
 .fnseg.theme em { color: var(--brass-hi); font-weight: 600; }
+/* 乐句语气：问/答（轮次 23 的 phraseRole）。文字通道为主，
+   「问」额外带一条虚线下划——「悬而未决」的形状线索，不依赖颜色 */
+.fnseg .qa {
+  font: 500 9px/1 var(--sans); letter-spacing: .06em; font-style: normal;
+  color: var(--brass-hi); min-height: 9px; opacity: .9;
+}
+.fnseg.qa-q .qa { border-bottom: 1px dotted var(--brass-hi); padding-bottom: 1px; }
 /* 循环锁死断路器触发：段顶一道细刻线——"这里被切断" */
 .fnseg.lock i::before {
   content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
@@ -532,6 +539,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .lg-sw.fn-D { background: var(--fn-D); } .lg-sw.fn-Tp { background: var(--fn-Tp); }
 .lg-sw.theme { background: var(--brass-hi); box-shadow: 0 0 0 1px var(--brass-hi); }
 .lg-sw.lock { background: var(--brass-hi); }
+.lg-sw.qa { background: transparent; border-bottom: 1px dotted var(--brass-hi); height: 6px; }
 .lg-sw.rej { background: var(--crimson-hi); }
 .lg-sw.sec { background: none; border-top: 2px dashed var(--brass); height: 0; border-radius: 0; }
 .lg-sw.motif { background: none; border-bottom: 2px solid var(--brass); height: 0; border-radius: 0; }

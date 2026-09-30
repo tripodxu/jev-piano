@@ -31,6 +31,13 @@ test('fnSegClass: 功能色类 + 断路器/驳回标记', () => {
   assert.equal(fnSegClass(bar({ loopLocked: true, rejected: true })), 'fnseg fn-T lock rej');
 });
 
+test('fnSegClass: 乐句语气标记（问/答）挂类名，未标记不带类', () => {
+  assert.ok(fnSegClass(bar({ phraseRole: 'question' })).includes('qa-q'), '问句尾应有 qa-q');
+  assert.ok(fnSegClass(bar({ phraseRole: 'answer' })).includes('qa-a'), '答句尾应有 qa-a');
+  assert.ok(!fnSegClass(bar()).includes('qa-'), '普通小节不带语气类');
+  assert.ok(!fnSegClass(bar({ phraseRole: 'weird' })).includes('qa-'), '未知语气不产出类');
+});
+
 test('fnSegClass: 非法/缺失功能一律降级为主功能，绝不产出无色的空类', () => {
   for (const chordFn of [null, undefined, 'X', '', 0]) {
     const cls = fnSegClass(bar({ chordFn }));
@@ -115,7 +122,7 @@ test('LEGEND_ITEMS: 每条都有名字与说明，且覆盖所有真实标记', 
   }
   // 覆盖面：四功能 + 五手法 + 断路器 + 驳回 + 段落 + 动机 + 张力 + 契合度 + 非和弦
   const text = LEGEND_ITEMS.map((i) => `${i.label}${i.desc}`).join('');
-  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '段落', '动机', '张力', '契合', '非和弦']) {
+  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句']) {
     assert.ok(text.includes(kw), `图例缺少「${kw}」的说明`);
   }
 });
