@@ -115,3 +115,29 @@ test('乱序入队回退线性映射，不崩溃', async () => {
   const t = p.barMarks[0].t;
   assert.ok(Math.abs(t - (50 + 12 * p.secPerBeat)) < 1e-9, '回退按恒定 secPerBeat 线性映射');
 });
+
+/* ---------------- 展示层异常不得中断播放（轮次 47）：调度器免疫 onBar/onNote 抛错 ---------------- */
+
+test('onBar 回调抛异常：调度器继续推进，后续小节照常调度', async () => {
+  const h = await makeHarness();
+  const p = await makePlayer(h);
+  p.onBarCb = (bar) => { h.barsSeen.push(bar); if (bar.index >= 1) throw new Error('展示层炸了'); }; // 先记录再抛（第 2 小节起必炸）
+  p.start();
+  await h.advance(9);
+  assert.ok(p.running, '播放器必须还在运行');
+  assert.ok(p.records.length > 0, '音符调度不受影响');
+  const idx = h.barsSeen.map((b) => b.index);
+  assert.ok(idx.length >= 3, `onBar 抛错后应继续触发后续小节: ${idx.length}`);
+  p.stop();
+});
+
+test('onNote/audio.play 抛异常：不中断排程循环', async () => {
+  const h = await makeHarness();
+  const p = await makePlayer(h);
+  p.audio.play = () => { throw new Error('音频节点炸了'); };
+  p.start();
+  await h.advance(9);
+  assert.ok(p.running);
+  assert.ok(p.records.length > 0, 'records 照常记录');
+  p.stop();
+});

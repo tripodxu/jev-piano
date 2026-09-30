@@ -71,19 +71,22 @@ export class Player {
   _tick() {
     if (!this.running) return;
     const horizon = this._now() + LOOKAHEAD;
-    // 1) 小节边界 → UI（当前和弦/决策展示）
+    // 1) 小节边界 → UI（当前和弦/决策展示）。展示层抛错**不得**中断调度——
+    // 2026-09-30 线上「弹到第二小节就停」的候选根因：onBar 里十几处 DOM 操作，
+    // 任何一个异常都会炸掉整个 _tick（setInterval 回调里的异常不清定时器、但吞掉本轮全部调度）。
+    // 红线「播放永不中断」要求把展示层隔离在 try/catch 后面。
     while (this.barMarks.length && this.barMarks[0].t <= this._now()) {
       const mark = this.barMarks.shift();
-      this.onBarCb(mark.bar);
+      try { this.onBarCb(mark.bar); } catch (e) { console.error('[jev] onBar 展示层异常（已跳过，播放不受影响）', e); }
       this.scheduledBars++;
       this.queuedBars = Math.max(0, this.queuedBars - 1);
     }
-    // 2) 到点的音符 → 音频（audio 内部按 t0 精确排程）
+    // 2) 到点的音符 → 音频（audio 内部按 t0 精确排程）。同上：音频节点异常也不得拖垮排程
     while (this.queue.length && this.queue[0].t <= horizon) {
       const ev = this.queue.shift();
-      this.audio?.play?.(ev.midi, ev.t, ev.dur, ev.vel);
+      try { this.audio?.play?.(ev.midi, ev.t, ev.dur, ev.vel); } catch (e) { console.error('[jev] audio.play 异常（跳过该音）', e); }
       this.records.push({ midi: ev.midi, startBeats: ev.beat, durBeats: ev.dur / this.secPerBeat, vel: ev.vel, hand: ev.hand });
-      this.onNoteCb(ev);
+      try { this.onNoteCb(ev); } catch (e) { console.error('[jev] onNote 展示层异常（已跳过）', e); }
     }
     // 3) 决策管线：保持提前 AHEAD_BARS 个小节
     if (!this.deciding && this.queuedBars < AHEAD_BARS) {
