@@ -5,6 +5,14 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-09-30 · 回归门固化（迭代轮次 28 · 优化）
+
+- **做了什么**：19+ 轮迭代里靠人肉跑的「12 种子指标门」变成一条命令 **`npm run gate`**（`scripts/regression-gate.mjs`）：硬不变量（相邻字面重复=0）逐种子判定、软指标（chords/entropy/melody/lh 均值）对照 `GATE_CONFIG` 单一真相源；接入 CI（test.yml 新步骤），每次推送自动执行。纯逻辑（parseMetrics/numeratorOf/evaluateGate）可单测：测试 140→**146**。
+- **实跑验证**：12 种子全过（chords 9.08 · entropy 2.55 · melody 32.00 · lh 31.67 · madj/ladj 全 0）；种子失败计为失败不静默跳过。
+- **坑（三个都是真的）**：① analyze 输出是**多行 pretty JSON**，按行过滤只捡到 `{`——JSON.parse 整体才是对的；② `Number('') === 0`——numeratorOf 的空串护栏；③ 配置键名（melody_unique）与数据键（melody_unique_bars）不一致，均值恒为 0——**两套键名没对齐的配置会安静地量出 0**。另：CI 文件名是 test.yml 不是 ci.yml（patch 前先 ls）。
+- **反思**：**校准过的门槛不固化进 CI，就只是某个会话的记忆**——轮次 2/11/16 每次都要手工重跑 12 种子，本轮之后 CI 替人记住。门槛数字与校准记录同源（AGENTS.md/memory），改门槛必须同时改 GATE_CONFIG 与文档——单一真相源 + 测试锁值（GATE_CONFIG 断言）双保险。
+- **下一步**（迭代轮次 29 · 创意）：舞台灯光随张力呼吸（纯展示层，午夜音乐厅世界的自然延伸）。
+
 ## [完成] 2026-09-30 · 反重复成果可见化（迭代轮次 27 · 前端）
 
 - **做了什么**（计划 [docs/superpowers/plans/2026-09-30-uniqueness-readout.md](docs/superpowers/plans/2026-09-30-uniqueness-readout.md)）：反重复系统成功时**没有事件**——只有断路器触发才被看见。演奏记录标题行加安静的读数 `旋律唯一 32/32 · 左手唯一 31/32`（`uniquenessLine` 纯函数，与 composer 同 sig 口径）；软层残留的复读获得**诚实归因**：`decision.farRepeat/lhFarRepeat` + 日志「复读」徽章 + 图例条目（软层说好的「尽力而为」要有可见的账）。测试 139→**140**（id 契约 86→87）。

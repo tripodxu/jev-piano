@@ -22,3 +22,6 @@ jobs:
           done
       - name: Unit tests
         run: node --test
+      # 决策指标回归门（轮次 28 固化）：12 种子多样性均值 + 相邻重复硬不变量
+      - name: Repetition regression gate
+        run: npm run gate
