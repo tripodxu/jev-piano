@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -239,4 +239,28 @@ test('chorusSummary: 遍次汇总一行纯文本；脏输入降级', () => {
   assert.equal(chorusSummary(2, 16, 7, 16, 16, 0), '第 2 遍完 · 16 小节 · 和弦 7 种 · 旋律唯一 16/16 · $0.0000');
   assert.equal(chorusSummary(NaN, 32, 9, 32, 31, 0.0026), '', '遍次非法 → 空串');
   assert.equal(chorusSummary(1, 0, 9, 32, 31, 0.0026), '', '小节数非法 → 空串');
+});
+
+/* ---------------- 双遍张力对照（轮次 42 · 创意） ---------------- */
+
+test('chorusView: 按 totalBars 分遍——past 是已完成遍，current 是进行中遍', () => {
+  const actual = Array.from({ length: 40 }, (_, i) => i / 40);
+  const v = chorusView(actual, 32);
+  assert.equal(v.past.length, 32);
+  assert.equal(v.current.length, 8);
+  assert.equal(v.base, 32, '当前遍在 actual 里的起点');
+  assert.equal(v.total, 32, 'x 轴分母 = 遍长');
+  // 第一遍进行中（未超过一遍）→ past 为空
+  const early = chorusView(actual.slice(0, 10), 32);
+  assert.equal(early.past.length, 0);
+  assert.equal(early.current.length, 10);
+  assert.equal(early.base, 0);
+});
+
+test('chorusView: 脏输入降级（无 totalBars / 空序列）', () => {
+  const v = chorusView([0.1, 0.2], 0);
+  assert.equal(v.past.length, 0);
+  assert.equal(v.current.length, 2);
+  assert.equal(v.total, 0, '0 = 未启用分遍（调用方回退旧行为）');
+  assert.deepEqual(chorusView([], 32), { past: [], current: [], base: 0, total: 32 });
 });

@@ -206,6 +206,7 @@ async function start() {
   // 张力对照带：计划弧线在演奏前就位，实际张力随小节逐条长出来
   tensionGraph.setTarget(smooth(planTargetSeries(plan, plan.barsPerPhrase), 3));
   tensionGraph.setSections(plan.sections);
+  tensionGraph.setTotalBars(plan.totalBars); // 双遍对照：第二遍起，上一遍曲线作为幽灵留在原地
   tensionGraph.reset();
 
   const composer = new Composer(plan, {

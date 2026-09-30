@@ -204,6 +204,12 @@ export class TensionGraph {
     this.draw();
   }
 
+  /** 设定遍长（轮次 42）：已知后进入双遍对照——上一遍曲线作为幽灵留在原地 */
+  setTotalBars(n) {
+    this.totalBars = Number.isInteger(n) && n > 0 ? n : 0;
+    this.draw();
+  }
+
   reset() { this.actual = []; this.meta = []; this.hoverX = null; this.draw(); }
   start() { if (!this.timer) this.timer = setInterval(() => this.draw(), 120); }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.draw(); }
@@ -217,7 +223,9 @@ export class TensionGraph {
     const padL = 26, padR = 6, padT = 6, padB = 12;
     const iw = Math.max(1, W - padL - padR), ih = Math.max(1, H - padT - padB);
     const yOf = (v) => padT + (1 - Math.min(1, Math.max(0, v))) * ih;
-    const n = Math.max(this.target.length, this.actual.length, 1);
+    // 双遍对照（轮次 42）：分遍后 x 轴是「遍内位置」——上一遍的形状与当前遍同轴叠加
+    const cv = chorusView(this.actual, this.totalBars);
+    const n = Math.max(this.target.length, cv.total || this.actual.length, 1);
 
     // 乐句分隔竖线：让"形状"有可读的乐句单位
     g.strokeStyle = 'rgba(214,178,110,0.10)';
@@ -244,9 +252,10 @@ export class TensionGraph {
       g.restore();
     };
 
-    // 计划弧线（幽灵）在下，实际张力在上——实际值压得住参照线
+    // 计划弧线（幽灵）在下，上一遍（幽灵）其次，当前遍实线在上
     line(this.target, 'rgba(214,178,110,0.34)', 1.2, true);
-    line(this.actual, '#e8c57c', 1.8, false);
+    if (cv.past.length) line(cv.past, 'rgba(154,144,120,0.55)', 1.2, true);
+    line(cv.current.length ? cv.current : this.actual, '#e8c57c', 1.8, false);
 
     // 段落竖线 + 段落名：虚线是**独立于颜色的形状线索**，段落名是文字线索，
     // 二者叠加满足「不依赖颜色」（ui-ux-pro-max chart 域）
@@ -289,7 +298,7 @@ export class TensionGraph {
           g.fillStyle = '#f6d695';
           g.beginPath(); g.arc(x, yOf(av), 2.5, 0, Math.PI * 2); g.fill();
         }
-        const m = this.meta[i] ?? {};
+        const m = this.meta[Math.min(this.meta.length - 1, (cv.base || 0) + i)] ?? (this.meta[i] ?? {});
         g.font = '10px monospace';
         g.textAlign = 'right'; g.textBaseline = 'top';
         g.fillStyle = 'rgba(240,205,138,0.95)';
@@ -358,6 +367,18 @@ export function stageLightFor(tension) {
   const t = Number(tension);
   const v = Number.isFinite(t) ? Math.min(1, Math.max(0, t)) : 0.5;
   return { warm: Math.round((0.05 + v * 0.16) * 1000) / 1000, cool: Math.round((0.16 - v * 0.10) * 1000) / 1000 };
+}
+
+/** 双遍张力对照（轮次 42）：把已演奏序列按遍长切成「上一遍」与「当前遍」。
+ *  再即兴的可视化——同一曲式，两条不同的形状。totalBars ≤ 0 表示未启用分遍（total=0，调用方回退旧行为）。 */
+export function chorusView(actual, totalBars) {
+  const bars = Number.isInteger(totalBars) && totalBars > 0 ? totalBars : 0;
+  const list = Array.isArray(actual) ? actual : [];
+  if (!bars || list.length <= bars) {
+    return { past: [], current: list, base: 0, total: bars };
+  }
+  const base = Math.floor((list.length - 1) / bars) * bars;
+  return { past: list.slice(0, bars), current: list.slice(base), base, total: bars };
 }
 
 /** 遍次小结（轮次 37）：每遍末小节在决策日志插入的一行汇总。
