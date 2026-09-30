@@ -270,6 +270,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 
 /* ---------- 动机卡：曲子的主题长什么样 ---------- */
 .motif-box { flex: none; padding: 0 26px 6px; }
+
 #motifCanvas {
   display: block; width: 100%; height: 48px;
   background: linear-gradient(180deg, rgba(12, 10, 8, 0.28), transparent);
@@ -678,3 +679,9 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   .fnseg { animation: none; }
   * { transition-duration: 0.01ms !important; }
 }
+
+/* 和声罗盘（轮次 45）：与动机卡并排；规则置尾以胜过既有 #motifCanvas 的 width:100% */
+.motif-box { display: flex; align-items: stretch; gap: 10px; }
+.motif-box #motifCanvas { flex: 1; width: auto; min-width: 0; }
+.motif-box #compassCanvas { flex: 0 0 96px; width: 96px; min-height: 48px; }
+@media (max-width: 980px) { .motif-box #compassCanvas { flex-basis: 84px; width: 84px; } }

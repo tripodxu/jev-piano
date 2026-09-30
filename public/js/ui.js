@@ -1,5 +1,5 @@
 // ui.js — 可视化：键盘 DOM、下落音符 canvas、决策日志、计划卡、状态条。
-import { midiName } from './music.js';
+import { midiName, PREFERRED_NAME } from './music.js';
 import { tempoMultAt } from './candidates.js';
 
 const LOW = 36, HIGH = 84; // C2..C6
@@ -389,6 +389,24 @@ export function goalTitle(hint) {
   return parts.length ? `影响：${parts.join(' · ')}` : '每次随机生成，不偏置任何参数';
 }
 
+/** 和声罗盘（轮次 45）：五度圈映射——rootPc × 7 mod 12 均匀落在圆环上（C 在顶点、G/F 为邻位）。
+ *  轮次 2 的声部进行加权（共同音 + 五度圈距离）一直在用这个几何，本函数让它显形。 */
+export function fifthPos(rootPc) {
+  const pc = Number.isFinite(rootPc) ? ((Math.round(rootPc) % 12) + 12) % 12 : 0; // 脏输入降级到顶点
+  return (((pc * 7) % 12) + 12) % 12 / 12;
+}
+
+/** 罗盘轨迹点：归一化坐标（圆心 0.5,0.5，半径 0.42），顺序即时间顺序；脏 pc 过滤 */
+export function compassPoints(rootPcs) {
+  const out = [];
+  for (const pc of rootPcs ?? []) {
+    if (!Number.isFinite(pc)) continue;
+    const a = fifthPos(pc) * Math.PI * 2 - Math.PI / 2; // 顶点起、顺时针
+    out.push({ x: 0.5 + Math.cos(a) * 0.42, y: 0.5 + Math.sin(a) * 0.42 });
+  }
+  return out;
+}
+
 /** 双遍张力对照（轮次 42）：把已演奏序列按遍长切成「上一遍」与「当前遍」。
  *  再即兴的可视化——同一曲式，两条不同的形状。totalBars ≤ 0 表示未启用分遍（total=0，调用方回退旧行为）。 */
 export function chorusView(actual, totalBars) {
@@ -451,6 +469,7 @@ export const LEGEND_ITEMS = [
   { group: '断路器与守卫（功能轨上的形状）', label: '复读', swatch: '', desc: '这一小节与远处小节字面相同——全曲指纹记忆尽力变形后仍无出路，如实标记' },
   { group: '结构（各处的虚线与名字）', label: '段落', swatch: 'sec', desc: 'A 陈述 / B 对比 / A′ 再现 / Coda 收束，虚线竖线是段落边界' },
   { group: '结构（各处的虚线与名字）', label: '动机', swatch: 'motif', desc: '曲子主题的旋律轮廓，右侧计数是它回来的次数' },
+  { group: '结构（各处的虚线与名字）', label: '罗盘', swatch: '', desc: '和声罗盘：最近小节的根音在五度圈上的轨迹——邻位小步是平滑进行，对角跳跃是色彩突变' },
   { group: '分析读数（张力带与卷帘）', label: '张力', swatch: 'ten', desc: '这一小节有多紧：实线是实际，虚线是计划弧线' },
   { group: '分析读数（张力带与卷帘）', label: '契合度', swatch: 'fit', desc: '旋律里有多少音属于当前和弦——越高越「在调上」' },
   { group: '分析读数（张力带与卷帘）', label: '非和弦', swatch: 'nct', desc: '带亮边的旋律音：不属于当前和弦，但正是调式的呼吸' },
@@ -660,6 +679,87 @@ export class MotifCard {
     g.stroke();
     g.fillStyle = fresh ? '#f6d695' : 'rgba(216,171,92,0.9)';
     for (const p of [pts[0], pts[pts.length - 1]]) g.fillRect(X(p) - 2, Y(p) - 2, 4, 4);
+    g.restore();
+  }
+}
+
+/**
+ * 和声罗盘（轮次 45）：最近若干小节的根音在五度圈上的轨迹。
+ * 骨架沿用 MotifCard（ResizeObserver + setInterval 而非 rAF）。
+ * 「声部进行」是本项目和声层的核心算法——这张卡让「和声在圈上怎么走」第一次可见：
+ * 邻位小步 = 平滑进行（共同音多），对角跳跃 = 色彩突变（轮次 2 断路器在工作）。
+ */
+export class CompassCard {
+  constructor(canvas, { max = 16 } = {}) {
+    this.canvas = canvas;
+    this.ctx2d = canvas.getContext('2d');
+    this.roots = [];
+    this.max = max;
+    this.timer = null;
+    this._resize = () => {
+      const dpr = globalThis.devicePixelRatio || 1;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      this.ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.draw();
+    };
+    this._ro = new ResizeObserver(this._resize);
+    this._ro.observe(canvas);
+    this._resize();
+  }
+
+  push(rootPc) {
+    if (Number.isFinite(rootPc)) {
+      this.roots.push(rootPc);
+      if (this.roots.length > this.max) this.roots.shift();
+    }
+    this.draw();
+  }
+
+  reset() { this.roots = []; this.draw(); }
+  start() { if (!this.timer) this.timer = setInterval(() => this.draw(), 120); }
+  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.draw(); }
+  destroy() { this.stop(); this._ro.disconnect(); }
+
+  draw() {
+    const { ctx2d: g, canvas } = this;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    if (!W || !H) return;
+    g.clearRect(0, 0, W, H);
+    g.save();
+    g.font = '10px var(--sans, sans-serif)';
+    g.fillStyle = 'rgba(154,144,120,0.95)';
+    g.textAlign = 'left'; g.textBaseline = 'top';
+    g.fillText('和声罗盘', 0, 0);
+    g.restore();
+    // 五度圈刻度（12 点，PREFERRED_NAME 按 pc×7 顺序）
+    g.save();
+    g.font = '8px var(--mono, monospace)';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const R = Math.min(W, H) / 2 - 12;
+    for (let pc = 0; pc < 12; pc++) {
+      const a = fifthPos(pc) * Math.PI * 2 - Math.PI / 2;
+      g.fillStyle = 'rgba(154,144,120,0.5)';
+      g.fillText(PREFERRED_NAME[pc], W / 2 + Math.cos(a) * R, H / 2 + Math.sin(a) * R);
+    }
+    g.restore();
+    const pts = compassPoints(this.roots);
+    if (pts.length < 1) return;
+    const X = (p) => p.x * W, Y = (p) => p.y * H;
+    // 轨迹连线 + 点
+    g.save();
+    g.strokeStyle = 'rgba(216,171,92,0.5)';
+    g.lineWidth = 1;
+    g.beginPath();
+    pts.forEach((p, i) => (i ? g.lineTo(X(p), Y(p)) : g.moveTo(X(p), Y(p))));
+    g.stroke();
+    pts.forEach((p, i) => {
+      const cur = i === pts.length - 1;
+      g.fillStyle = cur ? '#f6d695' : 'rgba(216,171,92,0.7)';
+      g.beginPath(); g.arc(X(p), Y(p), cur ? 3.5 : 2, 0, Math.PI * 2); g.fill();
+    });
     g.restore();
   }
 }

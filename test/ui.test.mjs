@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, fifthPos, compassPoints } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -122,7 +122,7 @@ test('LEGEND_ITEMS: 每条都有名字与说明，且覆盖所有真实标记', 
   }
   // 覆盖面：四功能 + 五手法 + 断路器 + 驳回 + 段落 + 动机 + 张力 + 契合度 + 非和弦
   const text = LEGEND_ITEMS.map((i) => `${i.label}${i.desc}`).join('');
-  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '复读', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句']) {
+  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '复读', '罗盘', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句']) {
     assert.ok(text.includes(kw), `图例缺少「${kw}」的说明`);
   }
 });
@@ -280,4 +280,27 @@ test('goalTitle: 目标的实际偏置透明化；无偏置说明随机', () => 
   assert.equal(goalTitle({ arc: 'flat', density: -0.15 }), '影响：弧线 flat · 密度 −0.15');
   assert.equal(goalTitle({}), '每次随机生成，不偏置任何参数');
   assert.equal(goalTitle(undefined), '每次随机生成，不偏置任何参数');
+});
+
+/* ---------------- 和声罗盘（轮次 45 · 创意） ---------------- */
+
+test('fifthPos: 五度圈映射 rootPc → 0..1 顺时针位置（C 在顶点，G 相邻）', () => {
+  assert.equal(fifthPos(0), 0, 'C 在顶点');
+  assert.ok(Math.abs(fifthPos(7) - 1 / 12) < 1e-9, 'G 是 C 的顺时针邻位（+1 步 = 相差五度 = 声部最近）');
+  assert.ok(Math.abs(fifthPos(5) - 11 / 12) < 1e-9, 'F 是逆时针邻位（−1 步）');
+  assert.ok(Math.abs(fifthPos(6) - 6 / 12) < 1e-9, '三全音对角（最远的声部进行）');
+  assert.ok(Math.abs(fifthPos(12) - 0) < 1e-9, '越界取模');
+  assert.ok(Number.isFinite(fifthPos(NaN)), '脏输入不抛错');
+});
+
+test('compassPoints: 归一化坐标在圆环上、顺序保持、脏 pc 过滤', () => {
+  const pts = compassPoints([0, 7, 5]);
+  assert.equal(pts.length, 3);
+  for (const p of pts) {
+    const d = Math.hypot(p.x - 0.5, p.y - 0.5);
+    assert.ok(Math.abs(d - 0.42) < 1e-9, `点到圆心距离恒为半径 0.42，实际 ${d}`);
+  }
+  assert.deepEqual(compassPoints([0, 7])[0], compassPoints([0])[0], '同 pc 同位置（顺序无关）');
+  assert.equal(compassPoints([]).length, 0);
+  assert.equal(compassPoints([3, NaN, 8]).length, 2, '脏 pc 过滤');
 });
