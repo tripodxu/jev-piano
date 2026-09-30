@@ -28,7 +28,15 @@ function trackBytes(events) {
   return out;
 }
 
-export function exportMidi(records, { bpm = 90, meterNum = 4 } = {}) {
+const clampMult = (m) => Math.min(2, Math.max(0.5, Number(m) || 1));
+
+/**
+ * exportMidi(records, { bpm, meterNum, tempoMults })
+ * tempoMults：每小节一个速度乘数（来自 candidates.tempoMultAt 的速度弧线）。
+ * 省略时与旧版字节逐位一致；给定时在 track0 按小节写 set_tempo（FF 51），
+ * plateau（与上一小节同乘数）不重复写，文件更小。
+ */
+export function exportMidi(records, { bpm = 90, meterNum = 4, tempoMults = null } = {}) {
   const byHand = { R: [], L: [] };
   for (const r of records) {
     const hand = r.hand === 'L' ? 'L' : 'R';
@@ -37,13 +45,26 @@ export function exportMidi(records, { bpm = 90, meterNum = 4 } = {}) {
     byHand[hand].push({ tick: onTick, status: 0x90, midi: r.midi, vel: Math.max(1, Math.min(127, Math.round(r.vel * 127))) });
     byHand[hand].push({ tick: offTick, status: 0x80, midi: r.midi, vel: 0 });
   }
-  const usPerQuarter = Math.round(60000000 / bpm);
+  const tempoBytes = (us) => [0xff, 0x51, 0x03, (us >> 16) & 255, (us >> 8) & 255, us & 255];
+  const m0 = Array.isArray(tempoMults) && Number.isFinite(tempoMults[0]) ? clampMult(tempoMults[0]) : 1;
   const meta = [
-    ...vlq(0), 0xff, 0x51, 0x03, (usPerQuarter >> 16) & 255, (usPerQuarter >> 8) & 255, usPerQuarter & 255,
-    ...vlq(0), 0xff, 0x58, 0x04, meterNum & 255, 0x02, 0x18, 0x08,
-    ...vlq(0), 0xff, 0x2f, 0x00,
+    { tick: 0, bytes: tempoBytes(Math.round(60000000 / (bpm * m0))) },
+    { tick: 0, bytes: [0xff, 0x58, 0x04, meterNum & 255, 0x02, 0x18, 0x08] },
   ];
-  const tracks = [meta, trackBytes(byHand.R), trackBytes(byHand.L)];
+  if (Array.isArray(tempoMults)) {
+    let prev = m0;
+    for (let bar = 1; bar < tempoMults.length; bar++) {
+      const m = clampMult(tempoMults[bar]);
+      if (m !== prev) meta.push({ tick: bar * meterNum * TPQN, bytes: tempoBytes(Math.round(60000000 / (bpm * m))) });
+      prev = m;
+    }
+  }
+  meta.sort((a, b) => a.tick - b.tick);
+  const metaBytes = [];
+  let last = 0;
+  for (const ev of meta) { metaBytes.push(...vlq(ev.tick - last), ...ev.bytes); last = ev.tick; }
+  metaBytes.push(...vlq(0), 0xff, 0x2f, 0x00); // end of track
+  const tracks = [metaBytes, trackBytes(byHand.R), trackBytes(byHand.L)];
   const size = 14 + tracks.reduce((s, t) => s + 8 + t.length, 0);
   const bytes = new Uint8Array(size);
   let o = 0;

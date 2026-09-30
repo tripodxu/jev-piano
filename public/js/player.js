@@ -1,6 +1,7 @@
 // player.js — 实时调度器：Web Audio 时钟 + lookahead（"A Tale of Two Clocks"模式）。
 // 决策管线与播放并行：始终提前 ≥ AHEAD_BARS 个小节向 composer 要下一小节，
 // Jev 的 100~500ms 延迟被完全藏在小节时长里。now/setTimer/clearTimer 可注入（测试用假时钟）。
+import { tempoMultAt } from './candidates.js';
 
 export const LOOKAHEAD = 0.15;  // 秒：提前交给 AudioContext 精确排程的窗口
 export const TICK_MS = 30;
@@ -29,13 +30,15 @@ export class Player {
     this._t0 = 0;
   }
 
-  /** 绝对拍 → ctx 时间轴秒 */
+  /** 绝对拍 → ctx 时间轴秒。仅在游标失配的防御路径使用（正常路径走 _enqueueBar 的逐小节累计） */
   _beatToSec(absBeat) { return this._t0 + absBeat * this.secPerBeat; }
 
   start() {
     if (this.running) return;
     this.running = true;
     this._t0 = this._now() + 0.25; // 起播缓冲：给第一小节的决策留时间
+    this._cursorBeat = 0;          // 速度弧线游标：下一期望小节的起始绝对拍
+    this._cursorSec = this._t0;    // 该小节的起始秒（由逐小节累计而来）
     this._tick();
     this._timer = this._setTimer(() => this._tick(), TICK_MS);
   }
@@ -101,13 +104,26 @@ export class Player {
 
   _enqueueBar(bar) {
     const barStartBeat = bar.index * this.meterNum;
-    this.barMarks.push({ t: this._beatToSec(barStartBeat), bar });
-    this.barMarks.sort((a, b) => a.t - b.t);
+    // 速度弧线：每小节用自己的乘数（tempoMultAt，来自计划），顺序游标累计小节起点秒。
+    // 小节内恒速——相邻小节差 ≤4% 时 bar 内连续变化不可闻，而游标把映射保持为一次乘法。
+    let barStartSec, spb;
+    if (barStartBeat === this._cursorBeat) {
+      spb = this.secPerBeat / tempoMultAt(this.composer.plan, bar.index);
+      barStartSec = this._cursorSec;
+      this._cursorBeat = barStartBeat + this.meterNum;
+      this._cursorSec = barStartSec + this.meterNum * spb;
+    } else {
+      // 防御：乱序/缺口入队（正常管线不会发生）——回退线性映射，绝不让播放中断
+      spb = this.secPerBeat;
+      barStartSec = this._beatToSec(barStartBeat);
+    }
+    this.barMarks.push({ t: barStartSec, bar });
+    this.barMarks.sort((a, b) => a.t - b.t); // 防御路径可能乱序，保持弹出语义正确
     for (const n of bar.notes) {
       const beat = barStartBeat + n.startBeats;
       this.queue.push({
-        kind: 'note', t: this._beatToSec(beat), midi: n.midi,
-        dur: n.durBeats * this.secPerBeat, vel: n.vel, hand: n.hand, beat,
+        kind: 'note', t: barStartSec + n.startBeats * spb, midi: n.midi,
+        dur: n.durBeats * spb, vel: n.vel, hand: n.hand, beat,
       });
     }
     this.queue.sort((a, b) => a.t - b.t);

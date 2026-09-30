@@ -9,6 +9,7 @@ import { exportMidi } from './midi.js';
 import { renderKeyboard, toast, sectionLabel } from './ui.js';
 import { loadSettings } from './settings.js';
 import { chordMidis, scaleMidis, nearest, NOTE_NAMES, functionOfPc } from './music.js';
+import { tempoMultAt } from './candidates.js';
 import { barTension } from './tension.js';
 import { barHarmonyFit } from './nct.js';
 
@@ -880,7 +881,9 @@ function bindControls() {
 
   els.midi.addEventListener('click', () => {
     if (!piece) return;
-    const bytes = exportMidi(piece.notes, { bpm: Number(els.bpm.value), meterNum: piece.plan.meterNum });
+    // 速度弧线写入分段 set_tempo（旧 JSON 无 sections 时 tempoMultAt 走兼容路径，尾部缓降）
+    const tempoMults = Array.from({ length: piece.totalBars }, (_, i) => tempoMultAt(piece.plan, i));
+    const bytes = exportMidi(piece.notes, { bpm: Number(els.bpm.value), meterNum: piece.plan.meterNum, tempoMults });
     const blob = new Blob([bytes], { type: 'audio/midi' });
     download(blob, `${piece.plan.title}.mid`);
   });

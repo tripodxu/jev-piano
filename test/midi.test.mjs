@@ -45,3 +45,41 @@ test('exportMidi: 头、轨数、tempo、双轨分hand', () => {
   assert.equal(b.length, total); // 平凡，但防止 off-by-one 重构回归
   assert.equal(TPQN, 480);
 });
+
+/* ---------------- 速度弧线（轮次 20）：分段 set_tempo ---------------- */
+
+/** 解析 track0 的全部 set_tempo 事件 → [{tick, us}] */
+function metaTempos(bytes) {
+  const hex = [...bytes];
+  let i = 14; // 跳过 MThd
+  const len = (hex[i + 4] << 24) | (hex[i + 5] << 16) | (hex[i + 6] << 8) | hex[i + 7];
+  let p = i + 8, end = p + len, tick = 0;
+  const out = [];
+  while (p < end) {
+    let d = 0, b0;
+    do { b0 = hex[p++]; d = (d << 7) | (b0 & 0x7f); } while (b0 & 0x80);
+    tick += d;
+    if (hex[p] === 0xff) {
+      const type = hex[p + 1], ln = hex[p + 2];
+      if (type === 0x51) out.push({ tick, us: (hex[p + 3] << 16) | (hex[p + 4] << 8) | hex[p + 5] });
+      p += 3 + ln; // ff(1) + type(1) + length(1) + data(ln)
+    } else { p += 2; } // 音符事件不影响此解析（track0 只有 meta）
+  }
+  return out;
+}
+
+test('exportMidi: tempoMults 写入分段 set_tempo（plateau 只写一次）', () => {
+  const records = [{ midi: 60, startBeats: 0, durBeats: 1, vel: 0.8, hand: 'R' }];
+  const b = exportMidi(records, { bpm: 96, meterNum: 4, tempoMults: [1.04, 1.04, 0.8] });
+  const t = metaTempos(b);
+  assert.equal(t.length, 2, 'plateau 不重复写');
+  assert.deepEqual(t[0], { tick: 0, us: Math.round(60000000 / (96 * 1.04)) });
+  assert.deepEqual(t[1], { tick: 8 * 480, us: Math.round(60000000 / (96 * 0.8)) });
+});
+
+test('exportMidi: 不带 tempoMults 时字节与现行为逐位一致', () => {
+  const records = [{ midi: 60, startBeats: 0, durBeats: 1, vel: 0.8, hand: 'R' }];
+  const a = exportMidi(records, { bpm: 96, meterNum: 4 });
+  const c = exportMidi(records, { bpm: 96, meterNum: 4, tempoMults: null });
+  assert.deepEqual([...a], [...c]);
+});

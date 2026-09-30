@@ -91,3 +91,27 @@ test('暂停/继续：暂停时不调度，恢复后继续', async () => {
   p.stop();
   assert.equal(p.paused, false, 'stop 应解除暂停态');
 });
+
+/* ---------------- 速度弧线（轮次 20）：每小节乘数 + 顺序游标 ---------------- */
+
+test('速度弧线：B 段小节更短，游标按小节累计且单调', async () => {
+  const h = await makeHarness();
+  const p = await makePlayer(h); // 星空→newage·arch·64 小节：A(0-15 flat) B(16-31 arch)
+  p._t0 = 100; p._cursorBeat = 0; p._cursorSec = 100;
+  for (let i = 0; i <= 17; i++) p._enqueueBar({ index: i, notes: [] });
+  const marks = p.barMarks.map((m) => m.t);
+  const barLen = p.meterNum * p.secPerBeat;
+  assert.ok(Math.abs(marks[0] - 100) < 1e-9, '首小节从 _t0 起');
+  for (let i = 1; i <= 16; i++) assert.ok(Math.abs(marks[i] - marks[i - 1] - barLen) < 1e-9, 'A 段恒定时长');
+  assert.ok(marks[17] - marks[16] < barLen - 1e-9, 'bar 16 在 B 段（1.04）应更短');
+  for (let i = 1; i < marks.length; i++) assert.ok(marks[i] > marks[i - 1], '小节起点必须严格递增');
+});
+
+test('乱序入队回退线性映射，不崩溃', async () => {
+  const h = await makeHarness();
+  const p = await makePlayer(h);
+  p._t0 = 50;
+  p._enqueueBar({ index: 3, notes: [] }); // 游标未起（期望 beat 0），实际 beat 12
+  const t = p.barMarks[0].t;
+  assert.ok(Math.abs(t - (50 + 12 * p.secPerBeat)) < 1e-9, '回退按恒定 secPerBeat 线性映射');
+});

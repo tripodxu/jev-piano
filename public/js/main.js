@@ -9,7 +9,7 @@ import { askJev, expandPlan, probeProxy } from './jev.js';
 import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend } from './ui.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { barHarmonyFit, NCT_ZH } from './nct.js';
-import { planTargetSeries } from './candidates.js';
+import { planTargetSeries, tempoMultAt } from './candidates.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -252,7 +252,9 @@ els.directorNote.addEventListener('input', () => {
 });
 els.midiBtn.addEventListener('click', () => {
   if (!player?.records?.length) return;
-  const bytes = exportMidi(player.records, { bpm: plan.bpm, meterNum: plan.meterNum });
+  // 速度弧线写入分段 set_tempo：导出的 MIDI 保留「尾段渐慢」的演奏意图
+  const tempoMults = Array.from({ length: plan.totalBars }, (_, i) => tempoMultAt(plan, i));
+  const bytes = exportMidi(player.records, { bpm: plan.bpm, meterNum: plan.meterNum, tempoMults });
   download(new Blob([bytes], { type: 'audio/midi' }), `${plan.title}.mid`);
 });
 els.recBtn.addEventListener('click', async () => {

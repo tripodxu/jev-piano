@@ -2,7 +2,7 @@
 // 这些纯函数决定了"模型能选什么"，因此这里锁住的是"不可选"的不变量，而不只是"可选"。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, commonTones, fifthsDist, functionCandidates, deriveSections, sectionAt, developCandidates } from '../public/js/candidates.js';
+import { detectLoop, chordCandidates, lhCandidates, rhythmCandidates, contourWeights, intensityTarget, commonTones, fifthsDist, functionCandidates, deriveSections, sectionAt, developCandidates, tempoMultAt } from '../public/js/candidates.js';
 import { parseRoman, STYLE_BY_ID, HARMONIC_FUNCTIONS } from '../public/js/music.js';
 
 const MINOR_PLAN = { mode: 'minor', meterNum: 4, barsPerPhrase: 8, density: 0.5, totalBars: 32, arc: 'arch' };
@@ -287,4 +287,35 @@ test('functionCandidates: 四功能齐备，D→T 与乐句尾→T 权重更高'
   assert.ok(mid.S.w > mid.T.w && mid.D.w > mid.T.w, '主功能之后应走向下属或属');
   // 乐句开头偏好主功能
   assert.ok(functionCandidates({ arc: 'arch' }, 'S', false, 0).T.w > functionCandidates({ arc: 'arch' }, 'S', false, 4).T.w, '乐句头偏好主功能');
+});
+
+/* ---------------- 速度弧线（轮次 20 · tempoMultAt） ---------------- */
+
+test('tempoMultAt: 尾段 rit. 单调下降到 0.8，arch/rise 段轻微推进', () => {
+  const plan = { totalBars: 32, arc: 'arch', sections: deriveSections('arch', 32, 8) };
+  // A 段（0-7，flat）恒速
+  assert.equal(tempoMultAt(plan, 0), 1);
+  assert.equal(tempoMultAt(plan, 7), 1);
+  // B 段（8-15，arch）推进
+  assert.equal(tempoMultAt(plan, 8), 1.04);
+  assert.equal(tempoMultAt(plan, 15), 1.04);
+  // Coda（24-31）从 1.0 滑到 0.8，单调不增
+  const coda = [];
+  for (let b = 24; b <= 31; b++) coda.push(tempoMultAt(plan, b));
+  assert.ok(Math.abs(coda[0] - 1) < 1e-9, 'Coda 段首不突变');
+  assert.ok(Math.abs(coda.at(-1) - 0.8) < 1e-9, 'Coda 段尾 0.8');
+  for (let i = 1; i < coda.length; i++) assert.ok(coda[i] <= coda[i - 1] + 1e-9, 'rit 必须单调不增');
+  // A' 段（flat）回原速
+  assert.equal(tempoMultAt(plan, 20), 1);
+});
+
+test('tempoMultAt: 脏输入降级不抛错（旧计划/越界/NaN）', () => {
+  const legacy = { totalBars: 32, arc: 'arch' }; // 无 sections（旧项目 JSON）
+  assert.equal(tempoMultAt(legacy, 0), 1);
+  assert.ok(tempoMultAt(legacy, 31) < 1, '旧计划尾部也应渐慢');
+  assert.equal(tempoMultAt(null, 5), 1);
+  const secs = { totalBars: 32, sections: deriveSections('arch', 32, 8) };
+  assert.equal(tempoMultAt(secs, -3), 1, '越界夹取到首小节');
+  assert.equal(tempoMultAt(secs, 99), tempoMultAt(secs, 31), '越界夹取到末小节');
+  assert.ok(Number.isFinite(tempoMultAt({ totalBars: 'x', sections: 'y' }, 'z')));
 });

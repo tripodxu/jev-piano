@@ -278,6 +278,38 @@ export function intensityTarget(plan, progress, isPhraseEnd, barsPerPhrase = 8) 
   return Math.min(3, Math.max(0, v - (isPhraseEnd ? 0.5 : 0)));
 }
 
+/** 速度乘数的边界：推进感 +4%，rit. 最低 −20%（真人尾声常见 −15%~−25% 的保守取值） */
+const TEMPO_PUSH = 1.04, TEMPO_RIT_FLOOR = 0.8;
+
+/**
+ * 速度弧线（每小节一个乘数，小节内恒速）：曲式的「时间形状」。
+ * 最后一段线性 rit.（1.0 → 0.8，曲尾渐慢是真人演奏最基本的呼吸）；
+ * 非尾段的 arch/rise 段轻微推进（+4%，对比段与攀升段自带「往前赶」的体感）；其余恒速。
+ * 与 intensityTarget 同层、同约定：描述**计划**而非已生成音乐，脏输入降级、绝不抛错；
+ * 消费方是 player（实时排程）与 midi（set_tempo 事件）——渲染层，不参与任何决策。
+ */
+export function tempoMultAt(plan, bar) {
+  const clampMult = (v) => Math.min(TEMPO_PUSH, Math.max(TEMPO_RIT_FLOOR, v));
+  const total = Math.max(1, Number(plan?.totalBars) || 32);
+  const b = Math.min(total - 1, Math.max(0, Math.floor(Number(bar) || 0)));
+  const secs = Array.isArray(plan?.sections) ? plan.sections : [];
+  const sec = sectionAt(secs, b);
+  if (!sec || secs.length < 2) {
+    // 旧计划兼容（无 sections）：最后 1/4 曲长从 1.0 缓降到 0.85
+    const tailStart = total * 0.75;
+    if (b <= tailStart) return 1;
+    return clampMult(1 - 0.15 * ((b - tailStart) / Math.max(1, total * 0.25)));
+  }
+  const isLast = sec === secs.at(-1);
+  if (isLast) {
+    if (sec.bars <= 1) return 1; // 单小节的"尾声"没有滑动的余地，硬渐慢只会突兀
+    const p = (b - sec.start) / (sec.bars - 1);
+    return clampMult(1 - 0.2 * p);
+  }
+  if (sec.arc === 'arch' || sec.arc === 'rise') return TEMPO_PUSH;
+  return 1;
+}
+
 /**
  * 发展手法（第 7 问）权重。**段落边界有特殊语义**：
  *  段落首大幅偏向 repeat（承袭）——A→A' 的听觉关联正是靠「同一动机在新段落里再出现一次」建立的；
