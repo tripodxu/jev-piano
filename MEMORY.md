@@ -5,6 +5,15 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-09-30 · 修复「移调只移旋律，不移和声」（迭代轮次 22 · 优化）
+
+- **做了什么**（详见 [docs/memory/2026-09-30-keypc-harmony-fix.md](docs/memory/2026-09-30-keypc-harmony-fix.md)，计划 [docs/superpowers/plans/2026-09-30-keypc-harmony-fix.md](docs/superpowers/plans/2026-09-30-keypc-harmony-fix.md)）：**存在了整个项目历史的一级正确性 bug**——`keyPc` 只被旋律音阶消费，`parseRoman` 的相对度数在渲染点被直接当绝对音高类用。取证：keyPc=0/7/3 三种「调」产出**逐位相同的 C 体系和弦**；选调后旋律与和弦可处于不同调（真实不协和），Jev 在错误的调性语境里做选择，README 承诺的 12 调移调对和声无效。修复 = **相对/绝对分离**：唯一介入点在 nextBar 素材化处（`absPc = relPc + keyPc`，chord 同时携带 `rootPc`(绝对)/`relPc`(相对)），决策层（疲劳/锁死/功能表/roman）锚 relPc，渲染层（声位/锚定/分析/工作室）用绝对值。修复后 G 小调 → `F Gm F Gm D Gm`。测试 132→**134**。
+- **为什么 19 轮没发现**：默认路径 keyPc 恒为 0，相对与绝对恰好相等——**默认值把 bug 藏了起来**，所有测试与真实渠道回归都测不到。
+- **验证**：npm test 134/134；12 种子指标与修复前**逐位一致**（chords 9.33 / entropy 2.34 / melody 29.42 / lh 28.33 / madj 0 / ladj 0）——相对/绝对分离正确性的直接证明。
+- **已知取舍**：Eb 小调 bVI 理论拼写 Cb、显示 `B`（同音；与轮次 4 的固定记谱惯例一致，完整调号拼写引擎不在本轮）。
+- **反思**：审计方法——对每个「X 度数」参数问「参照系是谁？参照系变了哪些消费点会跟着变？」，答案里任何「不变」的点都是嫌疑犯。两种语义并存不可怕，可怕的是**边界不设防**；最小介入点选在语义转换的唯一边界。
+- **下一步**（迭代轮次 23 · 创意）：乐句问答（question-answer phrasing）——偶数乐句半终止开放、奇数乐句全终止收束。
+
 ## [完成] 2026-09-30 · 时间维可见化（迭代轮次 21 · 前端）
 
 - **做了什么**（详见 [docs/memory/2026-09-30-tempo-visibility.md](docs/memory/2026-09-30-tempo-visibility.md)，计划 [docs/superpowers/plans/2026-09-30-tempo-visibility.md](docs/superpowers/plans/2026-09-30-tempo-visibility.md)）：轮次 20 的时间轴在界面上任何地方都看不到。三个通道补齐（零新增 id/canvas）：计划卡速度行 `速度 80 BPM · 尾段渐慢至 64`（`planTempoLine` 纯函数）；实时读数 nowBar 显示当前小节实际速度——Coda 渐慢时数字当着用户的面掉下去；张力带 hover crosshair + 画布内文字读数（`pushMeta`/`hoverBarAt` 纯函数）。skill `ui-ux-pro-max` chart 域：*"relying on hover only" 是反模式*——hover 只是增强，tensionStat 文本行与 aria 始终存在。测试 128→**132**。

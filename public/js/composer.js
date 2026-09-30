@@ -553,7 +553,7 @@ export class Composer {
       0, 3,
     );
 
-    const recentRoots = this.history.slice(-6).map((b) => b.chord.rootPc);
+    const recentRoots = this.history.slice(-6).map((b) => b.chord.relPc);
     const loopLocked = detectLoop(recentRoots).locked;
     // 段落边界标志：曲式在和声与动机上的语义（段落比乐句更强）
     const secHere = sectionAt(plan.sections, this.index);
@@ -688,11 +688,16 @@ export class Composer {
     const inFamily = cands.filter((c) => (c.fn ?? functionOf(c.sym, plan.mode)) === declaredFn);
     const chordP = picked ?? inFamily.sort((a, b) => b.weight - a.weight)[0] ?? cands[0];
     const chordSymRaw = picked ? picked.sym : chordP.sym;
-    const chord = { symbol: chordLabel(chordP.rootPc, chordP.shape), ...chordP };
+    // 素材化：候选集里的 rootPc 是「相对主音的度数」（I=0），在这里加上调中心变成**绝对音高类**。
+    // 修复（轮次 22）：此前这里直接把相对度数当绝对值用——keyPc 只移了旋律音阶，和声永远在 C 体系，
+    // 选调/LLM 给调后旋律与和弦可以处于不同调。决策层（疲劳/锁死/功能表/roman）全部锚在 relPc，
+    // 渲染层（声位/锚定/分析/工作室）用绝对 rootPc——两层各取所需，互不越界。
+    const absPc = (chordP.rootPc + plan.keyPc) % 12;
+    const chord = { ...chordP, rootPc: absPc, relPc: chordP.rootPc, symbol: chordLabel(absPc, chordP.shape) };
     if (pos.barInPhrase === 0) this.lastPhraseFirst = chordSymRaw;
     this.currentSymRoman = chordSymRaw;
     for (const k of Object.keys(this.rootFatigue)) this.rootFatigue[k] *= 0.93; // 全体衰减：休整约 2 小节后可回归
-    this.rootFatigue[chord.rootPc] = (this.rootFatigue[chord.rootPc] ?? 0) + 1;
+    this.rootFatigue[chord.relPc] = (this.rootFatigue[chord.relPc] ?? 0) + 1;
     const lh = lhs[ans.lh?.value] ? ans.lh.value : this.style.lh[0];
     const rhythmEntry = rhythms[ans.rhythm?.value] ?? rhythms.r0;
     const contour = CONTOURS[ans.contour?.value] ? ans.contour.value : 'wave';

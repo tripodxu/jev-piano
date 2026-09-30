@@ -400,3 +400,30 @@ test('功能族内回落：和弦作答非法时优先落在模型声明的功�
   assert.equal(bar.decision.chordFn, 'D', `非法作答应回落到 D 族，实际 ${bar.decision.chordFn}（和弦 ${bar.chord.symbol}）`);
 });
 
+
+/* ---------------- 移调正确性（轮次 22 · keyPc 必须同时移和声） ---------------- */
+
+test('移调：keyPc 必须同时移和声——同 seed 下和弦根音整体平移', async () => {
+  const a = await makeComposer({ styleId: 'romantic', keyPc: 0 });
+  const b = await makeComposer({ styleId: 'romantic', keyPc: 7 });
+  const symsA = [], symsB = [];
+  for (let i = 0; i < 8; i++) {
+    const ba = await a.composer.nextBar();
+    const bb = await b.composer.nextBar();
+    assert.equal(bb.chord.rootPc, (ba.chord.rootPc + 7) % 12, `第 ${i + 1} 小节根音未随调平移`);
+    assert.equal(bb.chord.relPc, ba.chord.rootPc, 'relPc 应保留相对根音（决策层锚点）');
+    symsA.push(ba.chord.symbol);
+    symsB.push(bb.chord.symbol);
+  }
+  assert.ok(symsA.some((s, i) => s !== symsB[i]), `移调后和弦名应有变化: ${symsA.join(' ')} vs ${symsB.join(' ')}`);
+});
+
+test('移调：左手低音声部的音级类 = 和弦的绝对根音（36 + absPc，可能上移八度）', async () => {
+  const { composer } = await makeComposer({ styleId: 'romantic', keyPc: 7 });
+  for (let i = 0; i < 4; i++) {
+    const bar = await composer.nextBar();
+    const bass = bar.notes.filter((n) => n.hand === 'L').map((n) => n.midi);
+    assert.ok(bass.some((m) => ((m - 36) % 12 + 12) % 12 === bar.chord.rootPc),
+      `第 ${i + 1} 小节左手应含根音声部（rootPc=${bar.chord.rootPc}），实际 ${bass.join(',')}`);
+  }
+});
