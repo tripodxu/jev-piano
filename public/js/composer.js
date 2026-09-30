@@ -155,8 +155,10 @@ export class Composer {
     this.lastIntensity = null;    // 上一小节实际渲染的强度（速率限制的参考点）
     this.directorNote = '';        // 用户自然语言演奏指示，实时生效
     this.pitchCenter = 72;         // 音区中心缓慢漂移，避免旋律总绕着同一个音域打转
-    this.lastSigs = [];            // 最近两小节旋律指纹（反重复护栏）
-    this.lastLhSigs = [];          // 最近两小节左手指纹（renderLH 变体不足时的兜底）
+    this.lastSigs = [];            // 最近两小节旋律指纹（反重复护栏的**硬**层）
+    this.lastLhSigs = [];          // 最近两小节左手指纹
+    this.allSigs = new Set();      // 全曲旋律指纹（轮次 26 的**软**层）：远距离复读也尽量避开
+    this.allLhSigs = new Set();    // 全曲左手指纹——64 小节里 21% 的左手小节曾与远处小节字面相同
     this.prevMelody = null;        // 上一小节旋律素材（供模进/倒影）
     this.developHistory = [];      // 发展手法历史
     this.lastPhraseFirst = null;   // 上一乐句开场的和弦（用于乐句间换进行）
@@ -411,12 +413,16 @@ export class Composer {
 
     // 反重复护栏 + 乐句尾锚定。post 交给护栏内部执行：护栏在「锚定之后」的最终形态上判定碰撞，
     // 锚定不再发生在护栏之外——否则会「逃出去又被锚定改回撞车」（词句尾相邻重复的真实根因）。
+    // 指纹记忆分两层（轮次 26）：lastSigs（最近 2 小节）是**硬**层——相邻字面重复绝不允许；
+    // allSigs（全曲，含循环的前几遍）是**软**层——远距离复读尽量避开（64 小节里 10.2% 的旋律
+    // 小节曾与远处小节字面相同），变形空间耗尽时保留原样，不为远距离去破坏小节本身。
     const post = pos.isPhraseEnd ? (ns) => snapLastToChord(ns, chord) : (ns) => ns;
     rh = post(rh);
-    if (this.lastSigs.includes(sigOf(rh))) {
-      rh = mutateMelody(rh, { scale, rng: this.rng, avoid: this.lastSigs, post });
+    if (this.lastSigs.includes(sigOf(rh)) || this.allSigs.has(sigOf(rh))) {
+      rh = mutateMelody(rh, { scale, rng: this.rng, avoid: [...this.lastSigs, ...this.allSigs], post });
     }
     this.lastSigs = [sigOf(rh), ...this.lastSigs].slice(0, 2);
+    this.allSigs.add(sigOf(rh));
 
     // 记录本小节旋律素材（供下一小节模进/倒影）
     this.prevMelody = {
@@ -431,13 +437,20 @@ export class Composer {
     // 旧实现只重试 3 次就用尽、然后直接返回撞车的那一份，等于没有护栏：
     // 本轮把 motif 路径修好、旋律序列一变，就把它顶了出来（seed 7 出现相邻复读）。
     let lhNotes = renderLH({ plan, chord, patternId: lh, intensity, rng: this.rng });
-    for (let k = 0; k < 6 && this.lastLhSigs.includes(sigOf(lhNotes)); k++) {
+    const lhClash = (ns) => this.lastLhSigs.includes(sigOf(ns)) || this.allLhSigs.has(sigOf(ns));
+    for (let k = 0; k < 6 && lhClash(lhNotes); k++) {
       lhNotes = renderLH({ plan, chord, patternId: lh, intensity, rng: this.rng });
     }
-    if (lhNotes.length > 1 && this.lastLhSigs.includes(sigOf(lhNotes))) {
+    if (lhNotes.length > 1 && lhClash(lhNotes)) {
+      lhNotes = lhNotes.slice(0, -1);
+    }
+    // 变体空间耗尽的最后逃逸（轮次 26）：block/octave 这类织体在同和弦下变体极少，
+    // 6 次重渲染可能全部撞全曲指纹——逐音裁剪（保留低音+至少一个上声部）必然改变签名。
+    while (lhNotes.length > 2 && lhClash(lhNotes)) {
       lhNotes = lhNotes.slice(0, -1);
     }
     this.lastLhSigs = [sigOf(lhNotes), ...this.lastLhSigs].slice(0, 2);
+    this.allLhSigs.add(sigOf(lhNotes));
 
     const notes = [...lhNotes, ...rh];
     this.lastEndMidi = rh.length ? rh.at(-1).midi : this.lastEndMidi;

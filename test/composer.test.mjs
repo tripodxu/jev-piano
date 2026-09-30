@@ -224,8 +224,8 @@ test('呼吸不再取消承袭：breathe 时动机整体延后，轮廓不变', 
 
 test('呼吸不再取消任何变形手法：模进/倒影/装饰都要用上素材（只是延后进入）', async () => {
   const stat = { sequence: [], inversion: [], ornament: [] };
-  // 轮次 23 起问句尾改变决策序列，breathe+inversion 的出现分布合法漂移——种子池放宽到 12 颗保覆盖
-  for (const seed of [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036, 2037]) {
+  // 轮次 23/26 起（问句尾、左手抽稀变体各消耗一次 rng）决策序列合法漂移——种子池 16 颗稳住小样本均值
+  for (const seed of [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036, 2037, 2038, 2039, 2040, 2041]) {
     const { composer } = await makeComposer({ styleId: 'romantic', seed, bars: 32 });
     const bars = [];
     for (let i = 0; i < 32; i++) bars.push(await composer.nextBar());
@@ -446,4 +446,28 @@ test('乐句问答：bar3 标记 question、乐句尾标记 answer（归因不�
     [7, 'answer'], [15, 'answer'], [23, 'answer'], [31, 'answer']]) {
     assert.equal(roles[bar], role, `bar ${bar} 应为 ${role}`);
   }
+});
+
+/* ---------------- 全曲级指纹记忆（轮次 26）：远距离小节不再字面复读 ---------------- */
+
+const sigOfBarR = (b) => b.notes.filter((n) => n.hand === 'R').map((n) => Math.round(n.startBeats * 4) + ':' + n.midi).join(',');
+const sigOfBarL = (b) => b.notes.filter((n) => n.hand === 'L').map((n) => Math.round(n.startBeats * 4) + ':' + n.midi).join(',');
+
+test('全曲级指纹记忆：64 小节内旋律/左手不再有远距离字面复读（护栏记忆扩展到全曲）', async () => {
+  let melDup = 0, lhDup = 0, total = 0;
+  for (const seed of [2026, 2027, 2028]) {
+    const { composer } = await makeComposer({ styleId: 'romantic', seed, bars: 64 });
+    const mel = new Map(), lh = new Map();
+    for (let i = 0; i < 64; i++) {
+      const b = await composer.nextBar();
+      total++;
+      const ms = sigOfBarR(b), ls = sigOfBarL(b);
+      if (mel.has(ms) && i - mel.get(ms) > 2) melDup++;
+      if (lh.has(ls) && i - lh.get(ls) > 2) lhDup++;
+      mel.set(ms, i); lh.set(ls, i);
+    }
+  }
+  // 基线（护栏只记最近 2 小节）：12 种子实测 旋律 10.2% / 左手 21.0%；修复后应趋近 0
+  assert.ok(melDup / total < 0.03, `远距离旋律字面重复 ${(melDup / total * 100).toFixed(1)}% 应 <3%`);
+  assert.ok(lhDup / total < 0.03, `远距离左手字面重复 ${(lhDup / total * 100).toFixed(1)}% 应 <3%`);
 });

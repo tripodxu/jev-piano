@@ -276,15 +276,21 @@ export function renderLH({ plan, chord, patternId, intensity, rng }) {
     case 'block': {
       const rehit = intensity >= 1.5 && rng() < 0.4;
       const half = plan.meterNum / 2;
+      // 织体变体（轮次 26）：三声部 35% 概率抽掉顶部一声——同和弦的 block 此前只有 rehit 两种
+      // 字面形态，全曲指纹记忆下变体空间必然穷尽（实测 seed 2026 撞车后裁无可裁）
+      const voiced = rng() < 0.35 && upper.length > 2 ? upper.slice(0, upper.length - 1) : upper;
       push(bassNote, 0, rehit ? half : plan.meterNum, 0.5);
-      chordHit(0, rehit ? half : plan.meterNum, 0.4);
-      if (rehit) { push(bassNote, half, half, 0.46); chordHit(half, half, 0.36); }
+      voiced.forEach((m, j) => push(m, 0, rehit ? half : plan.meterNum, 0.4 - j * 0.03));
+      if (rehit) { push(bassNote, half, half, 0.46); voiced.forEach((m, j) => push(m, half, half, 0.36 - j * 0.03)); }
       break;
     }
     case 'ballad': {
       const off = plan.meterNum >= 4 && rng() < 0.4 ? 1 : 2; // 和弦落在第二拍或第三拍
-      push(bassNote, 0, off, 0.5); chordHit(0, off, 0.35);
-      chordHit(off, plan.meterNum - off, 0.4);
+      // 同款抽稀变体：ballad 此前也只有 off 两种字面形态
+      const voiced = rng() < 0.35 && upper.length > 2 ? upper.slice(0, upper.length - 1) : upper;
+      push(bassNote, 0, off, 0.5);
+      voiced.forEach((m, j) => push(m, 0, off, 0.35 - j * 0.03));
+      voiced.forEach((m, j) => push(m, off, plan.meterNum - off, 0.4 - j * 0.03));
       break;
     }
     case 'alberti': {
