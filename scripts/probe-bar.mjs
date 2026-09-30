@@ -1,4 +1,4 @@
-// scripts/probe-bar.mjs — 用真实 Jev API 跑一整小节的 6 问决策（buildPlan+Composer 生产路径）
+// scripts/probe-bar.mjs — 用真实 Jev API 跑一整小节的 8 问决策（buildPlan+Composer 生产路径）
 // 用法：node scripts/probe-bar.mjs [prompt] （key 取自 .dev.vars 或环境变量 TYPESAFE_API_KEY）
 import { readFileSync } from 'node:fs';
 import { buildPlan, Composer } from '../public/js/composer.js';

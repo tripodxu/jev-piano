@@ -1,4 +1,4 @@
-// composer.js — 编曲决策器：Jev 每小节一次请求（七问并行），代码把选择渲染成音符。
+// composer.js — 编曲决策器：Jev 每小节一次请求（八问并行），代码把选择渲染成音符。
 // 真实 Jev 不可用时（无 key/CORS/断网），fixture 采样器用同一候选集与权重同构兜底，播放永不中断。
 import {
   STYLE_BY_ID, NOTE_NAMES,
@@ -219,7 +219,7 @@ export class Composer {
     const isQuestionEnd = pos.barInPhrase === plan.barsPerPhrase / 2 - 1;
     const openEnd = isQuestionEnd;
     const cands = chordCandidates(this.style, plan, this.currentSymRoman, pos.barInPhrase, pos.isPhraseEnd, this.lastPhraseFirst, recentRoots, this.rootFatigue, { sectionStart, sectionEnd, openEnd });
-    // 第 7 问「和声功能」：模型先说下一小节要往哪个功能走（语义先于音名），
+    // 第 8 问「和声功能」：模型先说下一小节要往哪个功能走（语义先于音名），
     // 和弦仍在候选集内选——功能**不做硬过滤**（同一请求里无法先问功能再问和弦，
     // 硬过滤会让模型自己的合法作答被前置问题判死）。它的三个用途：语义语境、
     // 非法作答时的族内回落、UI 可读维度。
