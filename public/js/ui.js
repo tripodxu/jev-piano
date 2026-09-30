@@ -467,6 +467,7 @@ export const LEGEND_ITEMS = [
   { group: '断路器与守卫（功能轨上的形状）', label: '断路', swatch: 'lock', desc: '循环锁死断路器触发：这一小节把在绕圈的根音剔出了候选' },
   { group: '断路器与守卫（功能轨上的形状）', label: '驳回', swatch: 'rej', desc: '模型答了候选集之外的和弦，已按候选集强制回落' },
   { group: '断路器与守卫（功能轨上的形状）', label: '复读', swatch: '', desc: '这一小节与远处小节字面相同——全曲指纹记忆尽力变形后仍无出路，如实标记' },
+  { group: '断路器与守卫（功能轨上的形状）', label: '超预算', swatch: 'slow', desc: '渠道跟不上演奏速度：决策超过本小节的音频预算，由离线随机顶替保住节奏，下一小节重试真实渠道' },
   { group: '结构（各处的虚线与名字）', label: '段落', swatch: 'sec', desc: 'A 陈述 / B 对比 / A′ 再现 / Coda 收束，虚线竖线是段落边界' },
   { group: '结构（各处的虚线与名字）', label: '动机', swatch: 'motif', desc: '曲子主题的旋律轮廓，右侧计数是它回来的次数' },
   { group: '结构（各处的虚线与名字）', label: '罗盘', swatch: '', desc: '和声罗盘：最近小节的根音在五度圈上的轨迹——邻位小步是平滑进行，对角跳跃是色彩突变' },
@@ -532,6 +533,21 @@ export function probabilityStrip(probabilities, picked, { max = 3 } = {}) {
   }).join('');
 }
 
+/** 决策归因标记（ADR-0003 的"剔除即强制"在人眼前的账本）。
+ *  四类，全是「内核做了一个用户看不见的决定」：循环锁死断路器、候选集强制驳回、
+ *  软层复读、**决策超预算**（轮次 48：渠道跟不上演奏速度时主动顶替保住节奏）。
+ *  纯函数便于单测；返回描述符而非 HTML——文字通道（label）与形状通道（cls）分离。
+ *  脏输入降级为空数组（渲染层整段不输出，与 probabilityStrip 同一纪律）。 */
+export function decisionGuards(d) {
+  if (!d || typeof d !== 'object') return [];
+  const out = [];
+  if (d.loopLocked) out.push({ cls: 'lock', label: '断路', title: '循环锁死断路器触发：循环根音已从本小节候选中剔除' });
+  if (d.rejected) out.push({ cls: 'rej', label: '驳回', title: '模型答案不在候选集内，已按候选集强制回落' });
+  if (d.farRepeat || d.lhFarRepeat) out.push({ cls: '', label: '复读', title: '这一小节与远处小节字面相同——全曲指纹记忆尽力变形后仍无出路，如实标记' });
+  if (d.deadlineMiss) out.push({ cls: 'slow', label: '超预算', title: '渠道跟不上演奏速度：这一小节的决策超过了音频预算，已由离线随机顶替——播放不中断，下一小节重试真实渠道' });
+  return out;
+}
+
 export function addDecision(ul, bar) {
   const d = bar.decision;
   ul.querySelectorAll('.fresh').forEach((el) => el.classList.remove('fresh'));
@@ -542,11 +558,10 @@ export function addDecision(ul, bar) {
     : `<span>${d.ms}ms</span><span>${d.inputTokens}tok</span><span>$${d.usd.toFixed(6)}</span>${d.confidence != null ? `<span>置信 ${Number(d.confidence).toFixed(2)}</span>` : ''}`;
   // 断路器/候选集强制的归因标记：把 ADR-0003 的"剔除即强制"从代码搬到人眼前。
   // 「复读」是轮次 26 软层的诚实账本：远距离字面重复、变形空间耗尽后如实保留并标记。
-  const guards = [
-    d.loopLocked ? '<span class="guard lock" title="循环锁死断路器触发：循环根音已从本小节候选中剔除">断路</span>' : '',
-    d.rejected ? '<span class="guard rej" title="模型答案不在候选集内，已按候选集强制回落">驳回</span>' : '',
-    (d.farRepeat || d.lhFarRepeat) ? '<span class="guard" title="这一小节与远处小节字面相同——全曲指纹记忆尽力变形后仍无出路，如实标记">复读</span>' : '',
-  ].join('');
+  // 「超预算」是轮次 48 的诚实账本：渠道跟不上演奏速度时，内核主动用离线随机顶替保住节奏。
+  const guards = decisionGuards(d)
+    .map((g) => `<span class="guard${g.cls ? ' ' + g.cls : ''}" title="${escapeHtml(g.title)}">${escapeHtml(g.label)}</span>`)
+    .join('');
   li.innerHTML =
     `<span class="log-no">${bar.index + 1}<small>${bar.label}</small></span>` +
     `<span class="log-chord">${escapeHtml(bar.chord.symbol)}</span>` +

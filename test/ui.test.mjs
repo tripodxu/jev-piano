@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, fifthPos, compassPoints } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, fifthPos, compassPoints, decisionGuards } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -122,8 +122,31 @@ test('LEGEND_ITEMS: 每条都有名字与说明，且覆盖所有真实标记', 
   }
   // 覆盖面：四功能 + 五手法 + 断路器 + 驳回 + 段落 + 动机 + 张力 + 契合度 + 非和弦
   const text = LEGEND_ITEMS.map((i) => `${i.label}${i.desc}`).join('');
-  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '复读', '罗盘', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句']) {
+  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '复读', '超预算', '罗盘', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句']) {
     assert.ok(text.includes(kw), `图例缺少「${kw}」的说明`);
+  }
+});
+
+test('decisionGuards: 四类归因标记（超预算是新的一类，且与图例同源）', () => {
+  assert.deepEqual(decisionGuards(null), [], '脏输入降级为空');
+  assert.deepEqual(decisionGuards(undefined), []);
+  assert.deepEqual(decisionGuards('x'), []);
+  assert.deepEqual(decisionGuards({}), [], '没有归因字段时一个标记都不产出');
+  assert.equal(decisionGuards({ loopLocked: true })[0].label, '断路');
+  assert.equal(decisionGuards({ rejected: true })[0].label, '驳回');
+  assert.equal(decisionGuards({ farRepeat: true })[0].label, '复读');
+  assert.equal(decisionGuards({ lhFarRepeat: true })[0].label, '复读');
+  // 超预算：轮次 48 的诚实账本——渠道跟不上时主动顶替，必须与"渠道坏了"分开说
+  const slow = decisionGuards({ deadlineMiss: true })[0];
+  assert.equal(slow.label, '超预算');
+  assert.equal(slow.cls, 'slow', '超预算用弱化配色（设计在起作用，不是故障）');
+  assert.ok(slow.title.includes('下一小节重试'), 'title 要说清会自动重试');
+  // 可叠加：断路 + 超预算同时成立时两个标记都要在
+  assert.deepEqual(decisionGuards({ loopLocked: true, deadlineMiss: true }).map((g) => g.label), ['断路', '超预算']);
+  // 与图例同源：每一个真实标记都要能在图例里找到（标记改了图例没改，比没图例更糟）
+  const legend = LEGEND_ITEMS.map((i) => i.label).join(' ');
+  for (const g of decisionGuards({ loopLocked: true, rejected: true, farRepeat: true, deadlineMiss: true })) {
+    assert.ok(legend.includes(g.label), `图例缺少标记「${g.label}」的说明`);
   }
 });
 

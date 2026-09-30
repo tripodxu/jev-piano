@@ -474,6 +474,8 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   border: 1px solid var(--line-strong); color: var(--brass-hi);
 }
 .guard.rej { color: var(--crimson-hi); border-color: rgba(212, 97, 79, 0.4); }
+/* 超预算不是故障而是设计在起作用（主动顶替保住节奏）——刻意用弱化的色调，不抢"驳回"的警示位 */
+.guard.slow { color: var(--text-dim); border-color: rgba(214, 178, 110, 0.22); }
 /* ---------- 张力对照带：实际张力（实线）vs 计划弧线（虚线幽灵） ---------- */
 .tension-box { margin: 2px 0 10px; }
 #tensionCanvas {
@@ -558,6 +560,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .lg-sw.ten { background: var(--brass-hi); }
 .lg-sw.fit { background: rgba(216, 171, 92, 0.5); }
 .lg-sw.nct { background: var(--brass); box-shadow: 0 0 0 1.5px var(--brass-hi); }
+.lg-sw.slow { background: none; border: 1px dashed var(--text-faint); height: 6px; }
 .lg-nodismiss { margin-top: 6px; }
 .fn-legend .k-d { color: var(--brass-hi); font-weight: 600; }
 

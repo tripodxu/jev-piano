@@ -40,12 +40,16 @@ const saveSettings = () => persistSettings(settings);
 
 const CHANNEL_LABEL = { fixture: '离线随机', proxy: '同源代理', typesafe: 'TypeSafe', openrouter: 'OpenRouter' };
 const stats = { tokens: 0, usd: 0, latencySum: 0, latencyN: 0 };
-// 兜底告知只发一次：恢复真实渠道后复位，再断还会提示（自愈是设计，用户该知道它发生过）
-let fallbackAnnounced = false;
-const refreshStatus = (extraFixture) => {
+// 兜底告知只发一次：恢复真实渠道后复位，再断还会提示（自愈是设计，用户该知道它发生过）。
+// 两种兜底的成因完全不同，必须分开说——「渠道坏了」和「渠道跟不上速度」不是一回事：
+// 前者是故障（轮次 41），后者是设计在主动保住节奏（轮次 48）。
+let fallbackAnnounced = false;   // 渠道不可用（429/502/断网/CORS/无 key）
+let slowAnnounced = false;       // 渠道跟不上：决策超过本小节的音频预算
+const refreshStatus = (fallback) => { // fallback: null | 'down' | 'slow'
   const label = CHANNEL_LABEL[settings.channel] ?? settings.channel;
+  const suffix = fallback === 'slow' ? ' ·跟不上' : fallback ? ' ·兜底' : '';
   setStatus({ channel: els.stChannel, tokens: els.stTokens, cost: els.stCost, latency: els.stLatency }, {
-    channel: label + (extraFixture ? ' ·兜底' : ''),
+    channel: label + suffix,
     tokens: stats.tokens,
     cost: stats.usd,
     latency: stats.latencyN ? stats.latencySum / stats.latencyN : null,
@@ -263,13 +267,20 @@ async function start() {
         stats.usd += bar.decision.usd;
         if (bar.decision.ms > 0) { stats.latencySum += bar.decision.ms; stats.latencyN++; }
       }
-      refreshStatus(bar.decision.fixture && settings.channel !== 'fixture');
+      // 兜底归因（轮次 41/48）：把"这一小节为什么不是 Jev 弹的"说清楚，且只在事件首次发生时告知一次
+      const fb = bar.decision.fixture && settings.channel !== 'fixture'
+        ? (bar.decision.deadlineMiss ? 'slow' : 'down')
+        : null;
+      refreshStatus(fb);
       if (settings.channel !== 'fixture') {
-        if (bar.decision.fixture && !fallbackAnnounced) {
+        if (fb === 'slow' && !slowAnnounced) {
+          slowAnnounced = true;
+          toast(els.toast, '渠道跟不上演奏速度，本小节起由离线随机顶替——播放不中断，后续小节自动重试真实渠道', 6000);
+        } else if (fb === 'down' && !fallbackAnnounced) {
           fallbackAnnounced = true;
           toast(els.toast, '真实渠道暂时不可用，本小节起由离线随机接管——播放不中断，后续小节自动重试真实渠道', 6000);
-        } else if (!bar.decision.fixture) {
-          fallbackAnnounced = false;
+        } else if (!fb) {
+          fallbackAnnounced = false; slowAnnounced = false;
         }
       }
       // 曲终（轮次 36 的手势在界面上的回声）：插入本遍小结，准备下一遍的记账
