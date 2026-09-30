@@ -6,7 +6,9 @@ const LOW = 36, HIGH = 84; // C2..C6
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
 const BLACK_PCS = [1, 3, 6, 8, 10];
 
-export function renderKeyboard(container, low = LOW, high = HIGH) {
+/** 渲染键盘。opts.onKey(midi) 提供时，点击琴键立即回调（试听）——事件委托到容器，49 键一个监听器。
+ *  键帽仍是 aria-hidden 的视觉元素：指针试听是增强，完整键盘导航属独立无障碍工程。 */
+export function renderKeyboard(container, { low = LOW, high = HIGH, onKey = null } = {}) {
   container.innerHTML = '';
   const whites = [];
   for (let m = low; m <= high; m++) if (WHITE_PCS.includes(((m % 12) + 12) % 12)) whites.push(m);
@@ -20,6 +22,7 @@ export function renderKeyboard(container, low = LOW, high = HIGH) {
     el.style.left = `${whiteIdx.get(m) * w}%`;
     el.style.width = `${w}%`;
     el.title = midiName(m);
+    el.dataset.midi = m;
     container.appendChild(el);
     keyMap.set(m, el);
   }
@@ -30,8 +33,19 @@ export function renderKeyboard(container, low = LOW, high = HIGH) {
     el.style.left = `${whiteIdx.get(m + 1) * w - w * 0.31}%`;
     el.style.width = `${w * 0.62}%`;
     el.title = midiName(m);
+    el.dataset.midi = m;
     container.appendChild(el);
     keyMap.set(m, el);
+  }
+  if (onKey) {
+    container.addEventListener('pointerdown', (e) => {
+      const key = e.target.closest('[data-midi]');
+      if (!key) return;
+      const midi = Number(key.dataset.midi);
+      key.classList.add('on');
+      setTimeout(() => key.classList.remove('on'), 240);
+      onKey(midi);
+    });
   }
   return {
     flash(midi, durSec) {

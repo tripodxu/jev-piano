@@ -63,7 +63,11 @@ export function ensureStudio() {
     bpm: $('stBpm'), undo: $('stUndo'), redo: $('stRedo'),
     chord: $('stChord'), info: $('stInfo'), keyboard: $('stKeyboard'),
   };
-  kb = renderKeyboard(els.keyboard);
+  kb = renderKeyboard(els.keyboard, {
+    onKey: (midi) => getAudio().ensure()
+      .then(() => getAudio().play(midi, getAudio().ctx.currentTime + 0.01, 0.9, 0.7))
+      .catch(() => { /* 同实时页：试听是增强 */ }),
+  });
   bindRoll();
   bindVelLane();
   bindControls();

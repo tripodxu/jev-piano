@@ -382,7 +382,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   position: relative; z-index: 3;
 }
 
-.keyboard {
+.keyboard { user-select: none; touch-action: manipulation;
   position: relative; height: 128px;
   background: #0a0806;
   border-left: 1px solid rgba(0, 0, 0, 0.9); border-right: 1px solid rgba(0, 0, 0, 0.9);
@@ -632,7 +632,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   .motif-box { padding: 0 18px 4px; }
   .fnseg { flex: 1 0 22px; }        /* 窄屏下更窄的一段，宁可横滚也不挤压 */
   .fn-ribbon { justify-content: flex-end; }
-  .keyboard { height: 100px; }
+  .keyboard { user-select: none; touch-action: manipulation; height: 100px; }
   .stage-light {
   position: absolute; inset: 0; pointer-events: none; z-index: 0;
   transition: opacity 1.4s ease;

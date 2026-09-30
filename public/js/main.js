@@ -128,7 +128,12 @@ els.bpmRange.addEventListener('input', () => { if (!els.bpmAuto.checked) els.bpm
 
 /* ---------------- 音频与可视化 ---------------- */
 const audio = getAudio();
-const kb = renderKeyboard(els.keyboard);
+// 点击琴键试听：点击本身是用户手势，ensure() 合法；未开演也能摸一摸这件乐器
+const kb = renderKeyboard(els.keyboard, {
+  onKey: (midi) => audio.ensure()
+    .then(() => audio.play(midi, audio.ctx.currentTime + 0.01, 0.9, 0.7))
+    .catch(() => { /* 音频不可用时静默——试听是增强 */ }),
+});
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);
 const tensionGraph = new TensionGraph(els.tensionCanvas);
 const motifCard = new MotifCard(els.motifCanvas);
