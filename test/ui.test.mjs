@@ -2,7 +2,8 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt } from '../public/js/ui.js';
+import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
   index: 3,
@@ -137,4 +138,38 @@ test('renderLegend: 输出可读结构，且不含未转义的注入面', () => 
   assert.ok(!evil.includes('<img'), 'desc 里的标签必须被转义：' + evil);
   assert.equal(renderLegend([]), '', '空列表不产出内容');
   assert.equal(renderLegend(null), '');
+});
+
+/* ---------------- 时间维可见化（轮次 21 · 前端） ---------------- */
+
+test('planTempoLine: 速度行带尾段渐慢的具体数字（文字通道，不靠画布）', () => {
+  const plan = { bpm: 92, totalBars: 32, sections: deriveSections('arch', 32, 8) };
+  assert.equal(planTempoLine(plan), '速度 92 BPM · 尾段渐慢至 74');
+});
+
+test('planTempoLine: 末小节乘数为 1 时只有速度', () => {
+  const plan = {
+    bpm: 90, totalBars: 2,
+    sections: [
+      { id: 'A', arc: 'flat', level: 1, swing: 0.3, bars: 1, start: 0 },
+      { id: 'B', arc: 'flat', level: 1, swing: 0.3, bars: 1, start: 1 },
+    ],
+  };
+  assert.equal(planTempoLine(plan), '速度 90 BPM');
+});
+
+test('planTempoLine: 脏输入降级为空串（整段不输出）', () => {
+  assert.equal(planTempoLine(null), '');
+  assert.equal(planTempoLine({ totalBars: 32 }), '');
+  assert.equal(planTempoLine({ bpm: -5, totalBars: 32 }), '');
+});
+
+test('hoverBarAt: 命中/边缘/越界/空数据', () => {
+  assert.equal(hoverBarAt(26, 326, 10), 0, '左缘 = 第 0 小节');
+  assert.equal(hoverBarAt(320, 326, 10), 9, '右缘 = 最后一小节');
+  const mid = hoverBarAt(176, 326, 10);
+  assert.ok(mid >= 4 && mid <= 5, `中线附近: ${mid}`);
+  assert.equal(hoverBarAt(10, 326, 10), -1, '绘图区外');
+  assert.equal(hoverBarAt(100, 326, 0), -1, '没有小节');
+  assert.equal(hoverBarAt(NaN, 326, 10), -1, '脏输入');
 });

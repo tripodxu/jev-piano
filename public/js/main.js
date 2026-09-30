@@ -181,7 +181,9 @@ async function start() {
     audio, composer, bpm,
     onBar(bar) {
       els.nowChord.textContent = bar.chord.symbol;
-      els.nowBar.textContent = `第 ${bar.index + 1} 小节 ${bar.label} · 强度 ${bar.intensity.toFixed(1)}${bar.loop > 0 ? `，第 ${bar.loop + 1} 遍` : ''}`;
+      // 实际速度 = 基速 × 该小节乘数：Coda 渐慢时这个数字当着用户的面掉下去
+      const barSpeed = Math.round((60 / player.secPerBeat) * tempoMultAt(plan, bar.index));
+      els.nowBar.textContent = `第 ${bar.index + 1} 小节 ${bar.label} · 强度 ${bar.intensity.toFixed(1)} · 速度 ${barSpeed}${bar.loop > 0 ? `，第 ${bar.loop + 1} 遍` : ''}`;
       addDecision(els.decisionLog, bar);
       // 动机卡：第 2 小节是动机诞生点；此后每次「承袭」计一次
       if (bar.index === 1) motifCard.setMotif(bar.notes.filter((n) => n.hand === 'R').map((n) => n.midi));
@@ -190,6 +192,8 @@ async function start() {
       els.logEmpty.classList.add('hidden');
       // 张力对照带：逐小节长出实际张力，并给出可读读数
       tensionGraph.push(barTension(bar));
+      // hover 读数的元数据：当前小节的和弦与实际速度
+      tensionGraph.pushMeta({ chord: bar.chord.symbol, speed: barSpeed });
       const st = tensionStats(tensionGraph.actual);
       const fit = barHarmonyFit(bar).fit;
       els.tensionStat.textContent = tensionGraph.actual.length

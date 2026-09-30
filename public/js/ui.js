@@ -1,5 +1,6 @@
 // ui.js — 可视化：键盘 DOM、下落音符 canvas、决策日志、计划卡、状态条。
 import { midiName } from './music.js';
+import { tempoMultAt } from './candidates.js';
 
 const LOW = 36, HIGH = 84; // C2..C6
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
@@ -144,7 +145,14 @@ export class TensionGraph {
     this.actual = [];    // 已演奏小节的张力
     this.target = [];    // 计划弧线
     this.sections = [];  // 段落（画竖线 + 段落名）
+    this.meta = [];      // 每小节元数据 {chord, speed}（hover 读数；与 actual 同序）
+    this.hoverX = null;  // 指针横坐标（null = 不在画布上）
     this.timer = null;
+    canvas.addEventListener('pointermove', (e) => {
+      this.hoverX = e.clientX - canvas.getBoundingClientRect().left;
+      this.draw();
+    });
+    canvas.addEventListener('pointerleave', () => { this.hoverX = null; this.draw(); });
     this._resize = () => {
       const dpr = globalThis.devicePixelRatio || 1;
       const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -165,6 +173,11 @@ export class TensionGraph {
     this.draw();
   }
 
+  /** 追加当前小节的读数元数据（与 push 同调）：{chord, speed} */
+  pushMeta(m) {
+    if (m && typeof m === 'object') this.meta.push(m);
+  }
+
   /** 设定计划弧线（一次性，演奏开始前） */
   setTarget(series) {
     this.target = Array.isArray(series) ? series : [];
@@ -177,7 +190,7 @@ export class TensionGraph {
     this.draw();
   }
 
-  reset() { this.actual = []; this.draw(); }
+  reset() { this.actual = []; this.meta = []; this.hoverX = null; this.draw(); }
   start() { if (!this.timer) this.timer = setInterval(() => this.draw(), 120); }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.draw(); }
   destroy() { this.stop(); this._ro.disconnect(); }
@@ -246,6 +259,38 @@ export class TensionGraph {
     g.textAlign = 'right'; g.textBaseline = 'middle';
     for (const v of [0, 0.5, 1]) g.fillText(v.toFixed(1), padL - 5, yOf(v));
     g.restore();
+
+    // hover 读数：crosshair + 文字（第 N 小节 / 张力 / 计划 / 和弦 / 速度）。
+    // 只在指针悬停时出现，读数全是文字——颜色不承载任何 hover 才能读到的信息。
+    if (this.hoverX != null) {
+      const i = hoverBarAt(this.hoverX, W, n, padL, padR);
+      if (i >= 0) {
+        const x = padL + (n > 1 ? (i / (n - 1)) * iw : 0);
+        g.save();
+        g.strokeStyle = 'rgba(240,205,138,0.45)';
+        g.lineWidth = 1;
+        g.beginPath(); g.moveTo(Math.round(x) + 0.5, padT); g.lineTo(Math.round(x) + 0.5, padT + ih); g.stroke();
+        const av = this.actual[i];
+        if (av != null && Number.isFinite(av)) {
+          g.fillStyle = '#f6d695';
+          g.beginPath(); g.arc(x, yOf(av), 2.5, 0, Math.PI * 2); g.fill();
+        }
+        const m = this.meta[i] ?? {};
+        g.font = '10px monospace';
+        g.textAlign = 'right'; g.textBaseline = 'top';
+        g.fillStyle = 'rgba(240,205,138,0.95)';
+        g.fillText(`第 ${i + 1} 小节`, W - padR, padT);
+        const tv = this.target[i];
+        g.fillStyle = 'rgba(232,197,124,0.92)';
+        g.fillText(`张力 ${av != null && Number.isFinite(av) ? av.toFixed(2) : '—'}${Number.isFinite(tv) ? ` · 计划 ${tv.toFixed(2)}` : ''}`, W - padR, padT + 13);
+        const speed = Number.isFinite(m.speed) ? ` · 速度 ${m.speed}` : '';
+        if (m.chord || speed) {
+          g.fillStyle = 'rgba(200,188,160,0.9)';
+          g.fillText(`${m.chord ?? ''}${speed}`, W - padR, padT + 26);
+        }
+        g.restore();
+      }
+    }
   }
 }
 
@@ -269,6 +314,29 @@ export function sectionMarkerAt(sections, bar) {
 export function planLine(sections) {
   if (!Array.isArray(sections) || !sections.length) return '';
   return sections.map((s) => `${sectionLabel(s)} ${Number(s?.bars) || 0} 小节`).join(' · ');
+}
+
+/** 计划卡的速度行：「速度 92 BPM · 尾段渐慢至 74」（轮次 20 速度弧线的文字通道）。
+ *  末小节乘数 ≈1（单小节尾声等无渐慢余地的情况）时只有前半；脏输入返回空串，调用方整段回退。 */
+export function planTempoLine(plan) {
+  const bpm = Number(plan?.bpm);
+  if (!Number.isFinite(bpm) || bpm <= 0) return '';
+  const total = Math.max(1, Number(plan?.totalBars) || 32);
+  const lastMult = tempoMultAt(plan, total - 1);
+  const end = Math.round(bpm * lastMult);
+  const base = Math.round(bpm);
+  return `速度 ${base} BPM` + (lastMult < 0.99 && end < base ? ` · 尾段渐慢至 ${end}` : '');
+}
+
+/** 张力带 hover：指针横坐标 px → 最近小节序号；绘图区外/脏输入/无数据返回 -1。
+ *  hover 只是增强（ui-ux-pro-max："relying on hover only" 是反模式）——
+ *  无 hover 的读法是 tensionStat 文本行与 aria-label，二者始终存在。 */
+export function hoverBarAt(px, width, n, padL = 26, padR = 6) {
+  if (!Number.isFinite(px) || !Number.isFinite(width) || !Number.isInteger(n) || n < 1) return -1;
+  const iw = width - padL - padR;
+  if (iw <= 0 || px < padL - 4 || px > width - padR + 4) return -1;
+  const t = (px - padL) / iw;
+  return Math.min(n - 1, Math.max(0, Math.round(t * (n - 1))));
 }
 
 /** 发展手法：第 7 问的五种手法，中文全称（供 title 等需要完整语义的场合） */
@@ -520,9 +588,10 @@ function sectionsAt(sections) {
 export function renderPlan(el, plan) {
   const srcBadge = plan.source === 'llm' ? '<span class="badge">LLM 扩写</span>' : '<span class="badge">关键词理解</span>';
   const form = planLine(plan.sections);
+  const tempo = planTempoLine(plan) || `${Number(plan.bpm) || '?'} BPM`;
   el.innerHTML =
     `<h3>${escapeHtml(plan.title)}${srcBadge}</h3>` +
-    `<div class="meta">${escapeHtml(plan.styleName)}　${'CDEFGAB'[plan.keyPc]} ${plan.mode}　${plan.bpm} BPM　${plan.meterNum}/4　弧线 ${plan.arc}　${plan.totalBars} 小节</div>` +
+    `<div class="meta">${escapeHtml(plan.styleName)}　${'CDEFGAB'[plan.keyPc]} ${plan.mode}　${escapeHtml(tempo)}　${plan.meterNum}/4　弧线 ${plan.arc}　${plan.totalBars} 小节</div>` +
     (form ? `<div class="meta form-line" title="曲式：段落划分">曲式 ${escapeHtml(form)}</div>` : '') +
     `<div class="meta" style="margin-top:2px">情绪 ${escapeHtml(plan.mood.join(' / '))}</div>` +
     (plan.notes ? `<div class="notes">${escapeHtml(plan.notes)}</div>` : '');

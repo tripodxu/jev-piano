@@ -5,6 +5,13 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-09-30 · 时间维可见化（迭代轮次 21 · 前端）
+
+- **做了什么**（详见 [docs/memory/2026-09-30-tempo-visibility.md](docs/memory/2026-09-30-tempo-visibility.md)，计划 [docs/superpowers/plans/2026-09-30-tempo-visibility.md](docs/superpowers/plans/2026-09-30-tempo-visibility.md)）：轮次 20 的时间轴在界面上任何地方都看不到。三个通道补齐（零新增 id/canvas）：计划卡速度行 `速度 80 BPM · 尾段渐慢至 64`（`planTempoLine` 纯函数）；实时读数 nowBar 显示当前小节实际速度——Coda 渐慢时数字当着用户的面掉下去；张力带 hover crosshair + 画布内文字读数（`pushMeta`/`hoverBarAt` 纯函数）。skill `ui-ux-pro-max` chart 域：*"relying on hover only" 是反模式*——hover 只是增强，tensionStat 文本行与 aria 始终存在。测试 128→**132**。
+- **验证**：npm test 132/132；12 种子指标逐位不变（seed 2026 → 9 / 2.51 与基线一致）；id 契约未新增；三曲风端到端冒烟（80→64 / 137→110 / 70→56）。
+- **反思**：**「新能力不可见 = 没交付」第二次应验**（第一次是轮次 12 动机卡）——内核先落地、前端轮用最少的通道补可见性，文字优先于新图层。hover 是查询不是通知：画在指针旁、随指针消失，不常驻。
+- **下一步**（迭代轮次 22 · 优化）：**已实锤的一级 bug——「移调」只移旋律不移和声**（keyPc=0/7/3 三种调下和弦序列逐位相同，旋律音阶与和弦可处于不同调）；修复它是本轮的天然任务。
+
 ## [完成] 2026-09-30 · 速度弧线（迭代轮次 20 · 创意）
 
 - **做了什么**（详见 [docs/memory/2026-09-30-tempo-arc.md](docs/memory/2026-09-30-tempo-arc.md)，计划 [docs/superpowers/plans/2026-09-30-tempo-arc.md](docs/superpowers/plans/2026-09-30-tempo-arc.md)）：曲式有两根轴（响度 × 时间），张力弧线已段落化但**时间维度是死的**——整曲恒速演奏，没有真人最基本的「结尾渐慢」。新增 `tempoMultAt(plan, bar)` 纯函数（最后一段 rit. 1.0→0.8、arch/rise 段 +4% 推进、旧 JSON 兼容路径）；`player.js` 改为**顺序游标累计**每小节时长（乱序回退线性映射）；`midi.js` 导出按小节写 `set_tempo`（plateau 去重，不带参数时字节逐位不变）。测试 122→**128**。
