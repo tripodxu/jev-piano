@@ -178,22 +178,56 @@ export class Composer {
     };
   }
 
-  /** 一次真实请求；失败返回 fixture 同构决策（fixture=true）。
-   *  实时约束：attempts=2 / 8s 超时 → 最坏 ~19s 兜底，避免长静默；下一次小节仍会重试真实渠道（自愈）。 */
-  async _decide(state, questions) {
-    try {
-      const out = await askJev({ state, questions }, {
-        channel: this.cfg.channel, apiKey: this.cfg.apiKey, signal: this.cfg.signal, rng: this.rng,
-        attempts: 2, timeoutMs: 8000,
-      });
-      return { ...out, provider: this.cfg.channel };
-    } catch (e) {
-      if (e?.name === 'AbortError') throw e;
-      return { answers: fixtureAnswer(questions, this.rng), inputTokens: 0, usd: 0, ms: 0, fixture: true, provider: 'fixture', error: String(e?.message ?? e) };
+  /** 一次真实请求。budget 是「这一小节没时间了」的信号（播放器按音频时钟给出）：
+   *  真实答案先到就用真实答案；预算先耗尽就用 fixture 顶这一小节（deadlineMiss=true），
+   *  下一小节仍重试真实渠道（自愈）。
+   *
+   *  为什么必须有预算（轮次 48 线上事故「只能弹两小节」）：播放器的音频缓冲只有
+   *  AHEAD_BARS=2 小节，而 attempts=2 × 8s 超时让单次决策最坏 ~17s——远长于一小节
+   *  （60-140 BPM 下 0.86-4s）。渠道慢于一小节 → 缓冲抽干 → 静音；渠道挂住且超时信号
+   *  不兜底（AbortSignal.timeout 不可用的浏览器）→ nextBar 永不返回 → Player.deciding
+   *  永为 true → 管线永久楔死。红线「播放永不中断」要求决策时间有界，而这个界只能由
+   *  音频时钟给（Composer 不知道用户把 BPM 调到了多少）。 */
+  async _decide(state, questions, budget = null) {
+    const fixtureFallback = (error) => ({
+      answers: fixtureAnswer(questions, this.rng), inputTokens: 0, usd: 0, ms: 0,
+      fixture: true, provider: 'fixture', error: String(error?.message ?? error),
+    });
+    const ask = () => askJev({ state, questions }, {
+      channel: this.cfg.channel, apiKey: this.cfg.apiKey, signal: this.cfg.signal, rng: this.rng,
+      attempts: 2, timeoutMs: 8000,
+    });
+
+    if (!budget) { // 无音频时间轴约束（工作室批量生成）：保持原路径
+      try {
+        const out = await ask();
+        return { ...out, provider: this.cfg.channel };
+      } catch (e) {
+        if (e?.name === 'AbortError') throw e;
+        return fixtureFallback(e);
+      }
     }
+
+    // 赛道一：真实请求。两个分支都接住——否则预算先赢时它的迟到拒绝会变成未处理拒绝
+    const reqP = ask().then(
+      (out) => ({ out: { ...out, provider: this.cfg.channel } }),
+      (e) => ({ err: e }),
+    );
+    // 赛道二：预算耗尽。只可能解析出这一个值
+    const budgetP = budget.then(() => ({ budgetMiss: true }));
+    const won = await Promise.race([reqP, budgetP]);
+
+    if (won.budgetMiss) {
+      return { ...fixtureFallback(new Error('决策超预算，本小节由离线随机顶替')), deadlineMiss: true };
+    }
+    if (won.err) {
+      if (won.err?.name === 'AbortError') throw won.err;
+      return fixtureFallback(won.err);
+    }
+    return won.out;
   }
 
-  async nextBar() {
+  async nextBar(opts = {}) {
     const plan = this.plan;
     const pos = this._position();
     this.pitchCenter = clamp(this.pitchCenter + (this.rng() * 2 - 1) * 3 + (72 - this.pitchCenter) * 0.08, 62, 80);
@@ -331,7 +365,7 @@ export class Composer {
       },
     };
 
-    const dec = await this._decide(state, questions);
+    const dec = await this._decide(state, questions, opts.budget ?? null);
 
 
     // 解析答案（越界/非法一律回退到本地期望值）
@@ -487,6 +521,7 @@ export class Composer {
       intensity,
       decision: {
         provider: dec.provider, fixture: !!dec.fixture, ms: dec.ms ?? 0,
+        deadlineMiss: !!dec.deadlineMiss,
         inputTokens: dec.inputTokens ?? 0, usd: dec.usd ?? 0,
         lh, contour, tier: rhythmEntry.tier ?? 1, breathe, develop: effectiveDev, roman: chordSymRaw,
         confidence: ans.chord?.confidence ?? ans.chord?.probability ?? null,

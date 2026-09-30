@@ -10,7 +10,7 @@ function makeHarness() {
   let nextId = 1;
   const played = [];
   const barsSeen = [];
-  const audio = { play: (midi, when, dur, vel) => played.push({ midi, when, dur, vel }) };
+  const audio = { play: (midi, when, dur, vel) => played.push({ midi, when, dur, vel, disp: t }) };
   const now = () => t;
   const setTimer = (fn, ms) => { const id = nextId++; timers.set(id, { fn, ms }); return id; };
   const clearTimer = (id) => timers.delete(id);
@@ -140,4 +140,67 @@ test('onNote/audio.play 抛异常：不中断排程循环', async () => {
   assert.ok(p.running);
   assert.ok(p.records.length > 0, 'records 照常记录');
   p.stop();
+});
+
+/* ---------------- 决策预算与迟到小节（轮次 48：线上「只能弹两小节」） ----------------
+ * 症状复现（脚手架已删，复刻方法见 docs/memory/2026-09-30-decision-budget-two-bars.md）：
+ * 渠道慢于一小节 → 缓冲抽干 → 用户只听到约两小节；
+ * 渠道挂住 → 迟到小节的音符被排进过去 → Web Audio 立即发声 → 炸成一片。两件事都必须在
+ * 播放器侧修掉：决策时间由音频时钟封顶，迟到小节顺延到现在而不是排进过去。
+ */
+
+test('渠道挂住：预算内切 fixture，播放持续推进（只能弹两小节的回归）', async () => {
+  const h = await makeHarness();
+  const bars = 8;
+  const plan = await buildPlan({ prompt: '星空', goal: '随机冒险', styleId: 'newage', seed: 9, bars, keyPc: 0 }, {});
+  const composer = new Composer(plan, { channel: 'proxy' }); // 真实渠道：fetch 永不返回
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = () => new Promise(() => {});
+  const errors = [];
+  const p = new Player({
+    audio: h.audio, composer, bpm: plan.bpm,
+    onBar: (bar) => h.barsSeen.push(bar), onNote: () => {},
+    onError: (e) => errors.push(String(e?.message ?? e)),
+    now: h.now, setTimer: h.setTimer, clearTimer: h.clearTimer,
+  });
+  try {
+    p.start();
+    const barLen = p.secPerBeat * p.meterNum;
+    await h.advance((bars + 1) * barLen);
+    assert.equal(errors.length, 0, '挂住的渠道不得升级为演奏中断');
+    assert.ok(p.running, '播放器必须还在运行');
+    assert.ok(h.barsSeen.length >= bars - 1,
+      `挂住时也应把 ${bars} 小节演完，实际只播到 ${h.barsSeen.length} 小节（线上症状：只能弹两小节）`);
+    assert.ok(h.barsSeen.length >= 4, '至少四小节有回调');
+    assert.ok(p.records.length > 20, '音符必须持续被调度');
+    // 听觉真相：Web Audio 对「排程在过去」的音是立即发声——整小节会炸成一声，
+    // 用户听到的就是「卡住」。健康管线只会提前排程（when ≥ disp），迟到 = 排进了过去。
+    // 判据取量级：旧缺陷是整小节秒级迟到，正常只有 tick 粒度（30ms）的零头。
+    const maxLate = h.played.reduce((m, e) => Math.max(m, e.disp - e.when), 0);
+    assert.ok(maxLate <= 0.05,
+      `不得有音符被排进过去（那会把整小节炸成一声），最大迟到 ${(maxLate * 1000).toFixed(0)}ms`);
+  } finally {
+    globalThis.fetch = origFetch;
+    p.stop();
+  }
+});
+
+test('迟到小节顺延到现在：不把音符排进过去（Web Audio 对过去的音立即发声）', async () => {
+  const h = await makeHarness();
+  const p = await makePlayer(h);
+  p.start();
+  await h.advance(3);                       // 先让时钟走到 3s
+  p.stop();                                 // 停掉真实管线：只测 _enqueueBar 的顺延，别被后续入队干扰
+  const now = h.t;
+  const barLen = p.secPerBeat * p.meterNum;
+  // 手动制造一个「迟到的小节」：游标还在 0，但时钟已经走到 3s（首小节槽位 0.25s 早已过去）
+  p._cursorBeat = 0; p._cursorSec = p._t0; p._enqueuedOnce = false;
+  p._enqueueBar({ index: 0, notes: [{ midi: 60, startBeats: 0, durBeats: 1, vel: 0.5, hand: 'R' }] });
+  const mark = p.barMarks.at(-1);
+  assert.ok(mark.t >= now - 1e-9, `迟到小节必须顺延到 ${now} 之后，实际排在 ${mark.t}（过去 → 立即发声）`);
+  assert.ok(mark.t - now < barLen, `顺延量 ${mark.t - now} 不应超过一小节 ${barLen}`);
+  // 顺延后游标一致：下一小节接着新锚点排，不再累积迟到
+  p._enqueueBar({ index: 1, notes: [] });
+  const m1 = p.barMarks.at(-1);
+  assert.ok(Math.abs(m1.t - (mark.t + barLen)) < 1e-9, '后续小节从新锚点继续，节奏不断');
 });

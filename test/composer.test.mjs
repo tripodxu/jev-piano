@@ -562,3 +562,79 @@ test('曲终手势：snapLastToTonic 空输入安全；循环第二遍的曲末�
     }
   }
 });
+
+/* ---------------- 决策预算（轮次 48 · 线上「只能弹两小节」的根因修复） ----------------
+ * 播放器的音频缓冲只有 AHEAD_BARS=2 小节，而旧实现的决策时间无界（attempts=2 × 8s 超时 ≈ 17s
+ * 最坏）。渠道慢于一小节 → 缓冲抽干 → 用户只听到约两小节就静音；渠道挂住且超时信号不兜底 →
+ * Player.deciding 永为 true → 管线永久楔死。修法：决策时间必须由音频时钟封顶。
+ */
+
+/** 永不通向 resolve/reject 的 fetch：线上「上游挂住」的形态 */
+const hangFetch = () => new Promise(() => {});
+
+/** 合法的一次真实 Jev 响应 */
+const okBody = () => ({
+  model: 'jev', usage: { input_tokens: 1860 },
+  answers: {
+    function: { type: 'choice', choice: 'T' },
+    chord: { type: 'choice', choice: 'i' },
+    lh: { type: 'choice', choice: 'block' },
+    rhythm: { type: 'choice', choice: 'r1' },
+    contour: { type: 'choice', choice: 'wave' },
+    intensity: { type: 'score', score: 1 },
+    breathe: { type: 'noul', noul: 0.3 },
+    develop: { type: 'choice', choice: 'repeat' },
+  },
+});
+
+async function withFetch(fn, impl) {
+  const orig = globalThis.fetch;
+  globalThis.fetch = impl;
+  try { return await fn(); } finally { globalThis.fetch = orig; }
+}
+
+test('决策预算内：真实渠道正常返回，不误伤', async () => {
+  const { composer } = await makeComposer({}, { channel: 'proxy' });
+  const bar = await withFetch(
+    () => composer.nextBar({ budget: new Promise(() => {}) }),  // 预算永不耗尽
+    async () => ({ ok: true, status: 200, json: async () => okBody() }),
+  );
+  assert.equal(bar.decision.fixture, false, '真实答案必须被采用');
+  assert.notEqual(bar.decision.deadlineMiss, true, '预算未耗尽不得标记 deadlineMiss');
+  assert.ok(bar.notes.length > 0);
+});
+
+test('决策超预算：本小节 fixture 顶替并如实标记（渠道慢/挂住时播放不中断）', async () => {
+  const { composer } = await makeComposer({}, { channel: 'proxy' });
+  const t0 = Date.now();
+  const bar = await composer.nextBar({ budget: Promise.resolve({ budgetMiss: true }) });
+  assert.ok(Date.now() - t0 < 3000, '预算耗尽必须立刻返回，不能挂死');
+  assert.equal(bar.decision.fixture, true, '超预算那一小节由离线随机顶替');
+  assert.equal(bar.decision.deadlineMiss, true, '必须如实标记这是预算顶替而非渠道失败');
+  assert.equal(bar.decision.provider, 'fixture');
+  assert.ok(bar.notes.length > 0, '顶替小节也必须真的发声');
+});
+
+test('决策超预算后迟到的真实响应被丢弃，小节序号不错位', async () => {
+  const { composer } = await makeComposer({}, { channel: 'proxy' });
+  const late = (ms) => new Promise((r) => setTimeout(r, ms));
+  const b0 = await withFetch(() => composer.nextBar({
+    budget: Promise.resolve({ budgetMiss: true }),   // 预算先赢
+  }), async () => { await late(5); return { ok: true, status: 200, json: async () => okBody() }; });
+  assert.equal(b0.index, 0);
+  const b1 = await withFetch(() => composer.nextBar({ budget: new Promise(() => {}) }),
+    async () => ({ ok: true, status: 200, json: async () => okBody() }));
+  assert.equal(b1.index, 1, '小节序号严格递增：晚到的答案没有插队');
+});
+
+test('渠道挂住（fetch 永不返回）：预算内切 fixture，管线不楔死', async () => {
+  const { composer } = await makeComposer({}, { channel: 'proxy' });
+  const t0 = Date.now();
+  const bar = await withFetch(() => composer.nextBar({ budget: Promise.resolve({ budgetMiss: true }) }), hangFetch);
+  assert.ok(Date.now() - t0 < 3000, '挂住的渠道不得让 nextBar 永不返回');
+  assert.equal(bar.index, 0);
+  assert.equal(bar.decision.deadlineMiss, true);
+  // 管线必须还能继续：下一小节照样出声（楔死 = 线上「只能弹两小节」的终局）
+  const bar2 = await composer.nextBar({ budget: new Promise(() => {}) });
+  assert.equal(bar2.index, 1, '超预算之后管线必须继续推进');
+});

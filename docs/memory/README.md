@@ -7,6 +7,7 @@
 
 | 日期 | 条目 | 一句话 |
 |---|---|---|
+| 2026-09-30 | [decision-budget-two-bars](2026-09-30-decision-budget-two-bars.md) | 解决「只能弹两小节」：决策时间由音频时钟封顶 + 迟到小节顺延（根因是决策无界，不是渠道失败） |
 | 2026-09-30 | [docs-count-drift](2026-09-30-docs-count-drift.md) | 文档漂移清理：行数/测试数/八问/限流值一次对齐（宪法表格集体冻结） |
 | 2026-09-28 | [real-jev-repetition-baseline](2026-09-28-real-jev-repetition-baseline.md) | 真实 Jev 重复度基线：熔断（和弦种类 6<8，模型选择过集中） |
 | 2026-09-28 | [anti-repetition-overhaul](2026-09-28-anti-repetition-overhaul.md) | 反重复大修：根音疲劳/候选集强制/替换和弦，真实 Jev 验证 |
