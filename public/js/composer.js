@@ -422,6 +422,8 @@ export class Composer {
       rh = mutateMelody(rh, { scale, rng: this.rng, avoid: [...this.lastSigs, ...this.allSigs], post });
     }
     this.lastSigs = [sigOf(rh), ...this.lastSigs].slice(0, 2);
+    // 软层的诚实账本（轮次 27）：变形后仍与全曲某小节字面相同 → 归因字段如实标记（UI 显示「复读」）
+    const farRepeat = this.allSigs.has(sigOf(rh));
     this.allSigs.add(sigOf(rh));
 
     // 记录本小节旋律素材（供下一小节模进/倒影）
@@ -450,6 +452,7 @@ export class Composer {
       lhNotes = lhNotes.slice(0, -1);
     }
     this.lastLhSigs = [sigOf(lhNotes), ...this.lastLhSigs].slice(0, 2);
+    const lhFarRepeat = this.allLhSigs.has(sigOf(lhNotes));
     this.allLhSigs.add(sigOf(lhNotes));
 
     const notes = [...lhNotes, ...rh];
@@ -479,6 +482,7 @@ export class Composer {
         loopLocked, rejected: !picked,
         fn: declaredFn,
         phraseRole: isQuestionEnd ? 'question' : pos.isPhraseEnd ? 'answer' : null,
+        farRepeat, lhFarRepeat,
         chordFn: chordP.fn ?? functionOf(chordSymRaw, plan.mode),
         answers: ans, candidates: Object.keys(questions.chord.criteria),
       },

@@ -6,7 +6,7 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend } from './ui.js';
+import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine } from './ui.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { barHarmonyFit, NCT_ZH } from './nct.js';
 import { planTargetSeries, tempoMultAt } from './candidates.js';
@@ -21,7 +21,7 @@ const els = {
   fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), decisionLog: $('decisionLog'),
   fnRibbon: $('fnRibbon'), logEmpty: $('logEmpty'),
   tensionCanvas: $('tensionCanvas'), tensionStat: $('tensionStat'),
-  motifCanvas: $('motifCanvas'),
+  motifCanvas: $('motifCanvas'), repStat: $('repStat'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
   settingsBtn: $('settingsBtn'), settingsDrawer: $('settingsDrawer'), settingsClose: $('settingsClose'),
   legendBtn: $('legendBtn'), legendDrawer: $('legendDrawer'), legendClose: $('legendClose'),
@@ -110,6 +110,9 @@ const kb = renderKeyboard(els.keyboard);
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);
 const tensionGraph = new TensionGraph(els.tensionCanvas);
 const motifCard = new MotifCard(els.motifCanvas);
+// 唯一性读数（轮次 27）：与 composer 同口径的字面指纹（onset×4:midi），逐小节更新
+const sigOfNotes = (ns) => ns.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
+const seenMel = new Set(), seenLh = new Set();
 
 /* ---------------- 播放控制 ---------------- */
 let player = null;
@@ -147,6 +150,8 @@ async function start() {
   tensionGraph.setSections([]);
   motifCard.reset();
   els.tensionStat.textContent = '';
+  els.repStat.textContent = '';
+  seenMel.clear(); seenLh.clear();
   els.playBtn.disabled = true;
   els.playBtn.textContent = '… 编曲中';
 
@@ -199,6 +204,10 @@ async function start() {
       els.tensionStat.textContent = tensionGraph.actual.length
         ? `${st.mean.toFixed(2)} 均值 · ${st.min.toFixed(2)}–${st.max.toFixed(2)} 跨度 ${st.span.toFixed(2)} · 和弦音 ${(fit * 100).toFixed(0)}%`
         : '';
+      // 唯一性读数：反重复系统成功时没有事件，这个安静的数字就是它的可见形态
+      seenMel.add(sigOfNotes(bar.notes.filter((n) => n.hand === 'R')));
+      seenLh.add(sigOfNotes(bar.notes.filter((n) => n.hand === 'L')));
+      els.repStat.textContent = uniquenessLine(seenMel.size, seenLh.size, bar.index + 1);
       if (!bar.decision.fixture) {
         stats.tokens += bar.decision.inputTokens;
         stats.usd += bar.decision.usd;

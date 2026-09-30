@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -122,7 +122,7 @@ test('LEGEND_ITEMS: 每条都有名字与说明，且覆盖所有真实标记', 
   }
   // 覆盖面：四功能 + 五手法 + 断路器 + 驳回 + 段落 + 动机 + 张力 + 契合度 + 非和弦
   const text = LEGEND_ITEMS.map((i) => `${i.label}${i.desc}`).join('');
-  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句']) {
+  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '复读', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句']) {
     assert.ok(text.includes(kw), `图例缺少「${kw}」的说明`);
   }
 });
@@ -179,4 +179,14 @@ test('hoverBarAt: 命中/边缘/越界/空数据', () => {
   assert.equal(hoverBarAt(10, 326, 10), -1, '绘图区外');
   assert.equal(hoverBarAt(100, 326, 0), -1, '没有小节');
   assert.equal(hoverBarAt(NaN, 326, 10), -1, '脏输入');
+});
+
+/* ---------------- 反重复成果可见化（轮次 27 · 前端） ---------------- */
+
+test('uniquenessLine: 唯一性读数是纯文本；0 小节时不输出', () => {
+  assert.equal(uniquenessLine(32, 31, 32), '旋律唯一 32/32 · 左手唯一 31/32');
+  assert.equal(uniquenessLine(5, 5, 5), '旋律唯一 5/5 · 左手唯一 5/5');
+  assert.equal(uniquenessLine(0, 0, 0), '');
+  assert.equal(uniquenessLine(0, 0, -3), '');
+  assert.equal(uniquenessLine(3, 2, NaN), '');
 });

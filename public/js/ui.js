@@ -328,6 +328,15 @@ export function planTempoLine(plan) {
   return `速度 ${base} BPM` + (lastMult < 0.99 && end < base ? ` · 尾段渐慢至 ${end}` : '');
 }
 
+/** 唯一性读数（轮次 27）：反重复系统成功时没有事件，这个安静的数字就是它的可见形态。
+ *  口径与 composer 的指纹一致（onset×4:midi 字面唯一小节数）。bars≤0 或脏输入返回空串（整行不输出）。 */
+export function uniquenessLine(melSeen, lhSeen, bars) {
+  const n = Number(bars);
+  if (!Number.isFinite(n) || n < 1) return '';
+  const m = Math.min(Number(melSeen) || 0, n), l = Math.min(Number(lhSeen) || 0, n);
+  return `旋律唯一 ${m}/${n} · 左手唯一 ${l}/${n}`;
+}
+
 /** 张力带 hover：指针横坐标 px → 最近小节序号；绘图区外/脏输入/无数据返回 -1。
  *  hover 只是增强（ui-ux-pro-max："relying on hover only" 是反模式）——
  *  无 hover 的读法是 tensionStat 文本行与 aria-label，二者始终存在。 */
@@ -365,6 +374,7 @@ export const LEGEND_ITEMS = [
   { group: '乐句语气（功能轨上的字）', label: '答', swatch: '', desc: '答句·全终止——乐句在此收束、回到主和弦' },
   { group: '断路器与守卫（功能轨上的形状）', label: '断路', swatch: 'lock', desc: '循环锁死断路器触发：这一小节把在绕圈的根音剔出了候选' },
   { group: '断路器与守卫（功能轨上的形状）', label: '驳回', swatch: 'rej', desc: '模型答了候选集之外的和弦，已按候选集强制回落' },
+  { group: '断路器与守卫（功能轨上的形状）', label: '复读', swatch: '', desc: '这一小节与远处小节字面相同——全曲指纹记忆尽力变形后仍无出路，如实标记' },
   { group: '结构（各处的虚线与名字）', label: '段落', swatch: 'sec', desc: 'A 陈述 / B 对比 / A′ 再现 / Coda 收束，虚线竖线是段落边界' },
   { group: '结构（各处的虚线与名字）', label: '动机', swatch: 'motif', desc: '曲子主题的旋律轮廓，右侧计数是它回来的次数' },
   { group: '分析读数（张力带与卷帘）', label: '张力', swatch: 'ten', desc: '这一小节有多紧：实线是实际，虚线是计划弧线' },
@@ -419,10 +429,12 @@ export function addDecision(ul, bar) {
   const stats = d.fixture
     ? `<span class="fixture">离线随机</span>`
     : `<span>${d.ms}ms</span><span>${d.inputTokens}tok</span><span>$${d.usd.toFixed(6)}</span>${d.confidence != null ? `<span>置信 ${Number(d.confidence).toFixed(2)}</span>` : ''}`;
-  // 断路器/候选集强制的归因标记：把 ADR-0003 的"剔除即强制"从代码搬到人眼前
+  // 断路器/候选集强制的归因标记：把 ADR-0003 的"剔除即强制"从代码搬到人眼前。
+  // 「复读」是轮次 26 软层的诚实账本：远距离字面重复、变形空间耗尽后如实保留并标记。
   const guards = [
     d.loopLocked ? '<span class="guard lock" title="循环锁死断路器触发：循环根音已从本小节候选中剔除">断路</span>' : '',
     d.rejected ? '<span class="guard rej" title="模型答案不在候选集内，已按候选集强制回落">驳回</span>' : '',
+    (d.farRepeat || d.lhFarRepeat) ? '<span class="guard" title="这一小节与远处小节字面相同——全曲指纹记忆尽力变形后仍无出路，如实标记">复读</span>' : '',
   ].join('');
   li.innerHTML =
     `<span class="log-no">${bar.index + 1}<small>${bar.label}</small></span>` +

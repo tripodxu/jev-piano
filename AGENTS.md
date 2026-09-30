@@ -59,12 +59,12 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | `candidates.js` | 357 | **候选集构造**（= 给模型的可选域）+ **曲式**：两条断路器、声部进行加权、功能转移矩阵、`FORM_TEMPLATES`/`deriveSections`/`sectionAt`/段落感知 `intensityTarget`/`planTargetSeries`、速度弧线 `tempoMultAt`、**`developCandidates`（段落首偏承袭）** | 兜底判据是「候选够用 ≥3」不是「非空」；`W_SMOOTH` 锁在 0.5；断路器取舍先放疲劳、留锁死；**`rise` 曲式的 Coda level 必须高于 A**；**段落首 `repeat += 1.6` / `new *= 0.3` 是锁值**（改了 A→A' 的再现关系就没了） |
 | `render.js` | 383 | **渲染内核**：旋律渲染（轮廓/锚定/摇摆/人味）、左手 11 种织体（block/ballad 带声部抽稀变体）、动机发展四手法、反重复护栏（指纹/变形）；全部纯函数（rng 注入），只依赖 `music.js` |
 | `jev.js` | 215 | 四渠道客户端（fixture/typesafe/openrouter/proxy）、归一化、429/529 退避重试、fixture 采样、LLM 扩写（**系统二：可选的 sections 字段 = 曲式规划**） | `stripPrivate`：发送前剥离 `_` 前缀字段 |
-| `composer.js` | 496 | **决策器**：`buildPlan`（**曲式 `sections`**）、`Composer.nextBar()`（七问 + 强度连续化 + 段落边界语义 + 动机调度）、动机记忆、决策归因字段；渲染细节在 `render.js` | 候选集与曲式都不在本文件；旋律护栏必须在乐句尾锚定**之后**判定碰撞；`INTENSITY_DEV`/`INTENSITY_SLEW` 锁值；**发展手法的素材来源有分工**：`repeat` 用动机、其余用 `prevMelody`；**「呼吸」是时值指令（`breatheDelay` 延后进入）不是否决指令**——四条变形手法在有呼吸时也必须用上素材，兜底走 `fresh()` 后**归因强制改为 `new`**；左手护栏重试 6 次仍撞车则去掉末音 |
+| `composer.js` | 497 | **决策器**：`buildPlan`（**曲式 `sections`**）、`Composer.nextBar()`（七问 + 强度连续化 + 段落边界语义 + 动机调度）、动机记忆、决策归因字段；渲染细节在 `render.js` | 候选集与曲式都不在本文件；旋律护栏必须在乐句尾锚定**之后**判定碰撞；`INTENSITY_DEV`/`INTENSITY_SLEW` 锁值；**发展手法的素材来源有分工**：`repeat` 用动机、其余用 `prevMelody`；**「呼吸」是时值指令（`breatheDelay` 延后进入）不是否决指令**——四条变形手法在有呼吸时也必须用上素材，兜底走 `fresh()` 后**归因强制改为 `new`**；左手护栏重试 6 次仍撞车则去掉末音 |
 | `audio.js` | 133 | 合成钢琴（三角波+泛音+包络+低通+生成式混响）、录音 | `envFor` 纯函数有单测 |
 | `player.js` | 132 | lookahead 调度器（提前 2 小节），`now/setIntervalFn` 可注入 | 时钟注入契约被测试锁定 |
 | `midi.js` | 77 | SMF Type-1 双轨导出 | 字节格式有单测 |
-| `ui.js` | 626 | 键盘 DOM、下落音符 canvas、**和声功能轨**、**张力对照带**（`TensionGraph`）、**段落标注**、**动机卡**（`MotifCard`/`motifShape`）、**图例**（`LEGEND_ITEMS`/`renderLegend`）、决策日志、计划卡、toast | 功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；**颜色归功能、形态归手法**；段落/手法标注都必须有文字通道；**`LEGEND_ITEMS` 必须与真实标记同源**（标记改了图例没改，比没图例更糟，有测试守）；canvas 渲染用 setInterval 而非 rAF |
-| `main.js` | 338 | 实时即兴接线：设置持久化、渠道探测、开始/停止/导出、张力/功能轨/动机卡喂数、**图例抽屉开合与「不再提示」记忆** | 元素 id 契约见 `index.html` |
+| `ui.js` | 638 | 键盘 DOM、下落音符 canvas、**和声功能轨**、**张力对照带**（`TensionGraph`）、**段落标注**、**动机卡**（`MotifCard`/`motifShape`）、**图例**（`LEGEND_ITEMS`/`renderLegend`）、决策日志、计划卡、toast | 功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；**颜色归功能、形态归手法**；段落/手法标注都必须有文字通道；**`LEGEND_ITEMS` 必须与真实标记同源**（标记改了图例没改，比没图例更糟，有测试守）；canvas 渲染用 setInterval 而非 rAF |
+| `main.js` | 347 | 实时即兴接线：设置持久化、渠道探测、开始/停止/导出、张力/功能轨/动机卡喂数、**图例抽屉开合与「不再提示」记忆** | 元素 id 契约见 `index.html` |
 | `studio.js` | 924 | 工作室界面：批量生成 job、钢琴卷帘编辑（**头部含张力曲线 + 功能带 + 契合度带**）、量化 + 力度轨、Jev 路由的自然语言修改、JSON 导入导出 | 确定性编辑纯函数有单测；卷帘头部四段与音符区**共用 `ZOOM`**；**力度轨与卷帘同在 `.rollwrap` 内，播放头 `top:0/bottom:0` 自动覆盖两条轨——不要另建同步**；张力与 `nonChordIds` 两份缓存都在 `invalidateTension()` 里作废 |
 | `settings.js` | 21 | localStorage 设置读写（含 `legendHintOff`：图例提示记不记） | — |
 

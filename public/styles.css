@@ -427,6 +427,10 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 }
 
 /* ============================ 演奏记录 ============================ */
+.rep-stat {
+  font: 400 10px/1 var(--mono, monospace); letter-spacing: .08em;
+  color: var(--text-faint); margin-left: 10px; white-space: nowrap;
+}
 .programme-title {
   margin: 0 0 10px; font-family: var(--serif); font-weight: 600; font-size: 19px; color: var(--text);
   display: flex; align-items: baseline; gap: 14px;
