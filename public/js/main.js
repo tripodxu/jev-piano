@@ -38,6 +38,8 @@ const saveSettings = () => persistSettings(settings);
 
 const CHANNEL_LABEL = { fixture: '离线随机', proxy: '同源代理', typesafe: 'TypeSafe', openrouter: 'OpenRouter' };
 const stats = { tokens: 0, usd: 0, latencySum: 0, latencyN: 0 };
+// 兜底告知只发一次：恢复真实渠道后复位，再断还会提示（自愈是设计，用户该知道它发生过）
+let fallbackAnnounced = false;
 const refreshStatus = (extraFixture) => {
   const label = CHANNEL_LABEL[settings.channel] ?? settings.channel;
   setStatus({ channel: els.stChannel, tokens: els.stTokens, cost: els.stCost, latency: els.stLatency }, {
@@ -250,6 +252,14 @@ async function start() {
         if (bar.decision.ms > 0) { stats.latencySum += bar.decision.ms; stats.latencyN++; }
       }
       refreshStatus(bar.decision.fixture && settings.channel !== 'fixture');
+      if (settings.channel !== 'fixture') {
+        if (bar.decision.fixture && !fallbackAnnounced) {
+          fallbackAnnounced = true;
+          toast(els.toast, '真实渠道暂时不可用，本小节起由离线随机接管——播放不中断，后续小节自动重试真实渠道', 6000);
+        } else if (!bar.decision.fixture) {
+          fallbackAnnounced = false;
+        }
+      }
       // 曲终（轮次 36 的手势在界面上的回声）：插入本遍小结，准备下一遍的记账
       if (bar.index % plan.totalBars === plan.totalBars - 1) {
         const chorus = Math.floor(bar.index / plan.totalBars) + 1;
