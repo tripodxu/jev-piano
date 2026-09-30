@@ -3,19 +3,48 @@
 // /api/llm 只转发服务端 env 配置的端点（刻意不做开放中继，防 SSRF）。
 // 两个 API 共享每 IP 限流（isolate 内存，尽力而为）：RATE_LIMIT_PER_MIN，默认 30。
 
-const json = (obj, status = 200) =>
-  new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
+const json = (obj, status = 200, extra = {}) =>
+  new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json', ...extra } });
 
-/** 滑动窗口限流。Workers isolate 内存计数：单实例精确，多实例为尽力而为的下限保护。 */
-const hits = new Map();
-function rateLimited(ip, limit) {
-  const now = Date.now();
-  const arr = (hits.get(ip) ?? []).filter((t) => now - t < 60_000);
-  const blocked = arr.length >= limit;
-  arr.push(now);
-  hits.set(ip, arr);
-  if (hits.size > 10_000) hits.clear(); // 内存护栏：清空后重新累计，误伤可接受
-  return blocked;
+/** 载荷上限（轮次 43）：API 转发上游是要花钱的，任意大的请求体必须在门口拦下 */
+export const LIMITS = { jevBodyBytes: 256 * 1024, llmBodyBytes: 64 * 1024, llmMaxMessages: 24 };
+
+export function createRateLimiter() {
+  const hits = new Map();
+  const sweep = (now) => {
+    for (const [k, arr] of hits) {
+      const fresh = arr.filter((t) => now - t < 60_000);
+      if (fresh.length) hits.set(k, fresh); else hits.delete(k);
+    }
+  };
+  return {
+    check(ip, limit, now = Date.now()) {
+      const arr = (hits.get(ip) ?? []).filter((t) => now - t < 60_000);
+      const blocked = arr.length >= limit;
+      arr.push(now);
+      hits.set(ip, arr);
+      if (hits.size > 10_000) sweep(now); // 内存护栏：只清过期条目，活跃 IP 的计数不再被 clear-all 误伤
+      return blocked;
+    },
+    sweep,
+  };
+}
+
+const limiter = createRateLimiter();
+
+/** 载荷校验（可单测）：返回错误文案或空串 */
+export function validateJevBody(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return 'invalid body: {state, questions} expected';
+  if (!body.questions || typeof body.questions !== 'object' || Array.isArray(body.questions)) return 'invalid questions: plain object expected';
+  if (JSON.stringify(body).length > LIMITS.jevBodyBytes) return `payload 过大（> ${LIMITS.jevBodyBytes} 字节）`;
+  return '';
+}
+
+export function validateLlmBody(body) {
+  if (!body || typeof body !== 'object' || !Array.isArray(body.messages)) return 'invalid body: {messages} expected';
+  if (body.messages.length > LIMITS.llmMaxMessages) return `messages 过多（> ${LIMITS.llmMaxMessages}）`;
+  if (JSON.stringify(body).length > LIMITS.llmBodyBytes) return `payload 过大（> ${LIMITS.llmBodyBytes} 字节）`;
+  return '';
 }
 
 async function readJson(request) {
@@ -32,7 +61,7 @@ export default {
     }
     const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
     const limit = Number(env.RATE_LIMIT_PER_MIN ?? 30);
-    if (rateLimited(ip, limit)) return json({ error: 'rate limited, retry in a minute' }, 429);
+    if (limiter.check(ip, limit)) return json({ error: 'rate limited, retry in a minute' }, 429, { 'Retry-After': '60' });
 
     if (url.pathname === '/api/jev' && request.method === 'POST') return handleJev(request, env);
     if (url.pathname === '/api/llm' && request.method === 'POST') return handleLlm(request, env);
@@ -59,7 +88,8 @@ async function jevViaHTTP(endpoint, model, key, body) {
 
 async function handleJev(request, env) {
   const body = await readJson(request);
-  if (!body || !body.questions) return json({ error: 'invalid body: {state, questions} expected' }, 422);
+  const invalid = validateJevBody(body);
+  if (invalid) return json({ error: invalid }, invalid.includes('过大') ? 413 : 422);
 
   const backends = [];
   if (env.AI) backends.push(['workers-ai', () => jevViaAI(env, body)]);
@@ -83,7 +113,8 @@ async function handleJev(request, env) {
 
 async function handleLlm(request, env) {
   const body = await readJson(request);
-  if (!body || !Array.isArray(body.messages)) return json({ error: 'invalid body: {messages} expected' }, 422);
+  const invalid = validateLlmBody(body);
+  if (invalid) return json({ error: invalid }, invalid.includes('过大') ? 413 : 422);
   // 安全边界：只允许服务端配置的端点与凭据，忽略请求体里的 baseUrl/apiKey/model（防开放中继）
   if (!env.LLM_BASE_URL || !env.LLM_API_KEY || !env.LLM_MODEL) {
     return json({ error: 'llm proxy not configured: deployer must set LLM_BASE_URL/LLM_API_KEY/LLM_MODEL' }, 501);
