@@ -96,10 +96,13 @@ export class PianoAudio {
 
     const voice = { midi, gain: g };
     this.voices.push(voice);
-    setTimeout(() => {
+    // 事件驱动清理（轮次 32）：主振荡器 stop 到点时移除 voice。
+    // 旧实现每音挂一个 setTimeout——后台标签页定时器被节流（≥1s），voices 靠 32 上限硬挤；
+    // onended 由音频线程时钟驱动，不受页面可见性影响。
+    oscs[0].onended = () => {
       const i = this.voices.indexOf(voice);
       if (i >= 0) this.voices.splice(i, 1);
-    }, (stopAt - this.ctx.currentTime) * 1000 + 150);
+    };
   }
 
   setVolume(v) {

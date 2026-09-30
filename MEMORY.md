@@ -5,6 +5,13 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-09-30 · 音频 voices 生命周期修复（迭代轮次 32 · 优化）
+
+- **做了什么**（计划 [docs/superpowers/plans/2026-09-30-audio-voice-cleanup.md](docs/superpowers/plans/2026-09-30-audio-voice-cleanup.md)）：审计实测——`play()` **每音挂 1 个 setTimeout** 做 voices 清理（200 音实测 200 个定时器），后台标签页定时器节流 ≥1s，voices 堆积靠 32 上限硬挤。改为**主振荡器 `onended` 事件驱动清理**（音频线程时钟，不受页面可见性影响），附带让清理时机与实际发声结束精确同步。测试 150→**151**（mock AudioContext 单测：两音→触发 onended→对应 voice 移除、另一音保留）。
+- **审计其余项全部实测有据**：records 无上限（保留，MIDI 导出需要；记入文档待办）、undo 5.5MB 封顶（有界）、Fall/tensionCache 无恙、drawRoll 重绘属架构级（不动）。
+- **反思**：**「每音一个定时器」是 setTimeout 惯性**——浏览器给了事件（onended）却用了轮询。审计定时器压力的口径：数 `setTimeout(fn, …)` 的注册率，凡「注册后只做一次清理」的都应该问一句「有没有对应的事件」。同时**审计的另一面是敢保留**——records/undo/重绘三项实测有界或属架构取舍，写明理由比顺手乱改更负责。
+- **下一步**（迭代轮次 33 · 创意）：决策概率可视化——Jev 返回的 `probabilities` 字段（真渠道已验证存在）从未展示，把它画进决策日志。
+
 ## [完成] 2026-09-30 · 舞台灯光随张力呼吸（迭代轮次 31 · 创意）
 
 - **做了什么**（计划 [docs/superpowers/plans/2026-09-30-stage-light.md](docs/superpowers/plans/2026-09-30-stage-light.md)）：午夜音乐厅的**舞台本身**第一次对音乐起反应——张力升起时顶部黄铜顶光变暖变亮（warm 0.05→0.21），回落时底部冷青地光透出（cool 0.16→0.06），小节间 1.4s 的透明度渐变就是「呼吸」。`stageLightFor(tension)` 纯函数（脏输入降级中性 0.5）；两个 `aria-hidden` 灯光层 `mix-blend-mode: screen` 叠在舞台上（id 契约 87→**89**）；main.js 复用已算的 `barTension` 设透明度——**零新增计算**。测试 148→**150**。
