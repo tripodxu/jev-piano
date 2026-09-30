@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -230,4 +230,13 @@ test('probabilityStrip: 脏输入降级为空串（整行不输出）；sym 一�
   const html = probabilityStrip({ '<img>': 0.5, b: 0.3 }, '<img>');
   assert.ok(!html.includes('<img>'), 'sym 必须转义');
   assert.ok(html.includes('&lt;img&gt;'));
+});
+
+/* ---------------- 曲终读数与遍次小结（轮次 37 · 前端） ---------------- */
+
+test('chorusSummary: 遍次汇总一行纯文本；脏输入降级', () => {
+  assert.equal(chorusSummary(1, 32, 9, 32, 31, 0.0026), '第 1 遍完 · 32 小节 · 和弦 9 种 · 旋律唯一 32/32 · $0.0026');
+  assert.equal(chorusSummary(2, 16, 7, 16, 16, 0), '第 2 遍完 · 16 小节 · 和弦 7 种 · 旋律唯一 16/16 · $0.0000');
+  assert.equal(chorusSummary(NaN, 32, 9, 32, 31, 0.0026), '', '遍次非法 → 空串');
+  assert.equal(chorusSummary(1, 0, 9, 32, 31, 0.0026), '', '小节数非法 → 空串');
 });

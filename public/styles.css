@@ -649,6 +649,14 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   .log-stats { display: none; }
 }
 
+/* 遍次小结：曲终手势在界面上的回声——「这一遍完了，它长这样」 */
+.dlog li.log-summary {
+  font: 500 11px/1.4 var(--sans); letter-spacing: .05em;
+  color: var(--brass-hi); border-left-color: var(--line-strong);
+  background: linear-gradient(90deg, rgba(216, 171, 92, 0.05), transparent 70%);
+  padding: 6px 10px 6px 14px;
+}
+
 /* 决策概率条：模型在什么之间犹豫（微型条形 + 文本，不依赖颜色） */
 .prob-strip {
   display: flex; flex-basis: 100%; gap: 10px; margin: 2px 0 0; padding-left: 44px;

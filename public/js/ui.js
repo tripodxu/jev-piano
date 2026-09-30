@@ -346,6 +346,16 @@ export function stageLightFor(tension) {
   return { warm: Math.round((0.05 + v * 0.16) * 1000) / 1000, cool: Math.round((0.16 - v * 0.10) * 1000) / 1000 };
 }
 
+/** 遍次小结（轮次 37）：每遍末小节在决策日志插入的一行汇总。
+ *  与曲终手势（轮次 36）配对——音乐收束了，界面也要说一声「这一遍完了，它长这样」。 */
+export function chorusSummary(chorus, bars, chordKinds, melUnique, lhUnique, usd) {
+  const n = Number(chorus), b = Number(bars);
+  if (!Number.isInteger(n) || n < 1 || !Number.isInteger(b) || b < 1) return '';
+  const ck = Number(chordKinds) || 0, mu = Number(melUnique) || 0, lu = Number(lhUnique) || 0;
+  const u = Number(usd);
+  return `第 ${n} 遍完 · ${b} 小节 · 和弦 ${ck} 种 · 旋律唯一 ${mu}/${b} · $${(Number.isFinite(u) ? u : 0).toFixed(4)}`;
+}
+
 /** 张力带 hover：指针横坐标 px → 最近小节序号；绘图区外/脏输入/无数据返回 -1。
  *  hover 只是增强（ui-ux-pro-max："relying on hover only" 是反模式）——
  *  无 hover 的读法是 tensionStat 文本行与 aria-label，二者始终存在。 */

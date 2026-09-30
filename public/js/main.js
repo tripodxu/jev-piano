@@ -6,7 +6,7 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor } from './ui.js';
+import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary } from './ui.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { barHarmonyFit, NCT_ZH } from './nct.js';
 import { planTargetSeries, tempoMultAt } from './candidates.js';
@@ -135,6 +135,8 @@ const motifCard = new MotifCard(els.motifCanvas);
 // 唯一性读数（轮次 27）：与 composer 同口径的字面指纹（onset×4:midi），逐小节更新
 const sigOfNotes = (ns) => ns.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
 const seenMel = new Set(), seenLh = new Set();
+let chorusChords = new Set(); // 本遍用过的和弦（曲终小结用）
+let chorusStartUsd = 0, chorusStartTokens = 0, chorusStartMel = 0, chorusStartLh = 0;
 
 /* ---------------- 播放控制 ---------------- */
 let player = null;
@@ -174,6 +176,7 @@ async function start() {
   els.tensionStat.textContent = '';
   els.repStat.textContent = '';
   seenMel.clear(); seenLh.clear();
+  chorusChords = new Set(); chorusStartUsd = 0; chorusStartTokens = 0; chorusStartMel = 0; chorusStartLh = 0;
   els.playBtn.disabled = true;
   els.playBtn.textContent = '… 编曲中';
 
@@ -235,12 +238,31 @@ async function start() {
       seenMel.add(sigOfNotes(bar.notes.filter((n) => n.hand === 'R')));
       seenLh.add(sigOfNotes(bar.notes.filter((n) => n.hand === 'L')));
       els.repStat.textContent = uniquenessLine(seenMel.size, seenLh.size, bar.index + 1);
+      chorusChords.add(bar.chord.symbol);
       if (!bar.decision.fixture) {
         stats.tokens += bar.decision.inputTokens;
         stats.usd += bar.decision.usd;
         if (bar.decision.ms > 0) { stats.latencySum += bar.decision.ms; stats.latencyN++; }
       }
       refreshStatus(bar.decision.fixture && settings.channel !== 'fixture');
+      // 曲终（轮次 36 的手势在界面上的回声）：插入本遍小结，准备下一遍的记账
+      if (bar.index % plan.totalBars === plan.totalBars - 1) {
+        const chorus = Math.floor(bar.index / plan.totalBars) + 1;
+        const summary = chorusSummary(
+          chorus, plan.totalBars, chorusChords.size,
+          seenMel.size - chorusStartMel, seenLh.size - chorusStartLh,
+          stats.usd - chorusStartUsd,
+        );
+        if (summary) {
+          const li = document.createElement('li');
+          li.className = 'log-summary';
+          li.textContent = summary;
+          els.decisionLog.prepend(li);
+        }
+        chorusChords = new Set();
+        chorusStartUsd = stats.usd; chorusStartTokens = stats.tokens;
+        chorusStartMel = seenMel.size; chorusStartLh = seenLh.size;
+      }
     },
     onNote(ev) {
       const delay = Math.max(0, (ev.t - audio.ctx.currentTime) * 1000);
