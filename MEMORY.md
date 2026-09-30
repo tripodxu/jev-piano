@@ -5,6 +5,14 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-09-30 · 上线 & 部署核验工具化（轮次 48 部署）
+
+- **部署成功**：`npm run deploy` → Version `ef35f0d3-2702-4fb1-b85d-d00ec3142eb7`，上传 5 个静态资源（`player.js`/`composer.js`/`ui.js`/`main.js`/`styles.css`，正是本轮改的 5 个文件）+ Worker 启动 2ms。生产地址 https://jev-piano.xd04040212.workers.dev 。账号 `xd04040212@163.com`（`workers (write)`）。
+- **部署后核验被沙箱拦下**：本地外网在部署后即刻不可用——`curl`/`node fetch`/`wrangler deployments list` 全部 `fetch failed`，且 DNS 把 `workers.dev` 解析到 Facebook 的 IP 段（`2a03:2880:…:face:b00c:`）——**沙箱在 DNS 层投毒**。所以**上传清单 ≠ 内容正确**这一环没能合上，已挂任务板（见下）。
+- **顺手把核验变成工具**（而非一次性脚本）：`scripts/verify-deploy.mjs`——拉线上的 js + `/api/probe` + 打一发 `/api/jev`，断言刚改的代码片段真的在边缘上（`_decisionBudget`/`_settleBudgets`/迟到顺延/`budgetMiss`/`deadlineMiss`/`decisionGuards`/`超预算`），退出码 0/1 可接 CI。**`npm test` 全绿只证明磁盘上的代码对，不证明 CDN 边缘拿到的是这份**——这是两件事，以前从没分开过。AGENTS.md §2 已登记「每次 `wrangler deploy` 后必跑」。
+- **反思**：前两轮部署（46/47）都是"部署成功"就当完成，靠的是「线上代码 grep 确认」。那个办法在**外网可达时**够用，但它没有留下可复用的东西；这次把同样的检查固化成脚本 + 任务板条目，下次任何人都能一键重跑。**部署的最后一步应该是可执行的断言，不是一句"grep 确认"**。
+- **下一步**：任务板新增「轮次 48 部署后核验」——网络恢复后跑 `node scripts/verify-deploy.mjs`。
+
 ## [完成] 2026-09-30 · 「超预算」读数落地：兜底分因，不再一锅端（轮次 48 收尾 · 前端）
 
 - **做了什么**（轮次 48 内核修复的界面回声）：`decision.deadlineMiss` 此前只躺在对象里，用户看到它与"渠道坏了"完全一样的「离线随机」——**归因不可见等于没归因**。现在：
@@ -549,6 +557,7 @@
 
 | 状态 | 任务 | 领地 | 验收 |
 |---|---|---|---|
+| **待办** | **轮次 48 部署后核验**（已上线 Version `ef35f0d3`，但**内容未验证**）：本地外网当时被沙箱拦断（DNS 把 `workers.dev` 投毒到 Facebook IP 段，`curl`/`node fetch`/`wrangler deployments list` 全失败）。网络恢复后跑 `node scripts/verify-deploy.mjs`（默认打 `https://jev-piano.xd04040212.workers.dev`，`--no-api` 可跳过计费那一发）。**上传清单只证明传了哪 5 个文件，不证明内容对**。若 `player.js`/`composer.js`/`ui.js` 的片段未命中 → 这不是网络问题，是部署内容错了，必须查 CDN 缓存/资产目录。全过之后再让用户在线上实测「慢/挂住的渠道下是否还能连续演奏」 | `scripts/verify-deploy.mjs`（已有，片段清单按当次改动更新） | 退出码 0（3 个文件的 7 个片段全命中 + `/api/probe` 200 + `/api/jev` 返回 `answers`） |
 | **进行中** | **和声罗盘补完**（轮次 45 遗留，[计划](docs/superpowers/plans/2026-09-30-harmonic-compass.md)有完整清单）：① 尺寸阻塞项——移出动机卡行、独立 ≥120px 高；② 点接 FN_COLOR 功能色；③ 工作室接入；④ LEGEND swatch + 行内图例补齐；⑤ hover 读数；⑥ CompassCard 生命周期测试 | `public/js/ui.js`（CompassCard）、`public/styles.css`（:686 附近）、`public/index.html`、`test/ui.test.mjs` | 人眼可读（半径 ≥48px）+ 三处图例同源非空 + npm test 全绿 + 12 种子指标不变 |
 | 待办 | **和声主题（改走替换候选通道）**：轮次 14 证伪了「给池内候选加权」的做法（撬不动进行池的基础权重）。若重启，需让主题和弦走 `subs` 那样的高权重替换项，并接受「主题段落重复同一和弦」的代价 | `candidates.js` / `composer.js` | 12 种子 + 段落首承袭率不退化 |
 | 待办 | 音质升级评估：@tonejs/piano 采样（数 MB，违背轻量，需 ADR） | — | ADR 结论 |
