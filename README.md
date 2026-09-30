@@ -51,7 +51,7 @@ npx wrangler deploy                 # npm run deploy
 
 LLM 扩写代理（可选）：`wrangler.toml` 里取消 `[vars]` 注释 + `npx wrangler secret put LLM_API_KEY`，或前端设置面板里用户自带 key 直连任意 OpenAI 兼容端点。
 
-Worker 安全边界：`/api/llm` 只转发服务端 env 配置的端点（忽略请求体里的 baseUrl/apiKey，杜绝开放中继）；`/api/jev`、`/api/llm` 共享每 IP 限流（`RATE_LIMIT_PER_MIN`，默认 30 次/分钟，isolate 内存计数，多实例部署时为尽力而为）。
+Worker 安全边界：`/api/llm` 只转发服务端 env 配置的端点（忽略请求体里的 baseUrl/apiKey，杜绝开放中继）；`/api/jev`、`/api/llm` 共享每 IP 限流（`RATE_LIMIT_PER_MIN`，默认 90 次/分钟——实时演奏 140 BPM 需 ~35 次/分钟，30 没有余量，isolate 内存计数，多实例部署时为尽力而为）。
 
 > 注意：TypeSafe 官方 API 不允许浏览器跨域直连（实测 CORS 拦截），所以**直连渠道仅适用于允许 CORS 的端点**；生产环境请走同源代理（本 Worker）。
 
@@ -68,7 +68,7 @@ Worker 安全边界：`/api/llm` 只转发服务端 env 配置的端点（忽略
 ## 测试
 
 ```bash
-npm test          # 154 个单测：乐理内核 / 候选集构造 / 曲式 / Jev 客户端 / 决策器 / 调度器 / SMF 导出 / 张力分析 / 非和声音分析 / 界面层 / 工作室编辑
+npm test          # 171 个单测：乐理内核 / 候选集构造 / 曲式 / Jev 客户端 / 决策器 / 调度器 / SMF 导出 / 张力分析 / 非和声音分析 / 界面层 / 工作室编辑 / Worker 边界 / 回归门
 node scripts/probe-jev.mjs   # 真实 API 冒烟（需 TYPESAFE_API_KEY，单次 ~$0.00002）
 node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 ```
@@ -89,15 +89,18 @@ node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 ## 目录
 
 ```
-public/            纯静态前端（index.html + 14 个 ES Module）
+public/            纯静态前端（index.html + 15 个 ES Module）
   js/music.js      乐理内核：罗马数字解析、和弦声位、8 种曲风预设、和声功能分类、调式全色板
   js/candidates.js 候选集构造 + 曲式：反重复断路器、声部进行加权、功能转移矩阵、A–B–A'–Coda 段落模板
   js/jev.js        Jev 四渠道客户端（归一化/重试/超时）+ fixture 采样 + LLM 扩写
   js/composer.js   决策器：八问设计、音符渲染内核、动机记忆、双声部指纹护栏、决策归因
+  js/render.js      渲染内核：旋律/左手 11 种织体/动机发展/反重复护栏（纯函数，rng 可注入）
   js/audio.js      合成钢琴（泛音+包络+低通+生成式混响）、录音
   js/player.js     lookahead 调度器 + 决策管线（now/setTimer 可注入，可单测）
   js/midi.js       SMF Type-1 双轨导出
-  js/ui.js, main.js, studio.js  键盘可视化、下落音符、**和声功能轨**、**张力对照带**、决策日志、设置、工作室
+  js/settings.js   localStorage 设置读写
+  js/ui.js, main.js  键盘可视化、下落音符、**和声功能轨**、**张力对照带**、决策日志、设置
+  js/studio.js, studio-core.js  工作室界面 + 纯函数层（确定性编辑/Jev 路由修改/JSON 校验/时间轴分析）
   js/tension.js     分析层：张力（只读已生成的小节，不参与决策）
   js/nct.js         分析层：非和声音分类（只读，不参与决策）
 src/worker.js      CF Worker：静态资产 + /api/probe|jev|llm
