@@ -153,10 +153,6 @@
         </div>
         <div class="motif-box">
           <canvas id="motifCanvas" height="48" role="img" aria-label="动机卡：曲子主题的旋律轮廓，以及它已经回归的次数"></canvas>
-          <div class="compass-card">
-            <canvas id="compassCanvas" height="132" role="img" aria-label="和声罗盘：根音在五度圈上的轨迹，第 2 小节后出现"></canvas>
-            <p class="compass-readout" id="compassReadout" aria-live="polite">第 2 小节后出现根音轨迹</p>
-          </div>
         </div>
         <div class="fn-ribbon-wrap">
           <ol id="fnRibbon" class="fn-ribbon" aria-label="和声功能轨：每格一小节，按主/下属/属/色彩着色"></ol>
@@ -164,7 +160,6 @@
             <span class="k k-T">主</span><span class="k k-S">下属</span><span class="k k-D">属</span><span class="k k-Tp">色彩</span>
             <span class="k k-d">承</span><span class="k">模</span><span class="k">倒</span><span class="k">装</span>
             <span class="k">问</span><span class="k">答</span>
-            <span class="k k-compass">罗盘</span>
             <button id="legendMore" class="lg-more" type="button">这些标记是什么？</button>
           </p>
         </div>
@@ -258,10 +253,6 @@
           <div id="stRollWrap" class="rollwrap">
             <canvas id="stRoll" aria-hidden="true"></canvas>
             <canvas id="stVel" height="54" role="img" aria-label="力度轨：每个音符一根竖条，拖动可改力度"></canvas>
-            <div id="stCompassWrap" class="roll-compass">
-              <canvas id="stCompass" height="132" role="img" aria-label="和声罗盘：整曲根音在五度圈上的轨迹"></canvas>
-              <p class="compass-readout" id="stCompassReadout" aria-live="polite">生成后在这里看整曲的和声走向</p>
-            </div>
             <div id="stPlayhead" class="playhead hidden"></div>
           </div>
           <div class="rolltransport">

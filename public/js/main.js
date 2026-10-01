@@ -6,7 +6,7 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, TensionGraph, MotifCard, CompassCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle } from './ui.js';
+import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle } from './ui.js';
 import { STYLE_BY_ID } from './music.js';
 import { GOAL_HINTS } from './composer.js';
 import { barTension, smooth, tensionStats } from './tension.js';
@@ -23,7 +23,7 @@ const els = {
   fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), decisionLog: $('decisionLog'),
   fnRibbon: $('fnRibbon'), logEmpty: $('logEmpty'),
   tensionCanvas: $('tensionCanvas'), tensionStat: $('tensionStat'),
-  motifCanvas: $('motifCanvas'), compassCanvas: $('compassCanvas'), compassReadout: $('compassReadout'), repStat: $('repStat'), stageWarm: $('stageWarm'), stageCool: $('stageCool'),
+  motifCanvas: $('motifCanvas'), repStat: $('repStat'), stageWarm: $('stageWarm'), stageCool: $('stageCool'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
   settingsBtn: $('settingsBtn'), settingsDrawer: $('settingsDrawer'), settingsClose: $('settingsClose'),
   legendBtn: $('legendBtn'), legendDrawer: $('legendDrawer'), legendClose: $('legendClose'),
@@ -151,7 +151,6 @@ const kb = renderKeyboard(els.keyboard, {
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);
 const tensionGraph = new TensionGraph(els.tensionCanvas);
 const motifCard = new MotifCard(els.motifCanvas);
-const compass = new CompassCard(els.compassCanvas, { readout: els.compassReadout }); // 和声罗盘：根音的五度圈轨迹 + 文字读数
 // 唯一性读数（轮次 27）：与 composer 同口径的字面指纹（onset×4:midi），逐小节更新
 const sigOfNotes = (ns) => ns.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
 const seenMel = new Set(), seenLh = new Set();
@@ -193,7 +192,6 @@ async function start() {
   tensionGraph.setTarget([]);
   tensionGraph.setSections([]);
   motifCard.reset();
-  compass.reset();
   els.tensionStat.textContent = '';
   els.repStat.textContent = '';
   seenMel.clear(); seenLh.clear();
@@ -261,7 +259,6 @@ async function start() {
       seenLh.add(sigOfNotes(bar.notes.filter((n) => n.hand === 'L')));
       els.repStat.textContent = uniquenessLine(seenMel.size, seenLh.size, bar.index + 1);
       chorusChords.add(bar.chord.symbol);
-      compass.push({ rootPc: bar.chord.rootPc, symbol: bar.chord.symbol }, bar.decision.chordFn); // 罗盘轨迹：和声在五度圈上怎么走（点按功能着色）
       if (!bar.decision.fixture) {
         stats.tokens += bar.decision.inputTokens;
         stats.usd += bar.decision.usd;
@@ -315,7 +312,6 @@ async function start() {
   fall.start();
   tensionGraph.start();
   motifCard.start();
-  compass.start();
   player.start();
   els.playBtn.textContent = '▶ 开始演奏';
   setButtons(true);
@@ -326,7 +322,6 @@ function stopAll() {
   fall.stop();
   tensionGraph.stop();
   motifCard.stop();
-  compass.stop();
   kb.clear();
   if (recording) { recording.stop().then((blob) => download(blob, `${plan?.title ?? 'jev-piano'}.webm`)); recording = null; els.recBtn.textContent = '● 录音'; }
   setButtons(false); // player 保留引用：已演奏的 records 仍可导出 MIDI

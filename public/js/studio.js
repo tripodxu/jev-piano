@@ -6,7 +6,7 @@ import { buildPlan, Composer } from './composer.js';
 import { askJev } from './jev.js';
 import { getAudio } from './audio.js';
 import { exportMidi } from './midi.js';
-import { renderKeyboard, toast, sectionLabel, drawCompassCard, compassStep, compassStatLine } from './ui.js';
+import { renderKeyboard, toast, sectionLabel } from './ui.js';
 import { loadSettings } from './settings.js';
 import { chordMidis, scaleMidis, nearest, NOTE_NAMES } from './music.js';
 import { tempoMultAt } from './candidates.js';
@@ -62,7 +62,6 @@ export function ensureStudio() {
     revise: $('stRevise'), reviseBtn: $('stReviseBtn'),
     midi: $('stMidi'), saveJson: $('stSaveJson'), loadBtn: $('stLoadBtn'), loadJson: $('stLoadJson'),
     roll: $('stRoll'), rollWrap: $('stRollWrap'), playhead: $('stPlayhead'), vel: $('stVel'),
-    compass: $('stCompass'), compassReadout: $('stCompassReadout'),
     quant: $('stQuant'), quantGrid: $('stQuantGrid'),
     play: $('stPlay'), loopBtn: $('stLoop'), muteR: $('stMuteR'), muteL: $('stMuteL'),
     bpm: $('stBpm'), undo: $('stUndo'), redo: $('stRedo'),
@@ -76,8 +75,6 @@ export function ensureStudio() {
   bindRoll();
   bindVelLane();
   bindControls();
-  bindCompass();
-  drawCompass(); // 空状态也先画（"生成后在这里看整曲的和声走向"），而不是留一块黑
   window.__stDebug = () => ({ inited, hasPiece: !!piece, notes: piece?.notes.length ?? -1, savedVersion: piece?.version ?? null });
   // 恢复上次的工作台
   try {
@@ -106,7 +103,6 @@ function setPiece(p) {
   els.bpm.value = p.bpm ?? p.plan.bpm;
   drawRoll();
   drawVelLane();
-  drawCompass(); // 整曲和声走向：只在 piece 变化时重画（不受 hover/拖拽影响）
   updateInfo();
   autosave();
 }
@@ -154,7 +150,7 @@ async function compose(newSeed) {
       els.progress.style.transform = `scaleX(${(i + 1) / bars})`; // scaleX 而非 width：进度动画不触发布局
       els.progressText.textContent = `第 ${i + 1}/${bars} 小节 · ${bar.chord.symbol}`;
       updateInfo();
-      drawRoll(); drawVelLane(); drawCompass(); // jevthoven 式 complete-bar preview：边生成边可见
+      drawRoll(); drawVelLane(); // jevthoven 式 complete-bar preview：边生成边可见
       await new Promise((r) => setTimeout(r, 0)); // 让出主线程刷新 UI
     }
     undoStack = []; redoStack = [];
@@ -212,68 +208,6 @@ function drawVelLane() {
     g.fillStyle = `rgba(${base},1)`;
     g.fillRect(x, VEL_H - h, bw, 2);   // 顶端帽：让"改了没有"一眼可见
   }
-}
-
-/** 和声罗盘（轮次 49 接入工作室）：整曲根音在五度圈上的走向。
- *  **与实时界面渲染的是同一个 `drawCompassCard`**——「能力做一次，界面各自认领」（轮次 34）。
- *  画布在 `.rollwrap` 内且与卷帘共用 ZOOM，横轴天然对齐、滚动天然同步（轮次 6/15 的同一课）。
- *  与实时界面的差异是「看多久」：实时是最近 16 小节，工作室是整曲。 */
-const STUDIO_COMPASS_MAX = 32;
-
-function compassEntriesOf(p) {
-  const out = [];
-  for (const bc of p?.barChords ?? []) {
-    const rootPc = chordRoot(bc);
-    if (!Number.isFinite(rootPc)) continue;
-    out.push({ rootPc, symbol: bc.symbol, fn: p.plan?.mode ? barFunction(bc, p.plan.mode) : bc.fn });
-  }
-  return out.slice(-STUDIO_COMPASS_MAX);
-}
-
-function drawCompass() {
-  const canvas = els.compass;
-  if (!canvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const W = Math.max(240, canvas.parentElement?.clientWidth || 240);
-  const H = 132;
-  canvas.style.width = `${W}px`;
-  canvas.style.height = `${H}px`;
-  canvas.width = Math.round(W * dpr);
-  canvas.height = Math.round(H * dpr);
-  const g = canvas.getContext('2d');
-  g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.clearRect(0, 0, W, H);
-  if (!piece) {
-    g.font = '12px "PingFang SC", "Microsoft YaHei", sans-serif';
-    g.fillStyle = 'rgba(139,129,104,0.7)';
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('生成后在这里看整曲的和声走向', W / 2, H / 2);
-    if (els.compassReadout) els.compassReadout.textContent = '生成后在这里看整曲的和声走向';
-    return;
-  }
-  const entries = compassEntriesOf(piece);
-  drawCompassCard(g, { w: W, h: H, roots: entries, fnColor: FN_COLOR });
-  if (els.compassReadout) {
-    const n = piece.barChords?.length ?? 0;
-    const last = entries[entries.length - 1];
-    const step = entries.length >= 2 ? compassStep(entries[entries.length - 2].rootPc, last.rootPc) : null;
-    els.compassReadout.textContent = n
-      ? `整曲 ${n} 小节${n > entries.length ? `（罗盘取最近 ${entries.length}）` : ''} · ${compassStatLine({ count: entries.length, symbol: last?.symbol, fn: last?.fn, step, hideCount: true })}`
-      : '生成后在这里看整曲的和声走向';
-  }
-}
-
-/** 罗盘宽度跟随容器（工作台布局变化时重画）。用 ResizeObserver 而非 window.resize：
- *  「尺寸的事交给尺寸的事件」——侧栏开合/标签页切换都会改宽度而未必触发 window.resize。 */
-function bindCompass() {
-  const canvas = els.compass;
-  if (!canvas || typeof ResizeObserver !== 'function') return;
-  let lastW = 0;
-  const ro = new ResizeObserver(() => {
-    const w = Math.round(canvas.parentElement?.clientWidth ?? 0);
-    if (w > 0 && w !== lastW) { lastW = w; drawCompass(); }
-  });
-  ro.observe(canvas.parentElement ?? canvas);
 }
 
 /** 力度轨的指针交互：命中音符 → 拖动改力度 → 走既有 commit（自带 undo + 自动保存） */
