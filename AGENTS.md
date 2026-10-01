@@ -33,7 +33,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 
 | 你的任务 | 必读 | 按需 |
 |---|---|---|
-| 改乐理/曲风/和弦候选 | `public/js/music.js`、`public/js/candidates.js`、`test/theory.test.mjs`、`test/candidates.test.mjs` | `docs/CONTEXT.md` §和声 |
+| 改乐理/曲风/和弦候选 | `public/js/music.js`、`public/js/candidates.js`、`test/theory.test.mjs`、`test/candidates.test.mjs` | `docs/CONTEXT.md` §2 乐理域 |
 | 改曲式/段落/弧线 | `public/js/candidates.js`（`FORM_TEMPLATES`/`deriveSections`/`sectionAt`/`intensityTarget`/`developCandidates`）、`public/js/composer.js`（`buildPlan`/`sanitizeSections`/段落标志） | `public/js/jev.js`（LLM 提示词的 `sections` 字段） |
 | 改决策器/渲染内核 | `public/js/composer.js`、`test/composer.test.mjs`、`docs/adr/0003` | `docs/superpowers/plans/2026-09-28-jev-piano-mvp.md` §三 |
 | 改 Jev 客户端/渠道 | `public/js/jev.js`、`test/jev.test.mjs`、`src/worker.js` | `docs/research/jevthoven-调研.md` |
