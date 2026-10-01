@@ -41,6 +41,16 @@ npx wrangler login
 npx wrangler deploy                 # npm run deploy
 ```
 
+**生产地址：<https://jevpiano.logicc.top/>**（自定义域，挂在 Cloudflare Workers 上）。
+
+部署后**必须**跑一次核验——`npm test` 只证明磁盘上的代码对，不证明 CDN 边缘拿到的是这份：
+
+```bash
+node scripts/verify-deploy.mjs                      # 默认打生产域，含一发计费的 /api/jev
+node scripts/verify-deploy.mjs --no-api             # 跳过计费那一发
+node scripts/verify-deploy.mjs https://临时地址      # 或指定任意 base（如 *.workers.dev 预览域）
+```
+
 部署后 Jev 决策三种后端（自动探测，见 `src/worker.js`）：
 
 | 后端 | 配置 | 特点 |
@@ -84,13 +94,15 @@ node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 | 关键决策为什么这样设计 | [docs/adr/](docs/adr/) |
 | 调研笔记（jevthoven / 前端选型） | [docs/research/](docs/research/) |
 | MVP 实施计划（设计契约出处） | [docs/superpowers/plans/2026-09-28-jev-piano-mvp.md](docs/superpowers/plans/2026-09-28-jev-piano-mvp.md) |
+| **生产地址** | <https://jevpiano.logicc.top/> |
+| CI 跑什么 | [.github/workflows/test.yml](.github/workflows/test.yml)——语法检查 + `node --test` + `npm run gate` |
 
 > 多 agent 协同约定：一个任务动 1–3 个源文件；并行时文件领地禁止交集；完成任务必须写 MEMORY.md（最新在最上）。完整规范见 [AGENTS.md](AGENTS.md)。
 
 ## 目录
 
 ```
-public/            纯静态前端（index.html + 15 个 ES Module）
+public/            纯静态前端（index.html + 15 个 ES Module，零构建、零依赖）
   js/music.js      乐理内核：罗马数字解析、和弦声位、8 种曲风预设、和声功能分类、调式全色板
   js/candidates.js 候选集构造 + 曲式：反重复断路器、声部进行加权、功能转移矩阵、A–B–A'–Coda 段落模板
   js/jev.js        Jev 四渠道客户端（归一化/重试/超时）+ fixture 采样 + LLM 扩写
@@ -114,7 +126,7 @@ docs/superpowers/plans/   实施计划（本项目的完整设计文档）
 - **实时即兴**（默认）：边决策边演奏，不可预知，见下文全部说明。
 - **工作室**（顶栏切换）：jevthoven 式"生成 → 编辑"工作流——输入灵感批量生成整曲（每小节仍由 Jev 逐小节决策，带进度条与取消，生成中即可预览已完成小节），然后在**钢琴卷帘**里编辑：
   - 点空白新增音 / 拖动移动 / 拖右缘改时长 / 双击删除 / Ctrl+Z·Ctrl+Y 撤销重做——全部**确定性编辑，不调用模型**（jevthoven 的 deterministic edits）
-  - **卷帘自带时间轴**：头部自上而下是**张力曲线**（面积图）、**和声功能带**（主/下属/属/色彩四色）、和弦名、**契合度带**（每小节的和弦音占比），四者与音符区**共用同一个像素/拍刻度**，横轴天然对齐——看得出"哪一段音符密、那里张力高、那几小节在属功能上、哪一段最"在调上"；旋律里的**非和弦音**（经过音/邻音/倚音）带亮边，一眼看出调式的"呼吸"在哪
+  - **卷帘自带时间轴**：头部自上而下是**张力曲线**（面积图）、**和声功能带**（主/下属/属/色彩四色）、和弦名、**契合度带**（每小节的和弦音占比），四者与音符区**共用同一个像素/拍刻度**，横轴天然对齐——看得出「哪一段音符密、那里张力高、那几小节在属功能上、哪一段最在调上」；旋律里的**非和弦音**（经过音/邻音/倚音）带亮边，一眼看出调式的「呼吸」在哪
   - **量化与力度轨**：生成的音符带摇摆与人味时值，**「量化」按钮**可吸附到 1/4、1/8、1/16 网格（实测 1/4 网格上有 54% 的音符偏离，量化是真实可用的编辑动作）；卷帘下方的**力度轨**与卷帘共用同一刻度，拖动竖条即可直接改力度，走的是同一套撤销与自动保存
   - 回放支持循环、左右手分轨静音、BPM 调整、播放头跟随滚动
   - **让 Jev 修改**：自然语言（"左手更密集""整体轻一点"）由 Jev 从有限的确定性编辑命令中选择执行（加密/稀疏/移调/力度），对应 jevthoven 的 revisions routed through Jev；离线渠道用关键词匹配

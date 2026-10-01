@@ -6,14 +6,18 @@
 //
 // 用法：
 //   node scripts/verify-deploy.mjs [baseUrl]
-//   VEV_BASE=https://xxx.workers.dev node scripts/verify-deploy.mjs
+//   VEV_BASE=https://xxx.example.com node scripts/verify-deploy.mjs
+//
+// 默认打生产自定义域 https://jevpiano.logicc.top/。
+// 注：*.workers.dev 的默认域在本机被 DNS 投毒（解析到 Facebook IP 段），
+// 所以核验走自定义域；确需打 workers.dev 时显式传 URL 参数。
 // 退出码 0 = 全部命中；1 = 有缺失或网络不可达（可稍后重试，任务板有对应条目）。
 //
 // ⚠️ /api/jev 那一发是真钱（~$0.00008），默认打；加 --no-api 跳过。
 
 const BASE = process.argv.find((a) => /^https?:/.test(a))
   ?? process.env.VEV_BASE
-  ?? 'https://jev-piano.xd04040212.workers.dev';
+  ?? 'https://jevpiano.logicc.top';
 const withApi = !process.argv.includes('--no-api');
 
 // 每个条目：文件 → 必须出现在线上的代码片段（改动时同步更新这里）
