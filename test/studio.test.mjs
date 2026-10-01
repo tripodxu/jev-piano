@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   keywordAction, densifyHand, sparserHand, transposeNotes, scaleVel,
   chordAt, applyAction, validatePiece, savePiece, barFunction, pieceTension, quantizeNotes,
+  ZOOM, ROW, VEL_H, H_TENSION, H_FN, H_CHORD, H_FIT, HEADER,
 } from '../public/js/studio.js';
 import { functionOfPc } from '../public/js/music.js';
 
@@ -226,4 +227,18 @@ test('barIndexAt: 拍点 → 小节序号；越界/脏输入安全降级', async
   assert.equal(barIndexAt(NaN, 4, 32), -1);
   assert.equal(barIndexAt(5, 4, 0), -1, '无小节');
   assert.equal(barIndexAt(5, 0, 32), -1, '非法 meter');
+});
+
+/* ---------------- 卷帘布局常量（轮次 49 · 回归锁） ---------------- */
+
+test('布局常量：拆分后必须仍可从 studio.js 导入（轮次 38 曾把它们搬走却没 export 回来）', () => {
+  // 这些常量在轮次 38 的 studio.js→studio-core.js 拆分中被搬走、却漏了导出，
+  // 让卷帘的绘制路径成为 `ReferenceError` 死代码且十轮无人察觉（无测试走过该路径）。
+  // 这里逐一点名，确保「搬走的符号」永远有人看得见。
+  for (const [name, val] of Object.entries({ ZOOM, ROW, VEL_H, H_TENSION, H_FN, H_CHORD, H_FIT, HEADER })) {
+    assert.ok(Number.isFinite(val) && val > 0, `${name} 必须是正数，实际 ${val}`);
+  }
+  assert.equal(ZOOM, 24, '像素/拍是卷帘与头部对齐的契约，改它等于改全工作室的横轴');
+  assert.equal(HEADER, H_TENSION + H_FN + H_CHORD + H_FIT, '头部高度是四段的合成——不能各写各的');
+  assert.equal(HEADER, 66);
 });

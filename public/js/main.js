@@ -23,7 +23,7 @@ const els = {
   fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), decisionLog: $('decisionLog'),
   fnRibbon: $('fnRibbon'), logEmpty: $('logEmpty'),
   tensionCanvas: $('tensionCanvas'), tensionStat: $('tensionStat'),
-  motifCanvas: $('motifCanvas'), compassCanvas: $('compassCanvas'), repStat: $('repStat'), stageWarm: $('stageWarm'), stageCool: $('stageCool'),
+  motifCanvas: $('motifCanvas'), compassCanvas: $('compassCanvas'), compassReadout: $('compassReadout'), repStat: $('repStat'), stageWarm: $('stageWarm'), stageCool: $('stageCool'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
   settingsBtn: $('settingsBtn'), settingsDrawer: $('settingsDrawer'), settingsClose: $('settingsClose'),
   legendBtn: $('legendBtn'), legendDrawer: $('legendDrawer'), legendClose: $('legendClose'),
@@ -151,7 +151,7 @@ const kb = renderKeyboard(els.keyboard, {
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);
 const tensionGraph = new TensionGraph(els.tensionCanvas);
 const motifCard = new MotifCard(els.motifCanvas);
-const compass = new CompassCard(els.compassCanvas); // 和声罗盘：根音的五度圈轨迹
+const compass = new CompassCard(els.compassCanvas, { readout: els.compassReadout }); // 和声罗盘：根音的五度圈轨迹 + 文字读数
 // 唯一性读数（轮次 27）：与 composer 同口径的字面指纹（onset×4:midi），逐小节更新
 const sigOfNotes = (ns) => ns.map((n) => `${Math.round(n.startBeats * 4)}:${n.midi}`).join(',');
 const seenMel = new Set(), seenLh = new Set();
@@ -261,7 +261,7 @@ async function start() {
       seenLh.add(sigOfNotes(bar.notes.filter((n) => n.hand === 'L')));
       els.repStat.textContent = uniquenessLine(seenMel.size, seenLh.size, bar.index + 1);
       chorusChords.add(bar.chord.symbol);
-      compass.push(bar.chord.rootPc); // 罗盘轨迹：和声在五度圈上怎么走
+      compass.push({ rootPc: bar.chord.rootPc, symbol: bar.chord.symbol }, bar.decision.chordFn); // 罗盘轨迹：和声在五度圈上怎么走（点按功能着色）
       if (!bar.decision.fixture) {
         stats.tokens += bar.decision.inputTokens;
         stats.usd += bar.decision.usd;

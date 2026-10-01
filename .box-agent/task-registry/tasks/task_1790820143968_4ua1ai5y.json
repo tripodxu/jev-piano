@@ -1,0 +1,1461 @@
+{
+  "artifacts": [
+    {
+      "artifact_id": "artifact_5db8700875eb8a408b4dcba5",
+      "current_revision_id": "revision_4652c89d3c0c2ca86d137096",
+      "filename": "2026-09-30-docs-count-drift.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-30-docs-count-drift.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_4652c89d3c0c2ca86d137096",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "b4c27df49a2e3daeedec6e1f74dc4aca6643fdf4c9c72fba9e2b7b3475378289",
+          "size": 3626,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_c11d002c82a6d43bec6b1c32",
+      "current_revision_id": "revision_927c855d39d400ab4a071c01",
+      "filename": "2026-09-30-harmonic-compass.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-harmonic-compass.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_927c855d39d400ab4a071c01",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "80b7119eaf055d62b5b6a98e179ae2011e7e153edab0a03a261c3a21e7fcc343",
+          "size": 3321,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_23a0dcf14f690c6b87b55b44",
+      "current_revision_id": "revision_9fb026298908965cc126faa8",
+      "filename": "2026-09-30-keyboard-audition.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-keyboard-audition.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_9fb026298908965cc126faa8",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "378081c9c4af9ed07dd7ce40058a53bd80509e0b5e382cabbb88c2ae0b35bbee",
+          "size": 1164,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_859b630407fde5217d86e509",
+      "current_revision_id": "revision_0cc12025c9d5c1f75eaa4cb6",
+      "filename": "2026-09-30-studio-hover.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-studio-hover.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_0cc12025c9d5c1f75eaa4cb6",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "d11780ad90655b2c5dfcab0b6c1d08dd997c80208dd0f5e1b12edfdb1ed1c60b",
+          "size": 1329,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_c131797e3e65a7a366f19ff9",
+      "current_revision_id": "revision_875c1fbf4c1cd5dcb66970c2",
+      "filename": "2026-09-30-audio-voice-cleanup.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-audio-voice-cleanup.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_875c1fbf4c1cd5dcb66970c2",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "6d65b4294be6ae51e8d623926186a88f5805b7e43c5702d68c90f732c550033b",
+          "size": 1670,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_d9fd389574fef02d7917b73b",
+      "current_revision_id": "revision_ea69b61d03301dda1c36857b",
+      "filename": "2026-09-30-stage-light.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-stage-light.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_ea69b61d03301dda1c36857b",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "e71050372feb6ed32811bfd17bca6456ac5446557a12b20c126066d084cfc1b4",
+          "size": 1588,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_5c02aacdada6290416b2fa98",
+      "current_revision_id": "revision_47bafd3349848819d093adb5",
+      "filename": "2026-09-30-real-channel-regression-2.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-30-real-channel-regression-2.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_47bafd3349848819d093adb5",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "f78277adaa10825bf774ae15f001a3f88aed022ca770fa79a0d017746e39a3a5",
+          "size": 4254,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_5b818a35da1c086e0a852bd8",
+      "current_revision_id": "revision_54300fa6e5ae97469556ed99",
+      "filename": "2026-09-30-uniqueness-readout.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-uniqueness-readout.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_54300fa6e5ae97469556ed99",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "f63f2a4f8385d26bdc51e6f409107c5ad1234a2fbbc77d2d525aa7dc8884aa4a",
+          "size": 1640,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_fc229f196064ccc3e1ae1900",
+      "current_revision_id": "revision_bab19dc15aaa204adc9a97ef",
+      "filename": "2026-09-30-composer-split.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-composer-split.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_bab19dc15aaa204adc9a97ef",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "94b087896aaa3f823c7bf11761cbc54810ecf4cb9002b785c223b24a45c7fca9",
+          "size": 1567,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_8157c97394dabb30c7b7ca5c",
+      "current_revision_id": "revision_efc23c4cb691582b8af64a02",
+      "filename": "2026-09-30-phrase-role-visibility.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-30-phrase-role-visibility.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_efc23c4cb691582b8af64a02",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "e077a36f65c0803fc7d9605a1b4aed12995f132cda5c686e7dd968ea3fb138d8",
+          "size": 2725,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_9fd546fe5c78c9b4b119d1b1",
+      "current_revision_id": "revision_bc2ac6cb4f36b4e4e3bda89d",
+      "filename": "2026-09-30-phrase-question-answer.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-30-phrase-question-answer.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_bc2ac6cb4f36b4e4e3bda89d",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "2efcb7d8312bb3c03a0d67c7530519ca94adae7fa2f0c26fa83663f6d46b5760",
+          "size": 3321,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_39ff7e86d6ed4210edebed5f",
+      "current_revision_id": "revision_b5362bf24580fa926102ee88",
+      "filename": "2026-09-30-phrase-question-answer.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-phrase-question-answer.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_b5362bf24580fa926102ee88",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "d99adc0c2716fc67e2e2a93ac60b410f331e33614d93953bcb263ca48b65a384",
+          "size": 3604,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_42ddf8a64fb2ea603c5732f2",
+      "current_revision_id": "revision_522596b112dfd4a6f6e3f113",
+      "filename": "2026-09-30-keypc-harmony-fix.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-30-keypc-harmony-fix.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_522596b112dfd4a6f6e3f113",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "b51dd062685efd8288b3e860967cbb5a7125646ff22a81550e3993d780ed2fb2",
+          "size": 3699,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_89680ffcab81c963f6898fe7",
+      "current_revision_id": "revision_3dd5099d33fd238a6f5f871f",
+      "filename": "2026-09-30-keypc-harmony-fix.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-keypc-harmony-fix.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_3dd5099d33fd238a6f5f871f",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "a83a84bbdedd4a4ce690b0e6713fc0e5df2bdce436146a62e303497446e3b417",
+          "size": 3014,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_6da0e26298f1ac27c8ef7a8f",
+      "current_revision_id": "revision_84d01448a090d51e6b954ad4",
+      "filename": "2026-09-30-tempo-visibility.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-30-tempo-visibility.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_84d01448a090d51e6b954ad4",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "a1eaf2660dcf952f574e5e89360ad1281540972c49de1bd29e3807561ee3611d",
+          "size": 2534,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_31bb23a1e5f3c8f9680b0db1",
+      "current_revision_id": "revision_027c402468e53352a1eba2bc",
+      "filename": "2026-09-30-tempo-visibility.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-tempo-visibility.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_027c402468e53352a1eba2bc",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "102c83760d3ca559ea7623884ac50b4338577357e993a4b695c364bfca03c3c0",
+          "size": 1776,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_8bd3ee6f1bec2ba94c50eef1",
+      "current_revision_id": "revision_eaf41379844819ae3844baf7",
+      "filename": "2026-09-30-tempo-arc.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-30-tempo-arc.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_eaf41379844819ae3844baf7",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "a1dcd0d89054745dd05bc93684df9d1738777350da291e4c4aa7b0575f933ac1",
+          "size": 3592,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_d8599f1b7dbad63b3588f4ac",
+      "current_revision_id": "revision_93632a8ac78eb04145abdf18",
+      "filename": "2026-09-30-tempo-arc.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-30-tempo-arc.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_93632a8ac78eb04145abdf18",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "0fb1f75baa2af3ab2cc1a3fe66dff06b09acf969c086a8d49b962efeca1292b6",
+          "size": 5516,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_7a345ce373bd0a5e2bd4fb4e",
+      "current_revision_id": "revision_eb949a8cffef3185d80eccb6",
+      "filename": "2026-09-28-breathe-cancels-all-transforms.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-breathe-cancels-all-transforms.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_eb949a8cffef3185d80eccb6",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "b3c7b7c12d8b1ca0e12a4d81849cfb152a6879ea9e3d392992088a2e54fdafd3",
+          "size": 4129,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_912c8469af31941415e80a0e",
+      "current_revision_id": "revision_8128b554d6879a6cbbc54dcc",
+      "filename": "2026-09-28-breathe-cancels-all-transforms.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-breathe-cancels-all-transforms.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_8128b554d6879a6cbbc54dcc",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "e6807ba8d2614e9b09f92a3da32c1dac6740cad5596f7814d1bf1401944ad284",
+          "size": 6106,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_4065df21799351659f954e9b",
+      "current_revision_id": "revision_e87d317b26b5fd01719bcfd6",
+      "filename": "2026-09-28-legend-onboarding.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-legend-onboarding.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_e87d317b26b5fd01719bcfd6",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "5ae97b75769a2ce1b3d5cfd25fa5c71476d83440a5006cdd0e6290faf2f8f969",
+          "size": 3440,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_ff06efa3043593cc83e02180",
+      "current_revision_id": "revision_4b025e16b3ae282b24991716",
+      "filename": "2026-09-28-legend-onboarding.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-legend-onboarding.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_4b025e16b3ae282b24991716",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "fb53f5f8c3bf7d10bedfe1e4c92be55101be3f2a5c1ffc611582f9dc3a88e306",
+          "size": 5086,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_f2adf7e20e58a8059c56137d",
+      "current_revision_id": "revision_04b0d02af310c5757dd80831",
+      "filename": "2026-09-28-non-chord-tones.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-non-chord-tones.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_04b0d02af310c5757dd80831",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "f1437b46246716d8a24dd05a50b45b8dbcaad5a25093e023d86507c553e45a90",
+          "size": 3735,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_98080cf0556cd7fa6e8dc326",
+      "current_revision_id": "revision_f3818f214cc3bb7069c0b9a6",
+      "filename": "2026-09-28-non-chord-tones.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-non-chord-tones.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_f3818f214cc3bb7069c0b9a6",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "dd410f22f176522ffbe68bcaa6472b5abcd0f4de85317476b5757c2eab6ca0d7",
+          "size": 7867,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_b887db7a0981961a41a412d1",
+      "current_revision_id": "revision_1d6b97fd1218e67f420754ad",
+      "filename": "2026-09-28-breathe-cancels-restatement.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-breathe-cancels-restatement.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_1d6b97fd1218e67f420754ad",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "7e10bb43eae9668d0f6764fe505408d06856dde96d056aa3d89b6d8cc2a34e3b",
+          "size": 4416,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_401228198c8ebb496ce871f6",
+      "current_revision_id": "revision_ac81a299053aa7a61ee6d01b",
+      "filename": "2026-09-28-breathe-cancels-restatement.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-breathe-cancels-restatement.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_ac81a299053aa7a61ee6d01b",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "43ebcf7c7aed50c80d49e7b3b6c40eec2136fac790e2f1a9843ecc79528d26d5",
+          "size": 6034,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_721d798fb837d6ba42816044",
+      "current_revision_id": "revision_405bb648ad50f4c28aa8f602",
+      "filename": "2026-09-28-studio-quantize-velocity.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-studio-quantize-velocity.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_405bb648ad50f4c28aa8f602",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "206b8b7325b743dae827110c072ec56fa8f843e12950bf468d2a8f21196ee016",
+          "size": 3417,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_9128e324709b150924c2ed10",
+      "current_revision_id": "revision_836d15dd85612d158f9c65e7",
+      "filename": "2026-09-28-studio-quantize-velocity.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-studio-quantize-velocity.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_836d15dd85612d158f9c65e7",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "c95ebf2191a823f4cac2bfffbe2d607d95fae8d68320498f01a4fe3be17e4cbe",
+          "size": 7116,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_19dd49386e1bb81f47697da3",
+      "current_revision_id": "revision_f32e03198cb6d8f5b8c92b3e",
+      "filename": "2026-09-28-harmonic-theme-rejected.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-harmonic-theme-rejected.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_f32e03198cb6d8f5b8c92b3e",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "8dd870ac18a4550ba57fa916fe778c5212de3268b2535b7abe965944a6373f2d",
+          "size": 4098,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_97ec26a5305fc57c19765f90",
+      "current_revision_id": "revision_3723c7559967972261ef8b08",
+      "filename": "2026-09-28-harmonic-theme.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-harmonic-theme.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_3723c7559967972261ef8b08",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "31022ae1cfa08dc3cae1b0aca6ab6d870d18d0194917b7d721e39aa4cac7ab5c",
+          "size": 6447,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_da14dca6c9cb64999a9333f6",
+      "current_revision_id": "revision_0431546bed73cd2fa826593d",
+      "filename": "2026-09-28-real-channel-regression.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-real-channel-regression.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_0431546bed73cd2fa826593d",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "8c8f10c498fc34c083d8aba5d1d910cdca08aef7689c632af9064544bfd3a618",
+          "size": 3800,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_04341a6227d2408cea7412c9",
+      "current_revision_id": "revision_e001ed6c797c9c0e9b853547",
+      "filename": "2026-09-28-payload-dedup.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-payload-dedup.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_e001ed6c797c9c0e9b853547",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "4235acb000ae1215e2cc37d8942d8ed2733503d2a0cce22f919b0184170ed041",
+          "size": 2863,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_0dc1f86e9f1bf940f2c5070f",
+      "current_revision_id": "revision_a9dc4397a3256d6da910dddb",
+      "filename": "2026-09-28-motif-map.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-motif-map.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_a9dc4397a3256d6da910dddb",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "67a35ddfafbaa282c32ae43602c221a400fcf1ad07d070fa7b5a955613e2ab04",
+          "size": 3087,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_b08ce97d980beec622da94b4",
+      "current_revision_id": "revision_8a43e2ad1876f7a0d5010074",
+      "filename": "2026-09-28-motif-map.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-motif-map.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_8a43e2ad1876f7a0d5010074",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "0a84760e7b3d1f2c1fbff8339953d3fdde9e063d2571297f245ef2d158071ea4",
+          "size": 6020,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_1b31550f5d84dd830bb88bd1",
+      "current_revision_id": "revision_423b1ec8421e5020d17d0585",
+      "filename": "2026-09-28-motif-development.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-motif-development.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_423b1ec8421e5020d17d0585",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "2ee686c223da78df54532c4442999798b8fbbc980bab76d4ef625e314f5c6497",
+          "size": 4099,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_b3ceaf5c8c7d8cc9bc1ae22c",
+      "current_revision_id": "revision_a7cdcac2e30fa2ebf0bafc1e",
+      "filename": "2026-09-28-motif-development.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-motif-development.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_a7cdcac2e30fa2ebf0bafc1e",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "f054f4e0938d868cb9c6b928f8bbf508971a313df4a0bdead66f4c74b69fa92c",
+          "size": 8723,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_25a91902b40f3fbc7fc32c41",
+      "current_revision_id": "revision_cb07ae8a315dd3578e5e897d",
+      "filename": "2026-09-28-section-semantics.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-section-semantics.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_cb07ae8a315dd3578e5e897d",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "dfa0ceb2a64f4885dccb8e73ade17baa51d82da5b8b48f8dc7f1d72e596a0913",
+          "size": 4350,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_6f458c1013c9920de370d20a",
+      "current_revision_id": "revision_1024b52abb6e226229d28dcd",
+      "filename": "2026-09-28-section-semantics.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-section-semantics.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_1024b52abb6e226229d28dcd",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "2e3fe97288ec91792f61a634e8433621ba7f49dde15148a3d29efb0bd33e4b59",
+          "size": 9754,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_7c27f55118a838070e672f28",
+      "current_revision_id": "revision_03b53470ea75a0c6d55bcfc1",
+      "filename": "2026-09-28-section-visibility.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-section-visibility.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_03b53470ea75a0c6d55bcfc1",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "14f3287644c75f2c1c2079dcdf34284b76ba9100b5c35fdd69aae2cb462e348a",
+          "size": 3290,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_1d1c52b8d9bc179cff9a620c",
+      "current_revision_id": "revision_c4514f9a33dbeb4c59928777",
+      "filename": "2026-09-28-section-visibility.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-section-visibility.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_c4514f9a33dbeb4c59928777",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "32a4c228785bd22db10fce03ed9f7884a0348f4bac2ff9180414c31faff2802b",
+          "size": 4451,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_8cf81f8efe40463ea15b09ed",
+      "current_revision_id": "revision_4bcbeb3e9c0161fb6dd563d0",
+      "filename": "2026-09-28-form-sections.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-form-sections.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_4bcbeb3e9c0161fb6dd563d0",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "bf01d33792e24f1aece73fc745f0588659fc63278ff4973302bf337f357dc202",
+          "size": 4975,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_56872f88caf4efdc6c2ba997",
+      "current_revision_id": "revision_5a373ada33e645543926325a",
+      "filename": "2026-09-28-form-sections.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-form-sections.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_5a373ada33e645543926325a",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "038dee30e3b80845efe94ebaf5a3e1c7c11ce85037c340f6d6780f4628748167",
+          "size": 14349,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_c127d8ab911e0fe75f180d20",
+      "current_revision_id": "revision_e3c5f64c215e620f400e2d59",
+      "filename": "2026-09-28-intensity-continuity.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-intensity-continuity.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_e3c5f64c215e620f400e2d59",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "9ffcb419f8e055c24cd0878f330caf7fba7f599f697a0441ce837740cc527cab",
+          "size": 4608,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_5863a0feca5bbaa9d5e4ba14",
+      "current_revision_id": "revision_27e2d7e3d3ac208cd3b61a28",
+      "filename": "2026-09-28-intensity-continuity.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-intensity-continuity.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_27e2d7e3d3ac208cd3b61a28",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "25d3cc6fbd1106090b1bacd97cf2a1c742095d8136c5bbf5cca0e25d1f1095f1",
+          "size": 8383,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_04f7382a3a8d76362dda405b",
+      "current_revision_id": "revision_b19ce5a0d6eb5e3ea7348e8f",
+      "filename": "2026-09-28-studio-timeline.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-studio-timeline.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_b19ce5a0d6eb5e3ea7348e8f",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "6150214d76c2c37476c695183ce5cf03e17b699ad48ee34a886d428fde9c7522",
+          "size": 4421,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_3de097fb7ad246356c5599a4",
+      "current_revision_id": "revision_c4a06987e24e1a3b72b45892",
+      "filename": "2026-09-28-tension-band.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-tension-band.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_c4a06987e24e1a3b72b45892",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "8ef2845795c3bfd7f6a55e2ce156281d5be4429ed8f2e7c7f9f5add55cfc6b37",
+          "size": 4417,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_1aa13656e22684d33b613311",
+      "current_revision_id": "revision_df472dea65f1cb65505748a4",
+      "filename": "2026-09-28-chord-spelling.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-chord-spelling.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_df472dea65f1cb65505748a4",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "a2e3a45a4ef32f305976b71973a8947a7735550289b98aa4dfd9ff131ea53469",
+          "size": 3448,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_457e5374a97783adb88dfa4c",
+      "current_revision_id": "revision_7f42a8879840e2d80a4dfff9",
+      "filename": "2026-09-28-chord-spelling.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-chord-spelling.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_7f42a8879840e2d80a4dfff9",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "873a5fac5aef3f5004b8865b19168c171c96ad92288ef9ca4ca8511056203453",
+          "size": 7035,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_1dcb12b41159ea27397ea6f0",
+      "current_revision_id": "revision_8894a4eeaca26b1db35634df",
+      "filename": "2026-09-28-harmonic-ribbon-frontend.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-harmonic-ribbon-frontend.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_8894a4eeaca26b1db35634df",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "a0f400b5a851dcb70f798b70e322fc1edf01467a4f933859abc6afdaefc56e2d",
+          "size": 4849,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_37f68e8c2478c1a378e34257",
+      "current_revision_id": "revision_b0a864e8836f172d7a4a9ee5",
+      "filename": "2026-09-28-harmonic-function-layer.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-harmonic-function-layer.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_b0a864e8836f172d7a4a9ee5",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "e6a349eb24aaa184ffef93658bf18a1a45aec02a2da9646ba895342c952a79e9",
+          "size": 6722,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_3e88d1686e80a6df84664d0f",
+      "current_revision_id": "revision_6f3c4f4b155f59058db6bdba",
+      "filename": "2026-09-28-loop-lock-breaker.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-loop-lock-breaker.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_6f3c4f4b155f59058db6bdba",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "25f0723730ea227f16c0aaf4a19d399cc343664a8b37167c100410d2b291f180",
+          "size": 5122,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_53d7e39486b82a0280f67a1c",
+      "current_revision_id": "revision_758a2d7ad5deb3d7f5bc1696",
+      "filename": "2026-09-28-loop-lock-breaker.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-loop-lock-breaker.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_758a2d7ad5deb3d7f5bc1696",
+          "produced_at": "2026-10-01T10:02:31+08:00",
+          "sha256": "e4364de674b1390ca2c66d91b84655087db0ebae8fa602219f97ee85202c983f",
+          "size": 8541,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_8aa61feba565ba617a437412",
+      "current_revision_id": "revision_be3efa186c54cf37e5120b7b",
+      "filename": "2026-09-28-anti-repetition-overhaul.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-anti-repetition-overhaul.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_be3efa186c54cf37e5120b7b",
+          "produced_at": "2026-10-01T10:02:35+08:00",
+          "sha256": "932c6c1a013ab7e5817aafee857beac65f7123d5a88d98959d1f2ca24eee57d5",
+          "size": 2843,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_746bc908c376934bac3e1a69",
+      "current_revision_id": "revision_dadc6063f380a425994bf1c5",
+      "filename": "2026-09-28-studio-view.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/memory/2026-09-28-studio-view.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_dadc6063f380a425994bf1c5",
+          "produced_at": "2026-10-01T10:02:35+08:00",
+          "sha256": "114978390cd3437d906294e0b0a434d76f0a7993d7d65d02884f4fc71aec86cf",
+          "size": 2133,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_88fdacd509783ed4b9ae3e32",
+      "current_revision_id": "revision_7e43ccb3ad4c80232125790f",
+      "filename": "2026-09-28-jev-piano-mvp.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-09-28-jev-piano-mvp.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_7e43ccb3ad4c80232125790f",
+          "produced_at": "2026-10-01T10:02:35+08:00",
+          "sha256": "b661ad66e454e06c204634d6bc0e55c4f835214186b07145109a89e0d3e21669",
+          "size": 27631,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_fcc6739b9ae5b01d1d2c3b48",
+      "current_revision_id": "revision_2e8e0504d96a0e1ddd210af2",
+      "filename": "README.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "README.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_bcfc036e06e147aab039decb",
+          "produced_at": "2026-10-01T10:02:38+08:00",
+          "sha256": "534f9b02feb0ee0557f2407d3d6faf266583da340b56f7235b1aaab1804b5d99",
+          "size": 24183,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_2e8e0504d96a0e1ddd210af2",
+          "produced_at": "2026-10-01T10:29:59+08:00",
+          "sha256": "91eb7217176560d6721023ec3ec81a2f9c0afae30978d761c56bd9c67a6764c2",
+          "size": 24183,
+          "turn_id": "local_1790821562339_st9fqcb6"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_3dee12d1b6af38ac428497ee",
+      "current_revision_id": "revision_a3b46cc35ca07d192fcc4087",
+      "filename": "CONTEXT.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/CONTEXT.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_a3b46cc35ca07d192fcc4087",
+          "produced_at": "2026-10-01T10:02:38+08:00",
+          "sha256": "cf606ac5ad2521b731ca47495ab464dc8b5d35b0617a6c2156dd888d5dd3dbb5",
+          "size": 5557,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_404db6acc12d75c41d3458fa",
+      "current_revision_id": "revision_f43ea4b6ecd05340611ca46b",
+      "filename": "MEMORY.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "MEMORY.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_f43ea4b6ecd05340611ca46b",
+          "produced_at": "2026-10-01T10:02:38+08:00",
+          "sha256": "1c2c97c9e4c344acaeee63b0c09addd811b144914108f301b38ce4d50515516f",
+          "size": 114055,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_389401b5410104a4cae192e8",
+      "current_revision_id": "revision_781cda50fb228e9e0ce24dff",
+      "filename": "2026-10-01-harmonic-compass-completion.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "docs/superpowers/plans/2026-10-01-harmonic-compass-completion.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_781cda50fb228e9e0ce24dff",
+          "produced_at": "2026-10-01T10:03:13+08:00",
+          "sha256": "c5e43e75aa715f4ecf111487d56beb3c2b4baf3333d001e7a2c71cdac2a0854d",
+          "size": 3273,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_ff4f563f79ba4ae1206604e6",
+      "current_revision_id": "revision_384dd33d597fb1cacf0175e3",
+      "filename": "ui.js",
+      "kind": "code",
+      "mime": "application/javascript",
+      "rel_path": "public/js/ui.js",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_76450fb3a6885683cdf5cdc1",
+          "produced_at": "2026-10-01T10:03:59+08:00",
+          "sha256": "085624bc5ec6bc14f47cb452bd39af74c7fbc61c70479e6a1ab5877488312d1c",
+          "size": 44573,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_74e440b2be6f92d49d5b23bc",
+          "produced_at": "2026-10-01T10:04:11+08:00",
+          "sha256": "fa0203275da459d01d915f747de652b46ce66e77edac11af5a5bef67d9a95da3",
+          "size": 47801,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_49ccf0d9a4b50533f3e6705f",
+          "produced_at": "2026-10-01T10:06:43+08:00",
+          "sha256": "3809c32a1c29c872b541aa01714bda7b16afe523ed301772592b02d5581730a2",
+          "size": 47832,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_cd2a88c1586cad4e8913059f",
+          "produced_at": "2026-10-01T10:13:38+08:00",
+          "sha256": "811ea0b988af297002bf7b28ec71574ccb43a482ceaf54146b832860f348b258",
+          "size": 48399,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_384dd33d597fb1cacf0175e3",
+          "produced_at": "2026-10-01T10:28:09+08:00",
+          "sha256": "81e05d9d089e571dc78ac2f524479b6438ca193818cc06e2b2a7d38bed2e8503",
+          "size": 48691,
+          "turn_id": "local_1790821562339_st9fqcb6"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_8eff4aa22a1134c46d2ce75e",
+      "current_revision_id": "revision_0c8ef4db984cd68b2a739351",
+      "filename": "studio-core.js",
+      "kind": "code",
+      "mime": "application/javascript",
+      "rel_path": "public/js/studio-core.js",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_0c8ef4db984cd68b2a739351",
+          "produced_at": "2026-10-01T10:06:33+08:00",
+          "sha256": "fe3f322bb5f218f01ef88b7ffce6d7bf2912df2600a3a9ae61e7dbd80b9afa85",
+          "size": 10846,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_13e53355b7802335dfe0a37d",
+      "current_revision_id": "revision_ab21abc3a0e26143dbd49927",
+      "filename": "studio.js",
+      "kind": "code",
+      "mime": "application/javascript",
+      "rel_path": "public/js/studio.js",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_76af70fdf003ea6934d10756",
+          "produced_at": "2026-10-01T10:06:36+08:00",
+          "sha256": "67051eda28fb1dd66553ba3a09412c8e186c42ba9b6425430d9a021054a0dbdb",
+          "size": 33196,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_a72fa8e88de3431d1d107597",
+          "produced_at": "2026-10-01T10:08:06+08:00",
+          "sha256": "d1970d369e0fc693eacb20553e167c225f3e8b73f4718e220b4116b4d028992b",
+          "size": 33265,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_72835d0c0593aa16017dab14",
+          "produced_at": "2026-10-01T10:08:08+08:00",
+          "sha256": "eb421f47cc11c25b75a52a3cb95d87ef413a05c267c56b19c316d6d37ced2800",
+          "size": 33282,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_e87ee5a23c0ca0269de71a5e",
+          "produced_at": "2026-10-01T10:08:14+08:00",
+          "sha256": "6b540c8e9a160783ad8b288bac7f8bf8dd6260313893d6168f8decf733b1ca8b",
+          "size": 35597,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_f9427586e0848c8b51349bda",
+          "produced_at": "2026-10-01T10:08:17+08:00",
+          "sha256": "4b6e585631a76715caff63a77163052e4d17a20caae3ec8c1ec9447f0d970e16",
+          "size": 35627,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_acb2a4862cabf4fc12f34e30",
+          "produced_at": "2026-10-01T10:08:30+08:00",
+          "sha256": "c0119fa2b05dbccb190e8bbbc4028f39268c2dfb02d497bd148dff39d510c848",
+          "size": 35729,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_6c96531447df7393dee50f9a",
+          "produced_at": "2026-10-01T10:08:34+08:00",
+          "sha256": "8504994c153ec31b612a97c4c5dce4472436db68225ccc7317378cb64b4ced6e",
+          "size": 35744,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_1803f76c0ab848376c82c4f2",
+          "produced_at": "2026-10-01T10:08:46+08:00",
+          "sha256": "49492380577735bd4a2e9d77a1c94ecfc4d36100787947f2b8129ecdd7f3a34d",
+          "size": 35876,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_f90b17e1daea73f7f4595ede",
+          "produced_at": "2026-10-01T10:08:50+08:00",
+          "sha256": "955eddfc0bf0d4046c28dc4db021d3fa58a60e0de85373ab3b759878c0a850eb",
+          "size": 36483,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_08968b09c13ffa5dc752544a",
+          "produced_at": "2026-10-01T10:11:22+08:00",
+          "sha256": "365305f4ef38e04620c3f238032b597bc47bae8d7fd0157eca297ee6107b1d33",
+          "size": 36645,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_ab21abc3a0e26143dbd49927",
+          "produced_at": "2026-10-01T10:28:13+08:00",
+          "sha256": "5d83c8042b829d8317b3986868395e4625fb100823185511090405a534b9e81b",
+          "size": 36662,
+          "turn_id": "local_1790821562339_st9fqcb6"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_f9a0202ed4d7990aecce0e95",
+      "current_revision_id": "revision_7f51c32b4e7a25b3e3c97b5a",
+      "filename": "index.html",
+      "kind": "document",
+      "mime": "text/html",
+      "rel_path": "public/index.html",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_b2afbc900964811af2db2469",
+          "produced_at": "2026-10-01T10:06:47+08:00",
+          "sha256": "1cf5345d7aedd0259ae5cb754b1f9ade2fa71424d795cd700a3d10b63df98d45",
+          "size": 19973,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_1a84f7ffb46007b6c0f39c53",
+          "produced_at": "2026-10-01T10:06:52+08:00",
+          "sha256": "5e89dff72dcc8f04eccce1d47c5ac73bcd09876ca7030b144d19c514a9666280",
+          "size": 20026,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_33432e264b318efe86da738c",
+          "produced_at": "2026-10-01T10:08:02+08:00",
+          "sha256": "733070d4f4eeb71e90771ff9a9304dacb64a067036a81756ad18a7a788f6cd65",
+          "size": 20372,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_7f51c32b4e7a25b3e3c97b5a",
+          "produced_at": "2026-10-01T10:15:10+08:00",
+          "sha256": "7bfafcdacc2b79485dce958000543d55406c5e32924beb903d400a49bfdcd33f",
+          "size": 20758,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_9b17081fad2a060f3358f8a1",
+      "current_revision_id": "revision_e6b6ccdb72987163e464bc61",
+      "filename": "styles.css",
+      "kind": "document",
+      "mime": "text/css",
+      "rel_path": "public/styles.css",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_299f22cd409e73d6c989f716",
+          "produced_at": "2026-10-01T10:06:58+08:00",
+          "sha256": "ff66de18854f03d0d80fca95afbe5467e5f5d50e9a66b08a3df7eda5cdd7b3ac",
+          "size": 35180,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_1ea9562536dec7e7d6eadfc1",
+          "produced_at": "2026-10-01T10:07:02+08:00",
+          "sha256": "4b2b99b6fc6a75b5f57e9bbfc834d2ec91ffc233d7725e900c3cd04b4a2df9a6",
+          "size": 35430,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_e6b6ccdb72987163e464bc61",
+          "produced_at": "2026-10-01T10:08:58+08:00",
+          "sha256": "fa50aadd6216dc4f56827878c7acdf3381cb5a0fd3fae357ba5dfd39bd241e25",
+          "size": 35885,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_917ec931cea3728f1d7171a8",
+      "current_revision_id": "revision_11144a8755c7247df700699e",
+      "filename": "main.js",
+      "kind": "code",
+      "mime": "application/javascript",
+      "rel_path": "public/js/main.js",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_15a9759e1f07b42b6ce188e8",
+          "produced_at": "2026-10-01T10:07:07+08:00",
+          "sha256": "1e0c5fc97c1fa4351b8f470cdbbba5c16aaa4048ba7ded1483e85787ee243b84",
+          "size": 21962,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_f9281c3567eadbe4a34c23f2",
+          "produced_at": "2026-10-01T10:07:11+08:00",
+          "sha256": "cae8c702b8e4aaf0e6b0c835181b3d83b84e5f3dbfa70b92ead8d69dae405c47",
+          "size": 22010,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_11144a8755c7247df700699e",
+          "produced_at": "2026-10-01T10:07:13+08:00",
+          "sha256": "010bbe11fbb81f58376cfecc6c273d39d196ff0c700fd6e1a1b3ff9e9170d18e",
+          "size": 22094,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_a362753164419dfaa5abecc0",
+      "current_revision_id": "revision_0dd1ccde1b75cb7a9f1e805d",
+      "filename": "ui.test.mjs",
+      "kind": "document",
+      "mime": "text/plain",
+      "rel_path": "test/ui.test.mjs",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_fd2112625f8bc5a7a2bfbb17",
+          "produced_at": "2026-10-01T10:07:21+08:00",
+          "sha256": "d9df2fa8a77608e62d18913ec92df5927956aa4030f10bbd9afdecee154d20f8",
+          "size": 18264,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_d24d942376ea2aee59f20adb",
+          "produced_at": "2026-10-01T10:07:35+08:00",
+          "sha256": "f5a6c73cbc99148e9bb480246e5bb42bba29f98754e7cb665a239b97a392b26b",
+          "size": 25429,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_0dd1ccde1b75cb7a9f1e805d",
+          "produced_at": "2026-10-01T10:07:43+08:00",
+          "sha256": "553ad76227ce30ea061a6f3df6018c6d075681eb191cb3ecbb8600a4413f7a2c",
+          "size": 25553,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_f7e17f5d8b60512a287fd232",
+      "current_revision_id": "revision_ce4ee98b609755ecba9af5bd",
+      "filename": "studio.test.mjs",
+      "kind": "document",
+      "mime": "text/plain",
+      "rel_path": "test/studio.test.mjs",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_ce4ee98b609755ecba9af5bd",
+          "produced_at": "2026-10-01T10:11:06+08:00",
+          "sha256": "506c7f290bd003c83c876e70bb0488b182493a47b10825fe668e06493851c54a",
+          "size": 11220,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_ca4d888ad7f6e85b30dc6f38",
+      "current_revision_id": "revision_08ac0ea45badc3db3b403b38",
+      "filename": "verify-live-initial.png",
+      "kind": "image",
+      "mime": "image/png",
+      "rel_path": "verify-live-initial.png",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_08ac0ea45badc3db3b403b38",
+          "produced_at": "2026-10-01T10:12:41+08:00",
+          "sha256": "9b12ba96021bcb6408ff43f97c71e702016721b90ae86497739fd696d670f6d6",
+          "size": 499705,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_f87522b15ba4dccd0e7120c6",
+      "current_revision_id": "revision_87b3692ebd422028794246ee",
+      "filename": "snap2.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "snap2.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_87b3692ebd422028794246ee",
+          "produced_at": "2026-10-01T10:13:03+08:00",
+          "sha256": "efd90c602e8be1ec10e2d1d21c52cd29dd0f38331e8f093591519141209d1e96",
+          "size": 1552,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_cc01e67b0b2327ad43d08d3c",
+      "current_revision_id": "revision_233ad6c5f06f42043c277c32",
+      "filename": "qa-compass-check.mjs",
+      "kind": "document",
+      "mime": "text/plain",
+      "rel_path": "qa-compass-check.mjs",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_66056be925d922f4ecb2413b",
+          "produced_at": "2026-10-01T10:13:15+08:00",
+          "sha256": "44c1cacd1cd65dac216b4ff61ba21e79518e5735e68ae0d9eac5338f20143828",
+          "size": 1400,
+          "turn_id": "local_1790820143968_iiyroga9"
+        },
+        {
+          "artifact_revision_id": "revision_233ad6c5f06f42043c277c32",
+          "produced_at": "2026-10-01T10:13:23+08:00",
+          "sha256": "ab85fcf9567ffbf1686c56d00eed0aca61c944c32ca75df1a4a6a3c132b34592",
+          "size": 1439,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_2b43b835b7992a656972996c",
+      "current_revision_id": "revision_0bea2e48b89828c14d9a0fdb",
+      "filename": "qa-compass-play.mjs",
+      "kind": "document",
+      "mime": "text/plain",
+      "rel_path": "qa-compass-play.mjs",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_0bea2e48b89828c14d9a0fdb",
+          "produced_at": "2026-10-01T10:13:54+08:00",
+          "sha256": "af6a81b3108b8d1d990c5044a2893a5af7007b5a8deb0bfcc1f6a47f25d1ea74",
+          "size": 1427,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_e4fb8b779d33ce6ca5d003ab",
+      "current_revision_id": "revision_003763d7a11b738d7c35d24a",
+      "filename": "qa-diag.mjs",
+      "kind": "document",
+      "mime": "text/plain",
+      "rel_path": "qa-diag.mjs",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_003763d7a11b738d7c35d24a",
+          "produced_at": "2026-10-01T10:14:24+08:00",
+          "sha256": "adc3df1f125f94020dc3f6eb03e41e337bd0cca55aced4d1b05d4ea6a77197cc",
+          "size": 1632,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_c9ea63e20250c12f8e3ac8cf",
+      "current_revision_id": "revision_91dc3644bbbb7f2e84ac6255",
+      "filename": "dom-contract.test.mjs",
+      "kind": "document",
+      "mime": "text/plain",
+      "rel_path": "test/dom-contract.test.mjs",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_91dc3644bbbb7f2e84ac6255",
+          "produced_at": "2026-10-01T10:15:27+08:00",
+          "sha256": "69b92f7640e464d46bdd22495a58e79511084f425c9022ffdfedd96c6189a293",
+          "size": 2838,
+          "turn_id": "local_1790820143968_iiyroga9"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_9beb8a0a3de0322fb77e6e90",
+      "current_revision_id": "revision_b05f460397305e4b1482abe3",
+      "filename": "qa-verify-fix.mjs",
+      "kind": "document",
+      "mime": "text/plain",
+      "rel_path": "qa-verify-fix.mjs",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_b05f460397305e4b1482abe3",
+          "produced_at": "2026-10-01T10:27:11+08:00",
+          "sha256": "fced5ac10bf6c6ca42ea366b011571aade342bce7d0cc59f486f5fa7860e22b2",
+          "size": 2357,
+          "turn_id": "local_1790821562339_st9fqcb6"
+        }
+      ]
+    },
+    {
+      "artifact_id": "artifact_04c6b40350d973515f1d9fa1",
+      "current_revision_id": "revision_5c046ee1a29a24b909fc4645",
+      "filename": "AGENTS.md",
+      "kind": "document",
+      "mime": "text/markdown",
+      "rel_path": "AGENTS.md",
+      "revisions": [
+        {
+          "artifact_revision_id": "revision_5c046ee1a29a24b909fc4645",
+          "produced_at": "2026-10-01T10:29:59+08:00",
+          "sha256": "56d2c6734b9dbad900486f538e3b3fa29ce76ecce9a08caf53fc7ce56a4afbe4",
+          "size": 17348,
+          "turn_id": "local_1790821562339_st9fqcb6"
+        }
+      ]
+    }
+  ],
+  "created_at": "2026-10-01T02:02:25.447202+00:00",
+  "current_turn_id": "local_1790821562339_st9fqcb6",
+  "execution_status": "running",
+  "schema_version": 3,
+  "session_id": "0ede4a5c-6f2c-416d-a5e6-a261000cdba3",
+  "task_id": "task_1790820143968_4ua1ai5y",
+  "updated_at": "2026-10-01T02:29:59.216013+00:00"
+}

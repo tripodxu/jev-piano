@@ -64,16 +64,16 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | `audio.js` | 136 | 合成钢琴（三角波+泛音+包络+低通+生成式混响）、录音 | `envFor` 纯函数有单测；voices 由主振荡器 `onended` 事件驱动清理（不靠 setTimeout） |
 | `player.js` | 181 | lookahead 调度器（提前 2 小节），`now/setIntervalFn` 可注入 | 时钟注入契约被测试锁定；**展示层异常不得炸调度循环**（轮次 47）；**决策预算由本文件的音频时钟给出**（`_decisionBudget`/`_settleBudgets`，只用注入的 `now()`，不起新定时器；暂停/停止时结算掉未兑现预算）；**迟到小节必须顺延到现在**——Web Audio 对排程在过去乐曲是立即发声，整小节会炸成一声；`stop()` 后不得再排程 |
 | `midi.js` | 88 | SMF Type-1 双轨导出 | 字节格式有单测 |
-| `ui.js` | 848 | 键盘 DOM、下落音符 canvas、**和声功能轨**、**张力对照带**（`TensionGraph`）、**段落标注**、**动机卡**（`MotifCard`/`motifShape`）、**图例**（`LEGEND_ITEMS`/`renderLegend`）、决策日志（`addDecision`/`decisionGuards`）、计划卡、toast | 功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；**颜色归功能、形态归手法**；段落/手法标注都必须有文字通道；**`LEGEND_ITEMS` 必须与真实标记同源**（标记改了图例没改，比没图例更糟，有测试守）；**归因标记一律走 `decisionGuards()` 纯函数**（断路/驳回/复读/超预算四类，返回描述符而非 HTML）——加标记必须同时加图例条目与关键词断言；canvas 渲染用 setInterval 而非 rAF |
+| `ui.js` | 973 | 键盘 DOM、下落音符 canvas、**和声功能轨**、**张力对照带**（`TensionGraph`）、**段落标注**、**动机卡**（`MotifCard`/`motifShape`）、**和声罗盘**（`CompassCard`/`drawCompassCard`/`compassRadius`/`compassStep`/`compassStatLine`）、**图例**（`LEGEND_ITEMS`/`renderLegend`）、决策日志（`addDecision`/`decisionGuards`）、计划卡、toast | 功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；**颜色归功能、形态归手法**；段落/手法标注都必须有文字通道；**`LEGEND_ITEMS` 必须与真实标记同源**（标记改了图例没改，比没图例更糟，有测试守）；**归因标记一律走 `decisionGuards()` 纯函数**（断路/驳回/复读/超预算四类，返回描述符而非 HTML）——加标记必须同时加图例条目与关键词断言；canvas 渲染用 setInterval 而非 rAF；**`FN_COLOR` 在 ui.js 与 studio-core.js 各有一份且必须逐键等值**（有测试锁）；**罗盘可见性由 `compassRadius(w,h) ≥ 48` 保证**，不是靠 CSS 高度猜 |
 | `main.js` | 438 | 实时即兴接线：设置持久化、渠道探测、开始/停止/导出、张力/功能轨/动机卡喂数、**图例抽屉开合与「不再提示」记忆**、**两种兜底的分别告知** | 元素 id 契约见 `index.html`；**兜底必须分因**：`deadlineMiss`（渠道跟不上，设计在保节奏）与渠道故障（429/断网/CORS/无 key）是两件事，toast 文案与状态栏后缀都不同（`·跟不上` vs `·兜底`），各自一次性告知、恢复即复位 |
-| `studio.js` | 781 | 工作室界面：批量生成 job、钢琴卷帘编辑（**头部含张力曲线 + 功能带 + 契合度带**）、量化 + 力度轨、Jev 路由的自然语言修改、JSON 导入导出 | 确定性编辑纯函数有单测；卷帘头部四段与音符区**共用 `ZOOM`**；**力度轨与卷帘同在 `.rollwrap` 内，播放头 `top:0/bottom:0` 自动覆盖两条轨——不要另建同步**；张力与 `nonChordIds` 两份缓存都在 `invalidateTension()` 里作废 |
+| `studio.js` | 851 | 工作室界面：批量生成 job、钢琴卷帘编辑（**头部含张力曲线 + 功能带 + 契合度带**）、量化 + 力度轨、Jev 路由的自然语言修改、JSON 导入导出 | 确定性编辑纯函数有单测；卷帘头部四段与音符区**共用 `ZOOM`**；**力度轨与卷帘同在 `.rollwrap` 内，播放头 `top:0/bottom:0` 自动覆盖两条轨——不要另建同步**；张力与 `nonChordIds` 两份缓存都在 `invalidateTension()` 里作废；**布局常量（`ZOOM`/`ROW`/`VEL_H`/`HEADER` 等）住在 studio-core.js**——轮次 38 拆分时漏了导出，让卷帘整条绘制路径死了 10 轮，见 MEMORY 轮次 49 |
 | `settings.js` | 21 | localStorage 设置读写（含 `legendHintOff`：图例提示记不记） | — |
 
 ### 分析层
 
 | 文件 | 行数 | 职责 | 修改高危区 |
 |---|---|---|---|
-| `studio-core.js` | 209 | **工作室纯函数层**（轮次 38 拆出）：确定性编辑变换、自然语言→编辑命令、项目 JSON 校验、时间轴分析；studio.js 对其再导出（对外契约不变） |
+| `studio-core.js` | 229 | **工作室纯函数层**（轮次 38 拆出）：确定性编辑变换、自然语言→编辑命令、项目 JSON 校验、时间轴分析；studio.js 对其再导出（对外契约不变） |
 | `tension.js` | 76 | **音乐张力分析**（只读已生成的小节，不参与决策）：`shapeTension` 音程不协和度、`barTension` 五分量加权、`smooth`/`tensionStats` | 与决策层**无耦合**——`FUNCTION_TENSION` 是分析用的另一张表，别和 `candidates.js` 的 `FN_NEXT`（决策用）混；脏输入必须降级而非抛错。**「计划弧线」由 `candidates.js` 的 `planTargetSeries` 提供**（它描述计划而非已生成的音乐，放在这里会造成反向耦合） |
 | `nct.js` | 53 | **非和声音分析**（只读）：`classifyNote` 按「进出方式」分和弦音/经过音/邻音/倚音（Kostka-Payne 判据）、`barHarmonyFit`、`harmonySummary` | **pc 是音级类 0..11 不是 midi**——传错会让「和弦音 0%」这种荒谬结果出现；首尾音无邻居一律 `other`（把「4→5」判成经过音是错的）；脏输入降级为 `other` 绝不抛错 |
 
@@ -84,7 +84,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | 路径 | 职责 |
 |---|---|
 | `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
-| `test/*.test.mjs` | `node --test`，共 178 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
+| `test/*.test.mjs` | `node --test`，共 193 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
 | `scripts/probe-jev.mjs` `scripts/probe-bar.mjs` | 真实 API 冒烟（需 key，计费） |
 | `scripts/verify-deploy.mjs` | **部署后核验**：拉线上的 js/api，断言刚改的代码片段真的在边缘上（`npm test` 只证明磁盘对，不证明线上对）；退出码可接 CI。**每次 `wrangler deploy` 后必跑** |
 | `scripts/regression-gate.mjs` | **决策指标回归门**（`npm run gate`）：12 种子多样性均值 + 相邻重复硬不变量；门槛单一真相源 `GATE_CONFIG`，CI 每次推送执行 |
@@ -109,7 +109,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 2. 读 MEMORY.md 顶部 3 条 + 任务相关 memory 条目（最新在最上，先看有没有人踩过坑）
 3. 实现：先改/加测试，再改实现（本项目测试驱动传统，见 docs/adr/0004）
 4. 验证关卡（全部通过才算完成）：
-   a. npm test                        全绿（178 个，只增不减）
+   a. npm test                        全绿（193 个，只增不减）
    b. node --check 改动的新 .js        语法
    c. 涉及真实 API 的：scripts/probe-*.mjs 冒烟（可选，计费）
    d. 涉及听感/反重复的：analyze-repetition.mjs 对比指标不退化
@@ -176,7 +176,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 ## 6. 常用命令
 
 ```bash
-npm test                                  # 178 个单测（node --test）
+npm test                                  # 193 个单测（node --test）
 npm run gate                              # 12 种子决策指标回归门（CI 同步执行）
 python dev-proxy.py --port 8000           # 本地开发（或 npm run dev）→ http://127.0.0.1:8000
 node scripts/analyze-repetition.mjs 32 2026 random   # 重复度指标（结论至少 12 种子求均值）

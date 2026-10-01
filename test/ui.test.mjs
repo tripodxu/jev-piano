@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, fifthPos, compassPoints, decisionGuards } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, fifthPos, compassPoints, compassRadius, compassStep, compassStepZh, compassStatLine, drawCompassCard, CompassCard, decisionGuards, COMPASS_PAD } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -326,4 +326,155 @@ test('compassPoints: 归一化坐标在圆环上、顺序保持、脏 pc 过滤'
   assert.deepEqual(compassPoints([0, 7])[0], compassPoints([0])[0], '同 pc 同位置（顺序无关）');
   assert.equal(compassPoints([]).length, 0);
   assert.equal(compassPoints([3, NaN, 8]).length, 2, '脏 pc 过滤');
+});
+
+/* ---------------- 和声罗盘补完（轮次 49 · 前端）：可见性判据与生命周期 ---------------- */
+
+test('compassRadius: 半径随盒子缩放，且 ≥48px 才算「可读」（轮次 45 的失败是画小了）', () => {
+  // 轮次 45 的实际盒子：96×48 → 半径 ~12px，12 个刻度与轨迹挤成一团，这就是当时的阻塞项
+  assert.ok(compassRadius(96, 48) < 20, '旧尺寸确实不可读（<20px）——这是被修掉的那个数');
+  // 补完后的盒子：≥120px 高、宽度充足
+  assert.ok(compassRadius(240, 132) >= 48, `240×132 的盒子半径应 ≥48，实际 ${compassRadius(240, 132)}`);
+  assert.ok(compassRadius(120, 120) >= 48, '120×120 也应达线');
+  // 取短边：宽度很大但高度不足时，半径仍由高度决定
+  assert.equal(compassRadius(1000, 120), compassRadius(120, 120), '半径由短边决定（宽高各留 12px 刻度位）');
+  assert.equal(compassRadius(240, 132), Math.min(240, 132) / 2 - COMPASS_PAD);
+  // 脏输入降级为 0 而不是 NaN（绘制端据此提前返回，不抛错）
+  assert.equal(compassRadius(0, 100), 0);
+  assert.equal(compassRadius(NaN, 100), 0);
+  assert.equal(compassRadius(undefined, undefined), 0);
+});
+
+test('compassStep: 五度圈步数取「顺时针步」且值域 0..6（同音最近、三全音最远）', () => {
+  assert.equal(compassStep(0, 0), 0, '同一个根音 = 同音');
+  assert.equal(compassStep(0, 7), 1, 'C→G 是顺时针一步（相差五度 = 声部最近）');
+  assert.equal(compassStep(0, 5), 1, 'C→F 逆时针一步，取较短的 1 而不是 11');
+  assert.equal(compassStep(0, 6), 6, '三全音 = 圈上对角，最远的声部进行');
+  for (let a = 0; a < 12; a++) {
+    for (let b = 0; b < 12; b++) {
+      const s = compassStep(a, b);
+      assert.ok(s >= 0 && s <= 6, `步数必须落在 0..6，实际 ${s}（${a}→${b}）`);
+      assert.equal(s, compassStep(b, a), '步数对称');
+    }
+  }
+});
+
+test('compassStepZh: 步数→文字（罗盘的形状因此也能被读到，不依赖看图）', () => {
+  assert.equal(compassStepZh(0), '同音');
+  assert.equal(compassStepZh(1), '五度邻位');
+  assert.equal(compassStepZh(6), '远跳');
+  assert.equal(compassStepZh(NaN), '', '脏输入空串而不是「同音」——不能替数据编结论');
+});
+
+test('compassStatLine: 无轨迹给引导语，有轨迹给「第 N 小节 · 和弦 · 功能 · 进行」', () => {
+  assert.equal(compassStatLine({ count: 0 }), '第 2 小节后出现根音轨迹');
+  assert.equal(compassStatLine({}), '第 2 小节后出现根音轨迹');
+  assert.equal(compassStatLine(), '第 2 小节后出现根音轨迹');
+  // 单小节：还没有「进行」可言，不说距离
+  assert.equal(compassStatLine({ count: 1, symbol: 'Cm', fn: 'T' }), '第 1 小节 · Cm · 主功能');
+  assert.equal(compassStatLine({ count: 3, symbol: 'G', fn: 'D', step: 1 }), '第 3 小节 · G · 属功能 · 五度邻位');
+  assert.equal(compassStatLine({ count: 8, symbol: 'F', fn: 'S', step: 6 }), '第 8 小节 · F · 下属功能 · 远跳');
+  // 缺字段如实省略，不编内容
+  assert.equal(compassStatLine({ count: 2, step: 1 }), '第 2 小节 · 五度邻位');
+  assert.equal(compassStatLine({ count: 2, symbol: 'Cm', fn: '乱写', step: 0 }), '第 2 小节 · Cm · 同音');
+  assert.equal(compassStatLine({ count: -5 }), '第 2 小节后出现根音轨迹', '负数视为无轨迹');
+});
+
+test('drawCompassCard: 给定 ctx 就能画（工作室复用同一实现），无尺寸时安静返回不抛错', () => {
+  const calls = [];
+  const g = new Proxy({}, {
+    get: (_, k) => (...args) => { calls.push([k, args]); },
+    set: () => true,
+  });
+  drawCompassCard(g, { w: 200, h: 160, roots: [0, 7, 5], fnColor: { T: '#1', S: '#2', D: '#3', Tp: '#4' } });
+  assert.ok(calls.length > 0, '有尺寸与数据时应产生绘制调用');
+  assert.ok(calls.some(([k]) => k === 'arc'), '应画圆点');
+  assert.ok(calls.some(([k, a]) => k === 'fillText' && a.length >= 3), '应画 12 个音名刻度');
+
+  // 以下三种都不该抛错，且都不产生新的绘制调用
+  const before = calls.length;
+  drawCompassCard(g, { w: 0, h: 160, roots: [0] });    // 无宽度 → 提前返回
+  drawCompassCard(g, { w: 200, h: 0, roots: [0] });    // 无高度 → 提前返回
+  drawCompassCard(null, { w: 200, h: 160 });           // 无 ctx → 提前返回
+  assert.equal(calls.length, before, '无尺寸/无 ctx 时不得绘制');
+});
+
+test('CompassCard: push/reset/max 截断/读数 生命周期（mock canvas，无需真实 DOM）', () => {
+  const canvas = { clientWidth: 240, clientHeight: 132, width: 0, height: 0,
+    getContext: () => ({ clearRect() {}, save() {}, restore() {}, beginPath() {}, arc() {}, fill() {}, stroke() {}, moveTo() {}, lineTo() {}, fillText() {}, setTransform() {} }),
+    setAttribute() {} };
+  const readout = { textContent: '', setAttribute() {} };
+  const c = new CompassCard(canvas, { readout, max: 3, fnColor: { T: '#1', S: '#2', D: '#3', Tp: '#4' } });
+
+  assert.equal(c.status(), '第 2 小节后出现根音轨迹', '空状态是引导语');
+
+  c.push({ rootPc: 0, symbol: 'Cm' }, 'T');
+  assert.equal(c.entries.length, 1);
+  assert.equal(c.status(), '第 1 小节 · Cm · 主功能', '单小节不给「进行」');
+  assert.equal(readout.textContent, '第 1 小节 · Cm · 主功能', '读数节点被同步（文字通道）');
+
+  c.push({ rootPc: 7, symbol: 'G' }, 'D');
+  assert.equal(c.status(), '第 2 小节 · G · 属功能 · 五度邻位', 'C→G 是五度邻位');
+
+  c.push({ rootPc: 6, symbol: 'F#' }, 'Tp');
+  assert.equal(c.status(), '第 3 小节 · F# · 色彩功能 · 远跳', 'G→F# 圈上对角 = 远跳');
+
+  c.push({ rootPc: 3, symbol: 'Eb' }, 'S');   // 超过 max=3 → 最早的 Cm 被挤掉
+  assert.equal(c.entries.length, 3, 'max 截断生效');
+  assert.equal(c.entries[0].rootPc, 7, '挤掉的是最早那条');
+
+  c.push({ rootPc: NaN }, 'T');               // 脏输入不进入轨迹
+  assert.equal(c.entries.length, 3, '脏 pc 不占位');
+
+  c.reset();
+  assert.equal(c.entries.length, 0);
+  assert.equal(c.status(), '第 2 小节后出现根音轨迹', 'reset 回到引导语');
+  assert.equal(readout.textContent, '第 2 小节后出现根音轨迹');
+
+  // 兼容旧调用形态：直接给一个 pc 数字（不带和弦对象）
+  c.push(5);
+  assert.equal(c.entries.length, 1);
+  assert.equal(c.status(), '第 1 小节', '无和弦名/功能时如实省略，不编内容');
+  c.destroy();
+});
+
+test('图例：罗盘条目 swatch 非空（轮次 45 欠的账——标记没色块比没有图例更糟）', () => {
+  const it = LEGEND_ITEMS.find((i) => i.label === '罗盘');
+  assert.ok(it, '图例必须有罗盘条目');
+  assert.ok(it.swatch && it.swatch.trim(), `罗盘 swatch 不能为空，实际 ${JSON.stringify(it.swatch)}`);
+  assert.ok(it.desc.includes('五度圈'), '说明要点出五度圈');
+  const html = renderLegend(LEGEND_ITEMS);
+  assert.ok(html.includes('lg-sw compass'), '渲染出罗盘的色块类');
+  assert.ok(!html.includes('lg-sw lg-blank"></i><b>罗盘'), '罗盘不该走空色块分支');
+});
+
+/* ---------------- 模块完整性（轮次 49 · 真实回归） ---------------- */
+
+test('FN_COLOR: 功能色的单一真相源——与 studio-core.js 逐键等值（跨文件同名常量不许漂移）', async () => {
+  // 轮次 49 的真事故：我在 ui.js 里直接引用 FN_COLOR 却忘了引入，
+  // 让罗盘的绘制路径一加载就 `ReferenceError`（真实浏览器报错，Node 单测当时测不到）。
+  // 这个断言同时守住两件事：ui.js 有这个导出，且与 studio-core.js 的值一致。
+  const { FN_COLOR } = await import('../public/js/ui.js');
+  const { FN_COLOR: CORE } = await import('../public/js/studio-core.js');
+  assert.deepEqual(Object.keys(FN_COLOR).sort(), ['D', 'S', 'T', 'Tp'], '四功能齐全');
+  for (const k of Object.keys(FN_COLOR)) {
+    assert.equal(FN_COLOR[k], CORE[k], `FN_COLOR.${k} 必须与 studio-core.js 一致（两份调色板不许漂移）`);
+  }
+});
+
+test('drawCompassCard 的 fnColor 缺省值生效：不传 fnColor 时也不抛错（默认走 FN_COLOR）', async () => {
+  // 上面那条 ReferenceError 的直接守卫：把 ui.js 作为一个**模块**加载并真正调用绘制路径。
+  const { drawCompassCard } = await import('../public/js/ui.js');
+  const calls = [];
+  const g = new Proxy({}, { get: () => (...a) => calls.push(a), set: () => true });
+  assert.doesNotThrow(() => drawCompassCard(g, { w: 200, h: 160, roots: [0, 7, 5] }), '不传 fnColor 必须能画');
+  assert.ok(calls.length > 0);
+});
+
+test('compassStatLine: hideCount 抑制行内小节数（避免「整曲 16 小节 · 第 16 小节」重复）', () => {
+  assert.equal(compassStatLine({ count: 5, symbol: 'Cm', fn: 'T', step: 1, hideCount: true }), 'Cm · 主功能 · 五度邻位');
+  // 抑制后如果什么都不剩，仍要给出小节数，不能返回空串
+  assert.equal(compassStatLine({ count: 3, hideCount: true }), '第 3 小节');
+  // 默认行为不变
+  assert.equal(compassStatLine({ count: 5, symbol: 'Cm', fn: 'T' }), '第 5 小节 · Cm · 主功能');
 });

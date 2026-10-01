@@ -10,6 +10,26 @@ export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 export const snap = (v) => Math.round(v / SNAP) * SNAP;
 export const FN_COLOR = { T: '#d8ab5c', S: '#85b8ae', D: '#cf6a58', Tp: '#a8936f' };
 
+/**
+ * 卷帘布局常量（轮次 49 回填）。
+ *
+ * **这些常量在轮次 38 拆分时被搬到了 studio-core.js，却没有 export 回去**——
+ * studio.js 里 `ZOOM`/`HEADER`/`H_TENSION` 等 8 个标识符从那一刻起就是未定义引用，
+ * 一打开工作室的卷帘就会 `ReferenceError`。它与「拆分把 `STORE_KEY` 搬走、
+ * 被 try/catch 吞成静默行为变化」是同一类缺失（见 MEMORY 轮次 38 反思），
+ * 区别在于这次没有任何测试碰到过这条路径，所以它安静地活了 10 轮。
+ *
+ * 教训：**拆分时被搬走的每个符号都要点名核对「谁还在用」**，
+ * 而不是等某个恰好跑到该路径的测试来发现。
+ */
+export const ZOOM = 24;            // 像素/拍（卷帘与头部共用，对齐由它保证）
+export const ROW = 8;              // 每个半音行高
+export const VEL_H = 54;           // 力度轨高度
+// 卷帘头部自上而下：张力曲线 / 功能带 / 和弦名 / 契合度带。缺一个都会让下面的轨迹错位
+export const H_TENSION = 24, H_FN = 12, H_CHORD = 18, H_FIT = 12;
+export const HEADER = H_TENSION + H_FN + H_CHORD + H_FIT;
+
+
 
 /**
  * 把 onset 吸附到网格。strength ∈ [0,1] 支持**部分量化**（DAW 惯例：可以「收一半」而不是二选一）。

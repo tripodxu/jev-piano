@@ -2,6 +2,15 @@
 import { midiName, PREFERRED_NAME } from './music.js';
 import { tempoMultAt } from './candidates.js';
 
+/**
+ * 和声功能的颜色——**界面上的单一真相源**。
+ * 与 studio-core.js 的同名表是同一套十六进制值（那里给 canvas 头部用），
+ * 与 styles.css 的 `--fn-T/S/D/Tp` 也是同一套（那里给 CSS 用）。
+ * 轮次 49 的教训：我把 FN_COLOR 当成「到处都有」的全局引用了，
+ * 结果罗盘的绘制路径一加载就 `ReferenceError` —— **跨文件的同名常量必须在每个消费点显式引入**。
+ */
+export const FN_COLOR = { T: '#d8ab5c', S: '#85b8ae', D: '#cf6a58', Tp: '#a8936f' };
+
 const LOW = 36, HIGH = 84; // C2..C6
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
 const BLACK_PCS = [1, 3, 6, 8, 10];
@@ -407,6 +416,55 @@ export function compassPoints(rootPcs) {
   return out;
 }
 
+/**
+ * 罗盘绘制区在画布内的实际半径（轮次 49 补完）。
+ * **这是本卡的可见性判据**：轮次 45 的失败不是「画错了」而是「画小了」——
+ * 96×48px 的盒子里圆半径 ~12px，刻度与轨迹挤成一团。所以半径必须可断言，
+ * 而不是只能靠肉眼看截图。刻度环再外扩 12px 给音名留位置。
+ */
+export const COMPASS_PAD = 12;
+
+export function compassRadius(w, h) {
+  const W = Number.isFinite(w) && w > 0 ? w : 0;
+  const H = Number.isFinite(h) && h > 0 ? h : 0;
+  if (!W || !H) return 0;
+  return Math.max(0, Math.min(W, H) / 2 - COMPASS_PAD);
+}
+
+/** 轨迹两点之间的「声部进行」距离：五度圈上是**顺时针步数**而非直线距离（值域 0..6） */
+export function compassStep(a, b) {
+  const pa = Number.isFinite(a) ? a : 0;
+  const pb = Number.isFinite(b) ? b : 0;
+  const steps = Math.abs(fifthPos(pa) - fifthPos(pb)) * 12;
+  return Math.min(steps, 12 - steps);
+}
+
+/** 步数 → 声部进行的可读说法（纯文字通道：罗盘的「形状」因此也能被读到，不依赖看图） */
+export function compassStepZh(steps) {
+  if (!Number.isFinite(steps)) return '';
+  if (steps <= 0.25) return '同音';
+  if (steps <= 1.5) return '五度邻位';
+  return '远跳'; // 圈上对角 = 色彩突变，正是断路器要管的那种跳
+}
+
+/** 罗盘读数行：无轨迹时是引导语，有轨迹时是「第 N 小节 · 和弦 · 功能 · 进行」。
+ *  缺和弦名/功能时如实省略——读数不替数据编内容。
+ *  `hideCount`：调用方已在别处报过小节数时（工作室读数是「整曲 N 小节 · …」），
+ *  抑制行内的「第 N 小节」以免读成「整曲 16 小节 · 第 16 小节」这种重复。 */
+export function compassStatLine({ count, symbol, fn, step, hideCount = false } = {}) {
+  const n = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  if (!n) return '第 2 小节后出现根音轨迹';
+  const parts = [];
+  if (!hideCount) parts.push(`第 ${n} 小节`);
+  if (symbol) parts.push(String(symbol));
+  if (fn && FN_ZH[fn]) parts.push(`${FN_ZH[fn]}功能`);
+  if (count >= 2) {
+    const zh = compassStepZh(step);
+    if (zh) parts.push(zh);
+  }
+  return parts.join(' · ') || `第 ${n} 小节`;
+}
+
 /** 双遍张力对照（轮次 42）：把已演奏序列按遍长切成「上一遍」与「当前遍」。
  *  再即兴的可视化——同一曲式，两条不同的形状。totalBars ≤ 0 表示未启用分遍（total=0，调用方回退旧行为）。 */
 export function chorusView(actual, totalBars) {
@@ -470,7 +528,7 @@ export const LEGEND_ITEMS = [
   { group: '断路器与守卫（功能轨上的形状）', label: '超预算', swatch: 'slow', desc: '渠道跟不上演奏速度：决策超过本小节的音频预算，由离线随机顶替保住节奏，下一小节重试真实渠道' },
   { group: '结构（各处的虚线与名字）', label: '段落', swatch: 'sec', desc: 'A 陈述 / B 对比 / A′ 再现 / Coda 收束，虚线竖线是段落边界' },
   { group: '结构（各处的虚线与名字）', label: '动机', swatch: 'motif', desc: '曲子主题的旋律轮廓，右侧计数是它回来的次数' },
-  { group: '结构（各处的虚线与名字）', label: '罗盘', swatch: '', desc: '和声罗盘：最近小节的根音在五度圈上的轨迹——邻位小步是平滑进行，对角跳跃是色彩突变' },
+  { group: '结构（各处的虚线与名字）', label: '罗盘', swatch: 'compass', desc: '和声罗盘：最近小节的根音在五度圈上的轨迹（点按功能着色）——邻位小步是平滑进行，对角跳跃是色彩突变' },
   { group: '分析读数（张力带与卷帘）', label: '张力', swatch: 'ten', desc: '这一小节有多紧：实线是实际，虚线是计划弧线' },
   { group: '分析读数（张力带与卷帘）', label: '契合度', swatch: 'fit', desc: '旋律里有多少音属于当前和弦——越高越「在调上」' },
   { group: '分析读数（张力带与卷帘）', label: '非和弦', swatch: 'nct', desc: '带亮边的旋律音：不属于当前和弦，但正是调式的呼吸' },
@@ -699,85 +757,152 @@ export class MotifCard {
 }
 
 /**
- * 和声罗盘（轮次 45）：最近若干小节的根音在五度圈上的轨迹。
- * 骨架沿用 MotifCard（ResizeObserver + setInterval 而非 rAF）。
- * 「声部进行」是本项目和声层的核心算法——这张卡让「和声在圈上怎么走」第一次可见：
- * 邻位小步 = 平滑进行（共同音多），对角跳跃 = 色彩突变（轮次 2 断路器在工作）。
+ * 和声罗盘（轮次 45 立，轮次 49 补完）。
+ * 把「根音在五度圈上怎么走」画出来——这是轮次 2 声部进行加权（共同音 + 五度圈距离）
+ * 的几何显形：邻位小步 = 平滑进行（共同音多），对角跳跃 = 色彩突变（断路器在工作）。
+ *
+ * **绘制与生命周期分开**（轮次 49）：`drawCompassCard` 是纯绘制（只吃 ctx + 尺寸 + 数据），
+ * 实时界面的 `CompassCard` 与工作室卷帘头部**渲染的是同一份实现**——
+ * 轮次 34 的「能力做一次，界面各自认领」在这里落到函数级。
+ */
+
+/** 重量级：给一个 2d context 画罗盘本体（刻度环 + 轨迹 + 起点/当前点）。
+ *  圆占满 min(W,H)，半径由 compassRadius 给出——**尺寸是可见性的一部分，不该藏在 CSS 里**。 */
+export function drawCompassCard(g, { w, h, roots = [], fnColor = {} } = {}) {
+  if (!g) return;
+  const W = Number.isFinite(w) ? w : 0, H = Number.isFinite(h) ? h : 0;
+  if (!W || !H) return;
+  const cx = W / 2, cy = H / 2;
+  const R = compassRadius(W, H);
+  if (!R) return;
+
+  // 刻度环：12 个音名按 pc×7 顺序（PREFERRED_NAME 与和弦显示同源）
+  g.save();
+  g.font = '8px var(--mono, monospace)';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = 'rgba(154,144,120,0.5)';
+  for (let pc = 0; pc < 12; pc++) {
+    const a = fifthPos(pc) * Math.PI * 2 - Math.PI / 2;
+    g.fillText(PREFERRED_NAME[pc], cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+  }
+  g.restore();
+
+  const pts = compassPoints(roots);
+  if (!pts.length) return;
+  const X = (p) => p.x * W, Y = (p) => p.y * H;
+
+  // 轨迹线：整条安静（它是路径不是主角），顺序即时间
+  g.save();
+  g.strokeStyle = 'rgba(216,171,92,0.45)';
+  g.lineWidth = 1;
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  g.beginPath();
+  pts.forEach((p, i) => (i ? g.lineTo(X(p), Y(p)) : g.moveTo(X(p), Y(p))));
+  if (pts.length > 1) g.stroke();
+  g.restore();
+
+  // 点按**和声功能**着色（FN_COLOR 单一来源，与功能轨/图例同源）——
+  // 这是免费的第二通道：位置说「走了多远」，颜色说「走到哪个功能区」。
+  const n = pts.length;
+  for (let i = 0; i < n; i++) {
+    const p = pts[i];
+    const last = i === n - 1;
+    const raw = roots[i];
+    const fn = typeof raw === 'object' && raw ? raw.fn : null;
+    const col = (fn && fnColor[fn]) || 'rgba(216,171,92,0.85)';
+    g.save();
+    g.globalAlpha = last ? 1 : 0.35 + 0.55 * ((i + 1) / n); // 越久越淡：轨迹有方向
+    g.fillStyle = last ? '#f6d695' : col;
+    g.beginPath();
+    g.arc(X(p), Y(p), last ? 4 : 2.2, 0, Math.PI * 2);
+    g.fill();
+    if (last) { // 当前和弦：亮环，一眼找到「现在在哪」
+      g.strokeStyle = col; g.lineWidth = 1.5;
+      g.beginPath(); g.arc(X(p), Y(p), 6.5, 0, Math.PI * 2); g.stroke();
+    }
+    g.restore();
+  }
+}
+
+/**
+ * 实时界面的罗盘卡：`drawCompassCard` 的生命周期包装
+ * （ResizeObserver + setInterval，与 Fall/TensionGraph/MotifCard 同一骨架）。
  */
 export class CompassCard {
-  constructor(canvas, { max = 16 } = {}) {
+  constructor(canvas, el = {}) {
     this.canvas = canvas;
-    this.ctx2d = canvas.getContext('2d');
-    this.roots = [];
-    this.max = max;
+    this.ctx2d = canvas?.getContext ? canvas.getContext('2d') : null;
+    this.readout = el.readout ?? null;
+    this.entries = [];   // { rootPc, symbol, fn }，顺序即时间
+    this.max = el.max ?? 16;
+    this.fnColor = el.fnColor ?? FN_COLOR;
     this.timer = null;
     this._resize = () => {
+      if (!canvas) return;
       const dpr = globalThis.devicePixelRatio || 1;
       const w = canvas.clientWidth, h = canvas.clientHeight;
       if (!w || !h) return;
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
-      this.ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.ctx2d?.setTransform?.(dpr, 0, 0, dpr, 0, 0);
       this.draw();
     };
-    this._ro = new ResizeObserver(this._resize);
-    this._ro.observe(canvas);
+    if (canvas && typeof ResizeObserver === 'function') {
+      this._ro = new ResizeObserver(this._resize);
+      this._ro.observe(canvas);
+    }
     this._resize();
   }
 
-  push(rootPc) {
+  /** 接一小节的和声。`chord` 给 { rootPc, symbol }，`fn` 是归因里的 chordFn。 */
+  push(chord, fn) {
+    const rootPc = typeof chord === 'object' && chord ? chord.rootPc : chord;
     if (Number.isFinite(rootPc)) {
-      this.roots.push(rootPc);
-      if (this.roots.length > this.max) this.roots.shift();
+      this.entries.push({ rootPc, symbol: (typeof chord === 'object' ? chord?.symbol : '') ?? '', fn: fn ?? null });
+      if (this.entries.length > this.max) this.entries.shift();
     }
     this.draw();
   }
 
-  reset() { this.roots = []; this.draw(); }
+  reset() { this.entries = []; this.draw(); }
   start() { if (!this.timer) this.timer = setInterval(() => this.draw(), 120); }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.draw(); }
-  destroy() { this.stop(); this._ro.disconnect(); }
+  destroy() { this.stop(); this._ro?.disconnect(); }
+
+  _roots() { return this.entries.map((e) => e.rootPc); }
+
+  /** 读数（文字通道）：形状之外还要能「读」到—status 与 title 共用，别处禁止再拼中文字面量 */
+  status() {
+    const n = this.entries.length;
+    const cur = n ? this.entries[n - 1] : null;
+    const step = n >= 2 ? compassStep(this.entries[n - 2].rootPc, cur.rootPc) : null;
+    return compassStatLine({ count: n, symbol: cur?.symbol, fn: cur?.fn, step });
+  }
+
+  _paintReadout() {
+    if (!this.readout) return;
+    const text = this.status();
+    if (this.readout.textContent !== text) this.readout.textContent = text;
+    if (this.canvas?.setAttribute) this.canvas.setAttribute('aria-label', `和声罗盘：${text}`);
+  }
 
   draw() {
     const { ctx2d: g, canvas } = this;
+    if (!g || !canvas) return;
     const W = canvas.clientWidth, H = canvas.clientHeight;
     if (!W || !H) return;
     g.clearRect(0, 0, W, H);
-    g.save();
-    g.font = '10px var(--sans, sans-serif)';
-    g.fillStyle = 'rgba(154,144,120,0.95)';
-    g.textAlign = 'left'; g.textBaseline = 'top';
-    g.fillText('和声罗盘', 0, 0);
-    g.restore();
-    // 五度圈刻度（12 点，PREFERRED_NAME 按 pc×7 顺序）
-    g.save();
-    g.font = '8px var(--mono, monospace)';
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    const R = Math.min(W, H) / 2 - 12;
-    for (let pc = 0; pc < 12; pc++) {
-      const a = fifthPos(pc) * Math.PI * 2 - Math.PI / 2;
-      g.fillStyle = 'rgba(154,144,120,0.5)';
-      g.fillText(PREFERRED_NAME[pc], W / 2 + Math.cos(a) * R, H / 2 + Math.sin(a) * R);
+    drawCompassCard(g, { w: W, h: H, roots: this.entries, fnColor: this.fnColor });
+    this._paintReadout();
+    if (this.readout?.setAttribute) {
+      const t = this.entries.length
+        ? `最近 ${this.entries.length} 小节的根音轨迹。${this.status()}。邻位小步是平滑进行，对角跳跃是色彩突变`
+        : '和声罗盘：根音在五度圈上的轨迹，第 2 小节后出现';
+      this.readout.setAttribute('title', t);
     }
-    g.restore();
-    const pts = compassPoints(this.roots);
-    if (pts.length < 1) return;
-    const X = (p) => p.x * W, Y = (p) => p.y * H;
-    // 轨迹连线 + 点
-    g.save();
-    g.strokeStyle = 'rgba(216,171,92,0.5)';
-    g.lineWidth = 1;
-    g.beginPath();
-    pts.forEach((p, i) => (i ? g.lineTo(X(p), Y(p)) : g.moveTo(X(p), Y(p))));
-    g.stroke();
-    pts.forEach((p, i) => {
-      const cur = i === pts.length - 1;
-      g.fillStyle = cur ? '#f6d695' : 'rgba(216,171,92,0.7)';
-      g.beginPath(); g.arc(X(p), Y(p), cur ? 3.5 : 2, 0, Math.PI * 2); g.fill();
-    });
-    g.restore();
   }
 }
+
 
 /**
  * 和声功能轨：每个已演奏小节一格，按功能着色，标记断路器触发与候选集驳回。
