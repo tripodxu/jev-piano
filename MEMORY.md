@@ -28,7 +28,7 @@
 - **部署后核验被沙箱拦下**：本地外网在部署后即刻不可用——`curl`/`node fetch`/`wrangler deployments list` 全部 `fetch failed`，且 DNS 把 `workers.dev` 解析到 Facebook 的 IP 段（`2a03:2880:…:face:b00c:`）——**沙箱在 DNS 层投毒**。所以**上传清单 ≠ 内容正确**这一环没能合上，已挂任务板（见下）。
 - **顺手把核验变成工具**（而非一次性脚本）：`scripts/verify-deploy.mjs`——拉线上的 js + `/api/probe` + 打一发 `/api/jev`，断言刚改的代码片段真的在边缘上（`_decisionBudget`/`_settleBudgets`/迟到顺延/`budgetMiss`/`deadlineMiss`/`decisionGuards`/`超预算`），退出码 0/1 可接 CI。**`npm test` 全绿只证明磁盘上的代码对，不证明 CDN 边缘拿到的是这份**——这是两件事，以前从没分开过。AGENTS.md §2 已登记「每次 `wrangler deploy` 后必跑」。
 - **反思**：前两轮部署（46/47）都是"部署成功"就当完成，靠的是「线上代码 grep 确认」。那个办法在**外网可达时**够用，但它没有留下可复用的东西；这次把同样的检查固化成脚本 + 任务板条目，下次任何人都能一键重跑。**部署的最后一步应该是可执行的断言，不是一句"grep 确认"**。
-- **下一步**：任务板新增「轮次 48 部署后核验」——网络恢复后跑 `node scripts/verify-deploy.mjs`。
+- **下一步**：任务板新增「轮次 48 部署后核验」——网络恢复后跑 `node scripts/verify-deploy.mjs`（**2026-10-01 复核：本地 DNS 仍把 workers.dev 投毒**——`nslookup` 解析到 `2a03:2880:…:face:b00c`，`example.com` 却正常 200；片段清单已更新到轮次 49 的改动）。
 
 ## [完成] 2026-09-30 · 「超预算」读数落地：兜底分因，不再一锅端（轮次 48 收尾 · 前端）
 

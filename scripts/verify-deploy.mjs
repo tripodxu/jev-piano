@@ -20,7 +20,11 @@ const withApi = !process.argv.includes('--no-api');
 const CHECKS = [
   { file: '/js/player.js', needles: ['_decisionBudget', '_settleBudgets', 'barStartSec < this._now()'], why: '轮次 48：决策预算 + 迟到小节顺延' },
   { file: '/js/composer.js', needles: ['budgetMiss', 'deadlineMiss'], why: '轮次 48：预算赛跑 + 如实标记' },
-  { file: '/js/ui.js', needles: ['decisionGuards', '超预算'], why: '轮次 48 收尾：归因标记与图例' },
+  { file: '/js/ui.js', needles: ['decisionGuards', '超预算', 'drawCompassCard', 'compassRadius'], why: '轮次 48 归因标记 + 轮次 49 罗盘共享绘制与可见性判据' },
+  // 轮次 49：三个静默 bug 的现场——线上必须同时具备「罗盘」与「舞台灯光 DOM」
+  { file: '/js/studio-core.js', needles: ['export const ZOOM', 'export const HEADER', 'H_TENSION'], why: '轮次 49：布局常量回填（此前卷帘整条绘制路径 ReferenceError）' },
+  { file: '/index.html', needles: ['stageWarm', 'stageCool', 'compassReadout'], why: '轮次 49：舞台灯光 DOM（此前 onBar 每小节抛异常）+ 罗盘读数节点' },
+  { file: '/js/studio.js', needles: ['drawCompassCard', 'compassEntriesOf'], why: '轮次 49：工作室接入罗盘' },
 ];
 
 let bad = 0;
