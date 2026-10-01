@@ -729,11 +729,65 @@ export function renderPlan(el, plan) {
     (plan.notes ? `<div class="notes">${escapeHtml(plan.notes)}</div>` : '');
 }
 
+/**
+ * 计费台账（轮次 50）：tokens / 费用 / 延迟的**唯一记账口径**，两个界面共用。
+ *
+ * 为什么要抽出来：三个 pill（`stTokens`/`stCost`/`stLatency`）挂在顶栏、两个视图共用同一份 DOM，
+ * 但计数器原先只住在 `main.js` 里、只在实时演奏的 `onBar` 累加 —— **工作室整条生成循环从不读
+ * `bar.decision` 的计费字段**。结果是进了工作室那三个数字一动不动，用户完全无法知道一次 32 小节的
+ * 生成花了多少钱。**共用的显示 + 各写各的账 = 一半界面永远在说谎。**
+ */
+export const CHANNEL_LABEL = { fixture: '离线随机', proxy: '同源代理', typesafe: 'TypeSafe', openrouter: 'OpenRouter' };
+
+export function emptyLedger() {
+  return { tokens: 0, usd: 0, latencySum: 0, latencyN: 0 };
+}
+
+/** 累加一次决策。**fixture 不记账**——离线随机无网络请求、无费用，写进去等于虚报。
+ *  脏输入一律按 0 处理：台账宁可少记，绝不能把 NaN 渲染到顶栏。 */
+export function accumulateLedger(ledger, decision) {
+  const l = Number.isFinite(ledger?.tokens) ? { ...ledger } : emptyLedger();
+  const d = decision && typeof decision === 'object' ? decision : null;
+  if (!d || d.fixture) return l;                       // 离线渠道不计费
+  const tok = Number(d.inputTokens), usd = Number(d.usd), ms = Number(d.ms);
+  if (Number.isFinite(tok) && tok > 0) l.tokens += tok;
+  if (Number.isFinite(usd) && usd > 0) l.usd += usd;
+  if (Number.isFinite(ms) && ms > 0) { l.latencySum += ms; l.latencyN++; }
+  return l;
+}
+
+/** 台账 → 三个 pill 的文案。`latency` 为 null 表示无有效样本，由 setStatus 渲染成「— ms」。 */
+export function ledgerPills(ledger) {
+  const l = ledger && typeof ledger === 'object' ? ledger : {};
+  const tokens = Number.isFinite(l.tokens) && l.tokens > 0 ? l.tokens : 0;
+  const usd = Number.isFinite(l.usd) && l.usd > 0 ? l.usd : 0;
+  const n = Number.isFinite(l.latencyN) && l.latencyN > 0 ? l.latencyN : 0;
+  const sum = Number.isFinite(l.latencySum) && l.latencySum > 0 ? l.latencySum : 0;
+  return {
+    tokens: `${Math.round(tokens).toLocaleString()} tok`,
+    cost: `$${usd.toFixed(6)}`,
+    latency: n ? Math.round(sum / n) : null,
+  };
+}
+
+/**
+ * 写顶栏 pill。
+ *
+ * ⚠️ tokens/cost **接受两种形态**：裸数值，或 `ledgerPills()` 已格式化的字符串。
+ * `ledgerPills` 存在的意义就是「一套口径两处复用」；若它返回数值、本函数再格式化一次，
+ * 格式化规则就有两份、迟早漂移。**格式化只做一遍**，字符串直接透传。
+ * （轮次 50 教训：第一版对字符串调了 `.toFixed()`，真实浏览器立刻报
+ * `cost.toFixed is not a function`——单测只断言了 `ledgerPills` 的输出、没走本函数，所以没拦住。）
+ */
 export function setStatus(pills, { channel, tokens, cost, latency }) {
   if (channel != null) pills.channel.textContent = channel;
-  if (tokens != null) pills.tokens.textContent = `${Math.round(tokens).toLocaleString()} tok`;
-  if (cost != null) pills.cost.textContent = `$${cost.toFixed(6)}`;
-  if (latency != null) pills.latency.textContent = latency == null ? '— ms' : `${Math.round(latency)} ms`;
+  if (tokens != null) pills.tokens.textContent = typeof tokens === 'string' ? tokens : `${Math.round(tokens).toLocaleString()} tok`;
+  if (cost != null) pills.cost.textContent = typeof cost === 'string' ? cost : `$${cost.toFixed(6)}`;
+  // `undefined` = 本次没有延迟信息（别动）；`null` = **确实没有样本**（写成「— ms」）。
+  // 两者必须分开：若把 null 也当"别动"，从真实渠道切到离线渠道后，pill 会一直挂着上一次的旧值。
+  if (latency !== undefined) {
+    pills.latency.textContent = latency === null || latency === '' ? '— ms' : `${Math.round(latency)} ms`;
+  }
 }
 
 export function toast(el, msg, ms = 4000) {

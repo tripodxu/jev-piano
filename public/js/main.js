@@ -6,7 +6,7 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle } from './ui.js';
+import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills } from './ui.js';
 import { STYLE_BY_ID } from './music.js';
 import { GOAL_HINTS } from './composer.js';
 import { barTension, smooth, tensionStats } from './tension.js';
@@ -38,8 +38,9 @@ const els = {
 let settings = loadSettings();
 const saveSettings = () => persistSettings(settings);
 
-const CHANNEL_LABEL = { fixture: '离线随机', proxy: '同源代理', typesafe: 'TypeSafe', openrouter: 'OpenRouter' };
-const stats = { tokens: 0, usd: 0, latencySum: 0, latencyN: 0 };
+// 计费台账与渠道名都走 ui.js 的共享实现（轮次 50）——工作室与实时界面必须同一口径，
+// 否则共用同一排 pill 却各记各的账（工作室此前完全不记账）
+let stats = emptyLedger();
 // 兜底告知只发一次：恢复真实渠道后复位，再断还会提示（自愈是设计，用户该知道它发生过）。
 // 两种兜底的成因完全不同，必须分开说——「渠道坏了」和「渠道跟不上速度」不是一回事：
 // 前者是故障（轮次 41），后者是设计在主动保住节奏（轮次 48）。
@@ -48,11 +49,10 @@ let slowAnnounced = false;       // 渠道跟不上：决策超过本小节的�
 const refreshStatus = (fallback) => { // fallback: null | 'down' | 'slow'
   const label = CHANNEL_LABEL[settings.channel] ?? settings.channel;
   const suffix = fallback === 'slow' ? ' ·跟不上' : fallback ? ' ·兜底' : '';
+  const p = ledgerPills(stats);
   setStatus({ channel: els.stChannel, tokens: els.stTokens, cost: els.stCost, latency: els.stLatency }, {
     channel: label + suffix,
-    tokens: stats.tokens,
-    cost: stats.usd,
-    latency: stats.latencyN ? stats.latencySum / stats.latencyN : null,
+    tokens: p.tokens, cost: p.cost, latency: p.latency,
   });
 };
 
@@ -259,11 +259,7 @@ async function start() {
       seenLh.add(sigOfNotes(bar.notes.filter((n) => n.hand === 'L')));
       els.repStat.textContent = uniquenessLine(seenMel.size, seenLh.size, bar.index + 1);
       chorusChords.add(bar.chord.symbol);
-      if (!bar.decision.fixture) {
-        stats.tokens += bar.decision.inputTokens;
-        stats.usd += bar.decision.usd;
-        if (bar.decision.ms > 0) { stats.latencySum += bar.decision.ms; stats.latencyN++; }
-      }
+      stats = accumulateLedger(stats, bar.decision); // 与工作室同一口径（fixture 不计）
       // 兜底归因（轮次 41/48）：把"这一小节为什么不是 Jev 弹的"说清楚，且只在事件首次发生时告知一次
       const fb = bar.decision.fixture && settings.channel !== 'fixture'
         ? (bar.decision.deadlineMiss ? 'slow' : 'down')

@@ -2,7 +2,7 @@
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -303,4 +303,116 @@ test('goalTitle: 目标的实际偏置透明化；无偏置说明随机', () => 
   assert.equal(goalTitle({ arc: 'flat', density: -0.15 }), '影响：弧线 flat · 密度 −0.15');
   assert.equal(goalTitle({}), '每次随机生成，不偏置任何参数');
   assert.equal(goalTitle(undefined), '每次随机生成，不偏置任何参数');
+});
+
+/* ---------------- 计费台账（轮次 50）：工作室此前完全不记账 ---------------- */
+
+test('CHANNEL_LABEL: 四渠道都有中文名（实时/工作室共用同一份，不许各写各的）', () => {
+  assert.equal(CHANNEL_LABEL.fixture, '离线随机');
+  assert.equal(CHANNEL_LABEL.proxy, '同源代理');
+  assert.equal(CHANNEL_LABEL.typesafe, 'TypeSafe');
+  assert.equal(CHANNEL_LABEL.openrouter, 'OpenRouter');
+});
+
+test('emptyLedger: 四个字段从 0 起（不是 undefined，避免 NaN 传染）', () => {
+  const l = emptyLedger();
+  assert.deepEqual(l, { tokens: 0, usd: 0, latencySum: 0, latencyN: 0 });
+});
+
+test('accumulateLedger: 累加真实渠道的 tokens/费用/延迟', () => {
+  let l = emptyLedger();
+  l = accumulateLedger(l, { fixture: false, inputTokens: 1860, usd: 0.000078, ms: 461 });
+  assert.equal(l.tokens, 1860);
+  assert.ok(Math.abs(l.usd - 0.000078) < 1e-12);
+  assert.equal(l.latencyN, 1);
+  assert.equal(l.latencySum, 461);
+
+  l = accumulateLedger(l, { fixture: false, inputTokens: 1900, usd: 0.00008, ms: 539 });
+  assert.equal(l.tokens, 3760, '累加而非覆盖');
+  assert.equal(l.latencyN, 2);
+  assert.equal(l.latencySum, 1000);
+});
+
+test('accumulateLedger: fixture 决策不记账（离线随机无网络请求、无费用）', () => {
+  let l = emptyLedger();
+  l = accumulateLedger(l, { fixture: true, inputTokens: 999, usd: 1, ms: 500 });
+  assert.deepEqual(l, emptyLedger(), 'fixture 一律不计');
+  // 混合：真实的计、fixture 的不计
+  l = accumulateLedger(l, { fixture: false, inputTokens: 100, usd: 0.001, ms: 200 });
+  l = accumulateLedger(l, { fixture: true, inputTokens: 999, usd: 9, ms: 900 });
+  assert.equal(l.tokens, 100);
+  assert.equal(l.latencyN, 1);
+});
+
+test('accumulateLedger: 脏输入不污染台账（不产生 NaN）', () => {
+  let l = emptyLedger();
+  l = accumulateLedger(l, null);
+  l = accumulateLedger(l, undefined);
+  l = accumulateLedger(l, {});
+  l = accumulateLedger(l, { fixture: false, inputTokens: NaN, usd: NaN, ms: NaN });
+  l = accumulateLedger(l, { fixture: false, inputTokens: 'x', usd: 'y', ms: 'z' });
+  for (const [k, v] of Object.entries(l)) assert.ok(Number.isFinite(v), `${k} 必须是有限数，实际 ${v}`);
+  assert.equal(l.tokens, 0);
+  assert.equal(l.latencyN, 0, '无效 ms 不占延迟样本');
+});
+
+test('accumulateLedger: ms<=0 不计入延迟样本（但 tokens/费用照记）', () => {
+  const l = accumulateLedger(emptyLedger(), { fixture: false, inputTokens: 50, usd: 0.0001, ms: 0 });
+  assert.equal(l.tokens, 50);
+  assert.equal(l.latencyN, 0, '0ms 不是有效延迟样本');
+  assert.equal(l.latencySum, 0);
+});
+
+test('ledgerPills: 台账 → 三个 pill 的文案（0 样本时延迟显示 — ms）', () => {
+  const empty = ledgerPills(emptyLedger());
+  assert.equal(empty.tokens, '0 tok');
+  assert.equal(empty.cost, '$0.000000');
+  assert.equal(empty.latency, null, '无样本 → null，由 setStatus 渲染成 — ms');
+
+  const l = accumulateLedger(accumulateLedger(emptyLedger(),
+    { fixture: false, inputTokens: 1860, usd: 0.000078, ms: 461 }),
+    { fixture: false, inputTokens: 1900, usd: 0.00008, ms: 539 });
+  const p = ledgerPills(l);
+  assert.equal(p.tokens, '3,760 tok', '千分位');
+  assert.equal(p.cost, '$0.000158');
+  assert.equal(p.latency, 500, '平均而非求和');
+});
+
+test('ledgerPills: 脏台账不产出 NaN 文案', () => {
+  const p = ledgerPills(undefined);
+  assert.equal(p.tokens, '0 tok');
+  assert.equal(p.cost, '$0.000000');
+  assert.equal(p.latency, null);
+  const q = ledgerPills({ tokens: NaN, usd: NaN, latencySum: 0, latencyN: 0 });
+  assert.ok(!String(q.tokens).includes('NaN'), '不能把 NaN 渲染给用户');
+  assert.ok(!String(q.cost).includes('NaN'));
+});
+
+// 轮次 50 的真实事故：ledgerPills 返回字符串，而 setStatus 仍对它调 .toFixed()，
+// 浏览器报 `cost.toFixed is not a function`。下面这条把两者的**组合**也测上——
+// 只测各自的输出、不测它们对接，正是上面那个 bug 溜过去的原因。
+test('setStatus 必须能吃下 ledgerPills 的输出（一次集成断言，防格式化重复）', async () => {
+  const { setStatus } = await import('../public/js/ui.js');
+  const mk = () => ({ channel: {}, tokens: {}, cost: {}, latency: {} });
+  const p = ledgerPills(accumulateLedger(emptyLedger(),
+    { fixture: false, inputTokens: 7490, usd: 0.000315, ms: 461 }));
+
+  const pills = mk();
+  assert.doesNotThrow(() => setStatus(pills, { channel: 'TypeSafe', tokens: p.tokens, cost: p.cost, latency: p.latency }),
+    'ledgerPills 的输出必须能直接喂给 setStatus（曾因重复格式化而崩）');
+  assert.equal(pills.tokens.textContent, '7,490 tok');
+  assert.equal(pills.cost.textContent, '$0.000315');
+  assert.equal(pills.latency.textContent, '461 ms');
+
+  // 数值形态仍然可用（旧调用点兼容）
+  const num = mk();
+  setStatus(num, { channel: 'x', tokens: 1000, cost: 0.5, latency: 200 });
+  assert.equal(num.tokens.textContent, '1,000 tok');
+  assert.equal(num.cost.textContent, '$0.500000');
+  assert.equal(num.latency.textContent, '200 ms');
+
+  // null / undefined 延迟 → — ms（不是 NaN ms）
+  const nil = mk();
+  setStatus(nil, { channel: 'x', tokens: '0 tok', cost: '$0.000000', latency: null });
+  assert.equal(nil.latency.textContent, '— ms');
 });

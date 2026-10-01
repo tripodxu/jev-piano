@@ -6,7 +6,7 @@ import { buildPlan, Composer } from './composer.js';
 import { askJev } from './jev.js';
 import { getAudio } from './audio.js';
 import { exportMidi } from './midi.js';
-import { renderKeyboard, toast, sectionLabel } from './ui.js';
+import { renderKeyboard, toast, sectionLabel, setStatus, emptyLedger, accumulateLedger, ledgerPills, CHANNEL_LABEL } from './ui.js';
 import { loadSettings } from './settings.js';
 import { chordMidis, scaleMidis, nearest, NOTE_NAMES } from './music.js';
 import { tempoMultAt } from './candidates.js';
@@ -28,6 +28,22 @@ export {
 import { barTension } from './tension.js';
 import { barHarmonyFit } from './nct.js';
 
+
+/** 计费台账（轮次 50）：与实时界面共用 accumulateLedger 口径，生成过程的每一小节都记账 */
+let ledger = emptyLedger();
+
+/** 把台账刷到顶栏 pill。渠道名从当前设置读——工作室与实时界面看的是同一个渠道。 */
+function refreshLedger() {
+  if (!els?.tokens) return;
+  const s = loadSettings();
+  const p = ledgerPills(ledger);
+  setStatus({ channel: els.channel, tokens: els.tokens, cost: els.cost, latency: els.latency }, {
+    channel: CHANNEL_LABEL[s.channel] ?? s.channel,
+    tokens: p.tokens, cost: p.cost, latency: p.latency,
+  });
+}
+
+function resetLedger() { ledger = emptyLedger(); }
 
 let tensionCache = null;
 /** 张力受音符编辑影响（密度/音域分量），任何改动后必须作废 */
@@ -66,6 +82,9 @@ export function ensureStudio() {
     play: $('stPlay'), loopBtn: $('stLoop'), muteR: $('stMuteR'), muteL: $('stMuteL'),
     bpm: $('stBpm'), undo: $('stUndo'), redo: $('stRedo'),
     chord: $('stChord'), info: $('stInfo'), keyboard: $('stKeyboard'),
+    // 顶栏计费 pill 与实时界面**共用同一份 DOM**：工作室生成也必须记账，否则一次 32 小节的
+    // 花费对用户完全不可见（轮次 50 修复）
+    channel: $('stChannel'), tokens: $('stTokens'), cost: $('stCost'), latency: $('stLatency'),
   };
   kb = renderKeyboard(els.keyboard, {
     onKey: (midi) => getAudio().ensure()
@@ -76,6 +95,7 @@ export function ensureStudio() {
   bindVelLane();
   bindControls();
   window.__stDebug = () => ({ inited, hasPiece: !!piece, notes: piece?.notes.length ?? -1, savedVersion: piece?.version ?? null });
+  refreshLedger(); // 进工作室就把 pill 对齐到当前渠道（此前显示的是实时界面留下的存量）
   // 恢复上次的工作台
   try {
     const saved = validatePiece(JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null'));
@@ -115,6 +135,7 @@ async function compose(newSeed) {
   const seed = newSeed ?? Math.floor(Math.random() * 2 ** 31);
   const bars = Number(els.bars.value);
   composing = true; cancelFlag = false;
+  resetLedger(); // 新一次生成 = 新一本账，避免上一轮的花费混进来
   els.compose.disabled = true;
   els.compose.querySelector('span').textContent = '生成中…';
   els.cancel.classList.remove('hidden');
@@ -142,14 +163,16 @@ async function compose(newSeed) {
     piece = p;
     invalidateTension();
     for (let i = 0; i < bars; i++) {
-      if (cancelFlag) { toastify('已取消，保留已生成部分'); break; }
+      if (cancelFlag) { refreshLedger(); toastify('已取消，保留已生成部分'); break; }
       const bar = await composer.nextBar();
       const off = i * plan.meterNum;
       for (const n of bar.notes) p.notes.push({ id: p.nid++, midi: n.midi, startBeats: off + n.startBeats, durBeats: n.durBeats, vel: n.vel, hand: n.hand });
       p.barChords.push({ startBeat: off, symbol: bar.chord.symbol, rootPc: chordRoot(bar.chord), shape: bar.chord.shape, fn: bar.decision.chordFn, intensity: bar.intensity });
+      ledger = accumulateLedger(ledger, bar.decision); // 每小节记账（fixture 不计——离线随机无费用）
       els.progress.style.transform = `scaleX(${(i + 1) / bars})`; // scaleX 而非 width：进度动画不触发布局
       els.progressText.textContent = `第 ${i + 1}/${bars} 小节 · ${bar.chord.symbol}`;
       updateInfo();
+      refreshLedger(); // 生成中数字就在涨——花费对用户可见
       drawRoll(); drawVelLane(); // jevthoven 式 complete-bar preview：边生成边可见
       await new Promise((r) => setTimeout(r, 0)); // 让出主线程刷新 UI
     }
@@ -160,6 +183,7 @@ async function compose(newSeed) {
   } catch (e) {
     toastify('生成失败：' + (e?.message ?? e));
   } finally {
+    refreshLedger(); // 成功/取消/失败三条路径都在此落账——已生成部分的花费照实显示
     composing = false;
     els.compose.disabled = false;
     els.compose.querySelector('span').textContent = '生成编曲';
