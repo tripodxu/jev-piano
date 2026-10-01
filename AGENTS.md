@@ -86,7 +86,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
 | `test/*.test.mjs` | `node --test`，共 189 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
 | `scripts/probe-jev.mjs` `scripts/probe-bar.mjs` | 真实 API 冒烟（需 key，计费） |
-| `scripts/verify-deploy.mjs` | **部署后核验**：拉线上的 js/api，断言刚改的代码片段真的在边缘上（`npm test` 只证明磁盘对，不证明线上对）；退出码可接 CI。**每次 `wrangler deploy` 后必跑**。默认打生产自定义域 `https://jevpiano.logicc.top`（`*.workers.dev` 在本机被 DNS 投毒），可传 URL 参数或 `VEV_BASE` 覆盖 |
+| `scripts/verify-deploy.mjs` | **部署后核验**：拉线上的 js/api，断言刚改的代码片段真的在边缘上（`npm test` 只证明磁盘对，不证明线上对）；退出码可接 CI。**每次 `wrangler deploy` 后必跑**。默认打生产自定义域 `https://jevpiano.logicc.top`，可传 URL 参数或 `VEV_BASE` 覆盖。**只对网络异常重试 3 次；HTTP 非 200 与片段缺失立即判失败**——把「可重试的噪声」与「确定性的信号」分开，退出码才有意义 |
 | `scripts/regression-gate.mjs` | **决策指标回归门**（`npm run gate`）：12 种子多样性均值 + 相邻重复硬不变量；门槛单一真相源 `GATE_CONFIG`，CI 每次推送执行 |
 | `scripts/analyze-repetition.mjs` | 重复度量化分析（`node scripts/analyze-repetition.mjs 32 <seed> random [--real]`）。**单种子噪声大，结论至少取 12 个种子求均值** |
 | `dev-proxy.py` | 本地开发：静态服务 + mock/真实转发（stdlib only） |

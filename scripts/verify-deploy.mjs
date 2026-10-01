@@ -24,31 +24,50 @@ const withApi = !process.argv.includes('--no-api');
 const CHECKS = [
   { file: '/js/player.js', needles: ['_decisionBudget', '_settleBudgets', 'barStartSec < this._now()'], why: '轮次 48：决策预算 + 迟到小节顺延' },
   { file: '/js/composer.js', needles: ['budgetMiss', 'deadlineMiss'], why: '轮次 48：预算赛跑 + 如实标记' },
-  { file: '/js/ui.js', needles: ['decisionGuards', '超预算'], why: '轮次 48 收尾：归因标记与图例' },
-  // 轮次 49：三个静默 bug 的现场——线上必须同时具备「罗盘」与「舞台灯光 DOM」
+  { file: '/js/ui.js', needles: ['decisionGuards', '超预算', 'accumulateLedger', 'ledgerPills'], why: '轮次 48 归因标记 + 轮次 50 共享计费台账' },
+  // 轮次 49：三个静默 bug 的现场——线上必须同时具备「布局常量」与「舞台灯光 DOM」
   { file: '/js/studio-core.js', needles: ['export const ZOOM', 'export const HEADER', 'H_TENSION'], why: '轮次 49：布局常量回填（此前卷帘整条绘制路径 ReferenceError）' },
-  { file: '/index.html', needles: ['stageWarm', 'stageCool'], why: '轮次 49：舞台灯光 DOM（此前 onBar 每小节抛异常，导致 0 tok）' },
+  { file: '/index.html', needles: ['stageWarm', 'stageCool'], why: '轮次 49：舞台灯光 DOM（此前 onBar 每小节抛异常，导致 0 tok）' },
+  // 轮次 50：工作室记账的现场——接线点在 studio.js，实现点在 ui.js
+  { file: '/js/studio.js', needles: ['accumulateLedger(ledger, bar.decision)', 'refreshLedger'], why: '轮次 50：工作室逐小节记账（此前完全不记账）' },
 ];
+
+// 网络抖动会让 fetch 抛 TypeError（本沙箱对目标域时通时断），而内容不符是**确定信号**。
+// 两者绝不能混为一谈：某文件在 t1 失败、t2 通过，说明是网络；报「缺片段」才是内容问题。
+// 所以只对**网络异常**重试（3 次、退避），HTTP 非 200 与片段缺失一律立即判失败。
+const RETRIES = 3;
+async function fetchText(url, timeoutMs) {
+  let lastErr;
+  for (let attempt = 1; attempt <= RETRIES; attempt++) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      return { r, text: await r.text() };
+    } catch (e) {
+      lastErr = e;
+      if (attempt < RETRIES) await new Promise((res) => setTimeout(res, 400 * attempt));
+    }
+  }
+  throw lastErr;
+}
 
 let bad = 0;
 for (const c of CHECKS) {
   try {
-    const r = await fetch(BASE + c.file, { signal: AbortSignal.timeout(20000) });
+    const { r, text: t } = await fetchText(BASE + c.file, 20000);
     if (!r.ok) { console.log(`✗ ${c.file} HTTP ${r.status}`); bad++; continue; }
-    const t = await r.text();
     const miss = c.needles.filter((n) => !t.includes(n));
     if (miss.length) { console.log(`✗ ${c.file} 缺 ${JSON.stringify(miss)}（${c.why}）`); bad++; }
     else console.log(`✓ ${c.file} ${c.needles.length}/${c.needles.length} 命中（${c.why}）`);
   } catch (e) {
-    console.log(`✗ ${c.file} 取不到：${e.name} ${e.message}`);
+    console.log(`✗ ${c.file} 取不到（重试 ${RETRIES} 次仍失败）：${e.name} ${e.message}`);
     bad++;
   }
 }
 
 // 生产决策路径：确认线上真渠道活着（ Workers AI 5007 → 链式降级到 TYPESAFE_API_KEY ）
 try {
-  const r = await fetch(BASE + '/api/probe', { signal: AbortSignal.timeout(20000) });
-  console.log(`${r.ok ? '✓' : '✗'} /api/probe HTTP ${r.status} ${await r.text()}`);
+  const { r, text } = await fetchText(BASE + '/api/probe', 20000);
+  console.log(`${r.ok ? '✓' : '✗'} /api/probe HTTP ${r.status} ${text}`);
   if (!r.ok) bad++;
 } catch (e) { console.log(`✗ /api/probe 取不到：${e.message}`); bad++; }
 
