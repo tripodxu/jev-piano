@@ -31,6 +31,7 @@ venv/
 # 若在本机建了指针文件（如 .workbuddy/MEMORY.md），它同样不进仓库。
 .workbuddy/
 .claude/
+.box-agent/
 .cursor/
 .agent/
 .github/copilot-instructions.local.md
