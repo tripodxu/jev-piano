@@ -13,7 +13,7 @@ import { tempoMultAt } from './candidates.js';
 import {
   clamp, snap, P_LO, P_HI, FN_COLOR, chordAt, quantizeNotes, densifyHand, sparserHand,
   transposeNotes, scaleVel, keywordAction, ACTIONS, ACTIONS_ZH, applyAction, validatePiece,
-  barIndexAt, barFunction, pieceTension,
+  barIndexAt, barFunction, pieceTension, findNoteAt, nonChordIds as coreNonChordIds,
   // 卷帘布局常量（轮次 49 回填——轮次 38 拆分时它们被搬走却没 export 回来，见 studio-core.js 注释）
   ZOOM, ROW, VEL_H, H_TENSION, H_FN, H_CHORD, H_FIT, HEADER,
 } from './studio-core.js';
@@ -25,7 +25,6 @@ export {
   // 布局常量也走再导出：外部（测试/潜在使用方）只认 studio.js 这个门牌
   ZOOM, ROW, VEL_H, H_TENSION, H_FN, H_CHORD, H_FIT, HEADER,
 };
-import { barTension } from './tension.js';
 import { barHarmonyFit } from './nct.js';
 
 
@@ -285,22 +284,11 @@ function bindVelLane() {
 
 function chordRoot(c) { return c.rootPc; }
 
-/** 旋律里的非和弦音的 id 集合（用于亮边）。左手不参与。缓存随音符编辑作废。 */
+/** 非和弦音 id（卷帘亮边）的**缓存门面**：计算本身是纯函数（studio-core.js），缓存随音符编辑作废。 */
 let nctCache = null;
 function nonChordIds(piece) {
-  if (!piece) return new Set();
-  if (nctCache) return nctCache;
-  const ids = new Set();
-  const meter = piece.plan?.meterNum || 4;
-  for (const bc of piece.barChords ?? []) {
-    const i = Math.round(bc.startBeat / meter);
-    const mel = piece.notes.filter((n) => n.hand === 'R' && Math.floor(n.startBeats / meter) === i)
-      .sort((a, b) => a.startBeats - b.startBeats);
-    const { kinds } = barHarmonyFit({ chord: { rootPc: bc.rootPc, shape: bc.shape }, notes: mel });
-    kinds.forEach((t, k) => { if (t !== 'chord' && mel[k]) ids.add(mel[k].id); });
-  }
-  nctCache = ids;
-  return ids;
+  if (!nctCache) nctCache = coreNonChordIds(piece);
+  return nctCache;
 }
 
 /** 画时间轴：张力面积（顶）+ 功能带 + 契合度带（底）。与卷帘共用 ZOOM，横轴天然对齐。 */
@@ -469,14 +457,7 @@ function rollPos(e) {
   return { beat: px / ZOOM, pitch: P_HI - Math.floor((py - HEADER) / ROW), px };
 }
 
-function noteAt(beat, pitch) {
-  if (!piece) return null;
-  for (let i = piece.notes.length - 1; i >= 0; i--) {
-    const n = piece.notes[i];
-    if (n.midi === pitch && beat >= n.startBeats && beat <= n.startBeats + n.durBeats) return n;
-  }
-  return null;
-}
+function noteAt(beat, pitch) { return piece ? findNoteAt(piece.notes, beat, pitch) : null; }
 
 // 卷帘 hover（轮次 34）：光标所在小节的读数（编辑主战场的逐小节检视，与实时界面的张力带 hover 同源）
 let hoverBar = null;

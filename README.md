@@ -79,7 +79,7 @@ Worker 安全边界：`/api/llm` 只转发服务端 env 配置的端点（忽略
 ## 测试
 
 ```bash
-npm test          # 194 个单测：乐理内核 / 候选集构造 / 曲式 / Jev 客户端 / 决策器 / 调度器 / SMF 导出 / 张力分析 / 非和声音分析 / 界面层 / 工作室编辑 / Worker 边界 / 回归门 / 决策预算与迟到小节 / 归因标记
+npm test          # 197 个单测：乐理内核 / 候选集构造 / 曲式 / Jev 客户端 / 决策器 / 调度器 / SMF 导出 / 张力分析 / 非和声音分析 / 界面层 / 工作室编辑 / Worker 边界 / 回归门 / 决策预算与迟到小节 / 归因标记
 node scripts/probe-jev.mjs   # 真实 API 冒烟（需 TYPESAFE_API_KEY，单次 ~$0.00002）
 node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 ```
@@ -102,7 +102,7 @@ node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 ## 目录
 
 ```
-public/            纯静态前端（index.html + 15 个 ES Module，零构建、零依赖）
+public/            纯静态前端（index.html + 16 个 ES Module，零构建、零依赖）
   js/music.js      乐理内核：罗马数字解析、和弦声位、8 种曲风预设、和声功能分类、调式全色板
   js/candidates.js 候选集构造 + 曲式：反重复断路器、声部进行加权、功能转移矩阵、A–B–A'–Coda 段落模板
   js/jev.js        Jev 四渠道客户端（归一化/重试/超时）+ fixture 采样 + LLM 扩写
@@ -112,8 +112,9 @@ public/            纯静态前端（index.html + 15 个 ES Module，零构建�
   js/player.js     lookahead 调度器 + 决策管线（now/setTimer 可注入，可单测）
   js/midi.js       SMF Type-1 双轨导出
   js/settings.js   localStorage 设置读写
-  js/ui.js, main.js  键盘可视化、下落音符、**和声功能轨**、**张力对照带**、决策日志、设置
-  js/studio.js, studio-core.js  工作室界面 + 纯函数层（确定性编辑/Jev 路由修改/JSON 校验/时间轴分析）
+  js/ui.js, main.js  界面原语（键盘/功能轨/决策日志/图例/台账）+ 接线
+  js/canvas.js     canvas 三件套：下落音符 / **张力对照带** / 动机卡（零 import，只画不决策）
+  js/studio.js, studio-core.js  工作室界面 + 纯函数层（确定性编辑/Jev 路由修改/JSON 校验/时间轴分析/非和声音 id）
   js/tension.js     分析层：张力（只读已生成的小节，不参与决策）
   js/nct.js         分析层：非和声音分类（只读，不参与决策）
 src/worker.js      CF Worker：静态资产 + /api/probe|jev|llm

@@ -7,6 +7,7 @@
 
 | 日期 | 条目 | 一句话 |
 |---|---|---|
+| 2026-10-18 | [ui-module-split](2026-10-18-ui-module-split.md) | 先量后拆：渲染层只占单核 0.016% → 转向结构；ui.js 842→447 拆出 canvas.js，全仓回到 ADR-0004 的 800 行内 |
 | 2026-10-18 | [canvas-render-budget](2026-10-18-canvas-render-budget.md) | 静止画布按需重绘 + `draw()` 不逐帧读布局：clearRect 47.6→29.9/s、布局读取 47→0/s |
 | 2026-09-30 | [tempo-visibility](2026-09-30-tempo-visibility.md) | 速度弧线的三个可见通道：计划卡速度行、实时 BPM 读数、张力带 hover 十字线 |
 | 2026-09-30 | [tempo-arc](2026-09-30-tempo-arc.md) | 给曲式补时间轴：tempoMultAt 每小节速度乘数（尾段 rit. 1.0→0.8） |

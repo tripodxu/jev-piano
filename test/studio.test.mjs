@@ -6,7 +6,41 @@ import {
   chordAt, applyAction, validatePiece, savePiece, barFunction, pieceTension, quantizeNotes,
   ZOOM, ROW, VEL_H, H_TENSION, H_FN, H_CHORD, H_FIT, HEADER,
 } from '../public/js/studio.js';
+import { findNoteAt, nonChordIds } from '../public/js/studio-core.js';
 import { functionOfPc } from '../public/js/music.js';
+
+test('nonChordIds（轮次 52 收进 studio-core）：脏输入降级为空集，不抛', () => {
+  assert.equal(nonChordIds(null).size, 0);
+  assert.equal(nonChordIds(undefined).size, 0);
+  assert.equal(nonChordIds({}).size, 0);
+  // 老实现直接读 piece.notes.filter —— 缺字段会抛；这是搬家时的硬化，锁住它
+  assert.equal(nonChordIds({ plan: { meterNum: 4 }, barChords: [{ startBeat: 0, rootPc: 0, shape: '' }] }).size, 0);
+  const ids = nonChordIds({
+    plan: { meterNum: 4, mode: 'major' },
+    barChords: [{ startBeat: 0, rootPc: 0, shape: '' }],
+    notes: [
+      { id: 1, midi: 60, startBeats: 0, durBeats: 1, hand: 'R' },
+      { id: 2, midi: 61, startBeats: 1, durBeats: 1, hand: 'R' },
+      { id: 3, midi: 67, startBeats: 2, durBeats: 1, hand: 'L' },
+    ],
+  });
+  assert.ok(ids.has(2), 'C 大三和弦里的 C#5 是非和弦音，应被标出');
+  assert.ok(!ids.has(1), '和弦音不标');
+  assert.ok(!ids.has(3), '左手不参与非和声音分析');
+});
+
+test('findNoteAt：命中区间含端点，重叠时取后画的（从后往前）', () => {
+  const notes = [
+    { id: 1, midi: 60, startBeats: 0, durBeats: 2 },
+    { id: 2, midi: 60, startBeats: 1, durBeats: 2 },
+  ];
+  assert.equal(findNoteAt(notes, 0, 60).id, 1);
+  assert.equal(findNoteAt(notes, 1, 60).id, 2, '重叠处取后者（与绘制顺序一致）');
+  assert.equal(findNoteAt(notes, 3, 60).id, 2, '区间含右端点');
+  assert.equal(findNoteAt(notes, 3.5, 60), null);
+  assert.equal(findNoteAt(notes, 1, 61), null, '音高不符');
+  assert.equal(findNoteAt(null, 1, 60), null, '脏输入降级');
+});
 
 function mkPiece() {
   return {

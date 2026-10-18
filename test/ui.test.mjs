@@ -532,6 +532,17 @@ test('MotifCard: 强调只在窗口内自排程重绘，窗口一关就停手', 
   assert.equal(mc.pulseAt, null, 'pulseAt 归 null = 描边已回到常态');
 })));
 
+test('canvas.js 拆分（轮次 52）：ui.js 只做转出，调用方 import 路径不变', async () => {
+  const cv = await import('../public/js/canvas.js');
+  // 同一个绑定，不是"又一次实现"——拆分若被后人复制回去，这条会立刻红
+  for (const [name, sym] of Object.entries({ Fall, TensionGraph, MotifCard, sectionLabel, chorusView, hoverBarAt, motifShape, pulseActive, MOTIF_PULSE_MS })) {
+    assert.equal(sym, cv[name], `ui.js 转出的 ${name} 必须是 canvas.js 的同一个绑定`);
+  }
+  assert.equal(cv.renderKeyboard, undefined, '键盘 DOM 留在 ui.js（canvas.js 不碰 DOM 之外的东西）');
+  // 依赖方向只有一条：ui.js → canvas.js（反向 import 会成环）
+  assert.ok(!('renderPlan' in cv) && !('addDecision' in cv), 'canvas.js 不得反过来装界面原语');
+});
+
 test('MotifCard.stop(): 停播时清掉在途的强调排程', () => withDom(() => withFakeTimers((timers) => {
   const { canvas } = fakeCanvas();
   const mc = new MotifCard(canvas, { now: () => 0 });

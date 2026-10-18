@@ -3,6 +3,7 @@
 // 时间轴分析（功能/张力）。全部与 DOM 无关、可单测；studio.js 只保留界面、卷帘与回放。
 import { chordMidis, scaleMidis, nearest, functionOfPc } from './music.js';
 import { barTension } from './tension.js';
+import { barHarmonyFit } from './nct.js';
 
 export const P_LO = 36, P_HI = 95;
 export const SNAP = 0.25;
@@ -205,6 +206,39 @@ export function barFunction(bc, mode = 'major') {
   if (!bc) return 'T';
   if (bc.fn && FN_COLOR[bc.fn]) return bc.fn;
   return functionOfPc(bc.rootPc ?? 0, mode) ?? 'T';
+}
+
+/**
+ * 某拍某音高上有没有音符（卷帘命中测试）。**纯查询**，从后往前找，与画布绘制顺序一致——
+ * 重叠时命中最后画的那个，视觉与手感才对得上。无 piece/无命中返回 null。
+ */
+export function findNoteAt(notes, beat, pitch) {
+  if (!Array.isArray(notes)) return null;
+  for (let i = notes.length - 1; i >= 0; i--) {
+    const n = notes[i];
+    if (n && n.midi === pitch && beat >= n.startBeats && beat <= n.startBeats + n.durBeats) return n;
+  }
+  return null;
+}
+
+/**
+ * 旋律里的非和弦音的 id 集合（卷帘上的亮边）。左手不参与：非和声音分析的对象是旋律。
+ * **纯函数，不带缓存**——缓存随音符编辑作废，属界面层状态，所以由 studio.js 持有（见那边的 nonChordIds 门面）。
+ * 老实现直接读 piece.notes.filter，缺字段会抛；这里降级为空集。
+ */
+export function nonChordIds(piece) {
+  const ids = new Set();
+  if (!piece) return ids;
+  const meter = piece.plan?.meterNum || 4;
+  for (const bc of piece.barChords ?? []) {
+    const i = Math.round(bc.startBeat / meter);
+    const mel = (piece.notes ?? [])
+      .filter((n) => n.hand === 'R' && Math.floor(n.startBeats / meter) === i)
+      .sort((a, b) => a.startBeats - b.startBeats);
+    const { kinds } = barHarmonyFit({ chord: { rootPc: bc.rootPc, shape: bc.shape }, notes: mel });
+    kinds.forEach((t, k) => { if (t !== 'chord' && mel[k]) ids.add(mel[k].id); });
+  }
+  return ids;
 }
 
 /**
