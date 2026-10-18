@@ -74,6 +74,7 @@ export class Fall {
     this.span = high - low;
     this.notes = [];
     this.timer = null;
+    this.w = 0; this.h = 0; // 尺寸在 _resize 里缓存：draw 每 33ms 跑一次，不能再逐帧读 clientWidth
     // 移动端省 GPU：shadowBlur 是 canvas 最大的帧率杀手
     this.lite = globalThis.matchMedia?.('(max-width: 980px)')?.matches ?? false;
     // 用 ResizeObserver 保持位图与布局同步（缩放/窗口/布局变化都不怕）
@@ -81,6 +82,7 @@ export class Fall {
       const dpr = globalThis.devicePixelRatio || 1;
       const w = canvas.clientWidth, h = canvas.clientHeight;
       if (!w || !h) return;
+      this.w = w; this.h = h;
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       this.ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -105,8 +107,9 @@ export class Fall {
     this.draw();
   }
   draw() {
-    const { ctx2d: g, canvas } = this;
-    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const { ctx2d: g } = this;
+    const W = this.w, H = this.h;
+    if (!W || !H) return;
     g.clearRect(0, 0, W, H);
     const now = this.now();
     const colW = W / this.span;
@@ -162,6 +165,7 @@ export class TensionGraph {
     this.meta = [];      // 每小节元数据 {chord, speed}（hover 读数；与 actual 同序）
     this.hoverX = null;  // 指针横坐标（null = 不在画布上）
     this.timer = null;
+    this.w = 0; this.h = 0; // 尺寸在 _resize 里缓存
     canvas.addEventListener('pointermove', (e) => {
       this.hoverX = e.clientX - canvas.getBoundingClientRect().left;
       this.draw();
@@ -171,6 +175,7 @@ export class TensionGraph {
       const dpr = globalThis.devicePixelRatio || 1;
       const w = canvas.clientWidth, h = canvas.clientHeight;
       if (!w || !h) return;
+      this.w = w; this.h = h;
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       this.ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -211,13 +216,15 @@ export class TensionGraph {
   }
 
   reset() { this.actual = []; this.meta = []; this.hoverX = null; this.draw(); }
-  start() { if (!this.timer) this.timer = setInterval(() => this.draw(), 120); }
-  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.draw(); }
+  /** 张力带是**静止**画面：内容只在 push/setTarget/setSections/hover/resize 时变，且每个入口都自己调 draw()。
+   *  曾经用 setInterval(draw, 120) 自我重绘——8fps 反复清一整块不动的画布，纯烧 CPU 与电池。 */
+  start() { this.draw(); }
+  stop() { this.draw(); }
   destroy() { this.stop(); this._ro.disconnect(); }
 
   draw() {
-    const { ctx2d: g, canvas } = this;
-    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const { ctx2d: g } = this;
+    const W = this.w, H = this.h;
     if (!W || !H) return;
     g.clearRect(0, 0, W, H);
     const padL = 26, padR = 6, padT = 6, padB = 12;
@@ -587,22 +594,28 @@ export function motifShape(midis) {
 }
 
 /**
- * 动机卡：把曲子的主题画成一���「形状」，并累计它回来了几次。
- *  骨架沿用 Fall / TensionGraph（ResizeObserver + setInterval 而非 rAF——标签页遮挡时 rAF 会被暂停）。
+ * 动机卡：把曲子的主题画成一条「形状」，并累计它回来了几次。
+ *  骨架沿用 Fall / TensionGraph（canvas + ResizeObserver，不用 rAF——标签页遮挡时 rAF 会被暂停）。
+ *  只在数据变化与强调窗口内重绘：静止的卡片不该在背后持续画。
  *  这是这个产品独有的东西：别的 AI 音乐生成器给音频，这里给可溯源的结构。
  */
 export class MotifCard {
-  constructor(canvas) {
+  constructor(canvas, { now = () => Date.now() } = {}) {
     this.canvas = canvas;
     this.ctx2d = canvas.getContext('2d');
+    this.now = now;          // 时钟可注入：强调窗口的时长要能被测试断言，不靠 sleep
     this.midis = [];
     this.restatements = 0;
-    this.pulseAt = 0;
-    this.timer = null;
+    this.pulseAt = null;     // null = 没有正在进行的强调（0 是合法时间戳，不能当哨兵）
+    this.timer = null;       // 常驻定时器已废弃，字段保留只为 stop/destroy 的旧契约不炸
+    this.pulseTimer = null;  // 强调窗口内的有限次自排程重绘
+    this.running = false;
+    this.w = 0; this.h = 0;
     this._resize = () => {
       const dpr = globalThis.devicePixelRatio || 1;
       const w = canvas.clientWidth, h = canvas.clientHeight;
       if (!w || !h) return;
+      this.w = w; this.h = h;
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       this.ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -617,7 +630,7 @@ export class MotifCard {
   setMotif(midis) {
     this.midis = Array.isArray(midis) ? midis.filter((m) => Number.isFinite(m)) : [];
     this.restatements = 0;
-    this.pulseAt = 0;
+    this.pulseAt = null;
     this.draw();
     return this.midis.length;
   }
@@ -625,18 +638,35 @@ export class MotifCard {
   /** 一次承袭：计数 +1，并触发一次**静默**强调（delight 的判据：只为真正有意义的瞬间庆祝，且只此一次） */
   markRestatement() {
     this.restatements++;
-    this.pulseAt = Date.now();
+    this.pulseAt = this.now();
     this.draw();
+    this._pulse();
   }
 
-  reset() { this.midis = []; this.restatements = 0; this.pulseAt = 0; this.draw(); }
-  start() { if (!this.timer) this.timer = setInterval(() => this.draw(), 120); }
-  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.draw(); }
+  reset() { this.midis = []; this.restatements = 0; this.pulseAt = null; this._clearPulse(); this.draw(); }
+  /** 动机卡平时静止：start() 不再起常驻定时器，强调只在 markRestatement 后的窗口内自排程重绘。 */
+  start() { this.running = true; this.draw(); this._pulse(); }
+  stop() { this.running = false; this._clearPulse(); this.draw(); }
   destroy() { this.stop(); this._ro.disconnect(); }
 
+  _clearPulse() { if (this.pulseTimer) clearTimeout(this.pulseTimer); this.pulseTimer = null; }
+
+  /** 强调只活在 MOTIF_PULSE_MS 内：期间有限次重绘，窗口一关闭立刻停手并补一帧常态描边。
+   *  「重复一百次还讨喜」的前提是不再有东西在背后持续画。 */
+  _pulse() {
+    this._clearPulse();
+    if (!this.running) return;
+    if (pulseActive(this.pulseAt, this.now())) {
+      this.pulseTimer = setTimeout(() => { this.pulseTimer = null; this.draw(); this._pulse(); }, PULSE_TICK_MS);
+    } else if (this.pulseAt != null) {
+      this.pulseAt = null;
+      this.draw(); // 收尾帧：描边从强调色回到常态
+    }
+  }
+
   draw() {
-    const { ctx2d: g, canvas } = this;
-    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const { ctx2d: g } = this;
+    const W = this.w, H = this.h;
     if (!W || !H) return;
     g.clearRect(0, 0, W, H);
     g.save();
@@ -665,7 +695,7 @@ export class MotifCard {
     const X = (p) => padX + p.x * w;
     const Y = (p) => top + p.y * h;
     // 强调只在首次再现后约 900ms 内有效，之后回到常态——重复一百次还讨喜是 delight 的判据
-    const fresh = this.pulseAt && Date.now() - this.pulseAt < 900;
+    const fresh = pulseActive(this.pulseAt, this.now());
     g.save();
     g.strokeStyle = fresh ? 'rgba(240,205,138,0.98)' : 'rgba(216,171,92,0.72)';
     g.lineWidth = fresh ? 2 : 1.4;
@@ -677,6 +707,16 @@ export class MotifCard {
     for (const p of [pts[0], pts[pts.length - 1]]) g.fillRect(X(p) - 2, Y(p) - 2, 4, 4);
     g.restore();
   }
+}
+
+/** 强调窗口时长（ms）与重绘节拍。原实现以 120ms 常驻重绘，节拍沿用，只是改成窗口内有限次。 */
+export const MOTIF_PULSE_MS = 900;
+const PULSE_TICK_MS = 120;
+
+/** 强调窗口是否仍然有效——「还要不要再画一帧」的判据，做成纯函数才好测。
+ *  用注入的时钟判定，因此窗口行为可以单测，不必 sleep 900ms。 */
+export function pulseActive(pulseAt, now = Date.now(), ms = MOTIF_PULSE_MS) {
+  return pulseAt != null && now - pulseAt < ms;
 }
 
 /**

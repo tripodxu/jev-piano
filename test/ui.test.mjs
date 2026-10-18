@@ -1,8 +1,10 @@
 // ui.test.mjs — 可视化层的纯逻辑：和声功能轨的类名/文案映射、段落标注、决策日志的安全渲染。
 // DOM 相关行为靠浏览器冒烟；这里锁住的是"不可注入/不可错标/不依赖颜色"的不变量。
+// canvas 三件套（Fall/TensionGraph/MotifCard）用假 canvas + 假 ResizeObserver 测：
+// 只锁两条与画面无关、与耗电有关的契约——draw 不逐帧读布局、静止画布不自我重绘。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, Fall, TensionGraph, MotifCard, MOTIF_PULSE_MS, pulseActive } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -416,3 +418,128 @@ test('setStatus 必须能吃下 ledgerPills 的输出（一次集成断言，防
   setStatus(nil, { channel: 'x', tokens: '0 tok', cost: '$0.000000', latency: null });
   assert.equal(nil.latency.textContent, '— ms');
 });
+
+/* ---------------- canvas 渲染契约：尺寸缓存 + 按需重绘 ---------------- */
+
+/** 假 2D 上下文：任何方法都是 no-op；clearRect 单独计数，用来证明"该画的时候确实画了"。 */
+function fakeCtx() {
+  const calls = { clearRect: 0 };
+  const target = {};
+  return new Proxy(target, {
+    get(t, k) {
+      if (k === '__calls') return calls;
+      if (k in t) return t[k];
+      return () => { if (k in calls) calls[k]++; };
+    },
+    set(t, k, v) { t[k] = v; return true; },
+  });
+}
+
+/** 假 canvas：clientWidth/clientHeight 记读次数——「布局读取次数」就是这次优化的验收指标。 */
+function fakeCanvas(w = 320, h = 90) {
+  const m = { reads: 0 };
+  const ctx = fakeCtx();
+  const canvas = {
+    width: 0, height: 0,
+    get clientWidth() { m.reads++; return w; },
+    get clientHeight() { m.reads++; return h; },
+    getContext: () => ctx,
+    addEventListener() {}, removeEventListener() {},
+  };
+  return { canvas, ctx, m };
+}
+
+/** Node 里没有 ResizeObserver；三个类只在构造时 observe，空壳足够。 */
+function withDom(fn) {
+  const real = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = class { constructor(cb) { this.cb = cb; } observe() {} unobserve() {} disconnect() {} };
+  try { return fn(); } finally {
+    if (real) globalThis.ResizeObserver = real; else delete globalThis.ResizeObserver;
+  }
+}
+
+/** 在整个同步执行期间接管 setTimeout：返回排队数与手动 flush（时钟由调用方推进）。 */
+function withFakeTimers(fn) {
+  const realSet = globalThis.setTimeout, realClear = globalThis.clearTimeout;
+  const q = new Map();
+  let id = 1;
+  globalThis.setTimeout = (f) => { const i = id++; q.set(i, f); return i; };
+  globalThis.clearTimeout = (i) => { q.delete(i); };
+  try {
+    return fn({
+      pending: () => q.size,
+      flush() { const fs = [...q.values()]; q.clear(); for (const f of fs) f(); },
+    });
+  } finally {
+    globalThis.setTimeout = realSet;
+    globalThis.clearTimeout = realClear;
+  }
+}
+
+test('pulseActive: 强调窗口是有限时长，到点即失效', () => {
+  assert.equal(pulseActive(null, 1000), false, '没有强调时永远不是 fresh');
+  assert.equal(pulseActive(1000, 1000), true);
+  assert.equal(pulseActive(1000, 1899), true);
+  assert.equal(pulseActive(1000, 1900), false, '900ms 一到就回到常态描边');
+  assert.equal(MOTIF_PULSE_MS, 900);
+});
+
+test('TensionGraph: 静止画面不再起常驻定时器，但变更仍会重绘', () => withDom(() => {
+  const { canvas, ctx } = fakeCanvas();
+  const tg = new TensionGraph(canvas);
+  const realSet = globalThis.setInterval;
+  let scheduled = 0;
+  globalThis.setInterval = () => { scheduled++; return { fake: scheduled }; };
+  try { tg.start(); } finally { globalThis.setInterval = realSet; }
+  assert.equal(scheduled, 0, '张力带只在数据变化时变，start() 不该 8fps 自我重绘');
+  assert.equal(tg.timer, null);
+
+  const before = ctx.__calls.clearRect;
+  tg.push(0.4);
+  assert.ok(ctx.__calls.clearRect > before, 'push() 仍然要立刻重绘');
+  tg.setSections([{ start: 0, bars: 8, name: 'A' }]);
+  assert.ok(ctx.__calls.clearRect > before + 1, 'setSections() 仍然要立刻重绘');
+}));
+
+test('三块 canvas 的 draw 不再逐帧读布局（尺寸由 ResizeObserver 缓存）', () => withDom(() => {
+  const a = fakeCanvas(), b = fakeCanvas(), c = fakeCanvas();
+  const fall = new Fall(a.canvas, () => 0);
+  const tg = new TensionGraph(b.canvas);
+  const mc = new MotifCard(c.canvas, { now: () => 0 });
+  const base = [a.m.reads, b.m.reads, c.m.reads];
+  fall.push({ midi: 60, t: 1, dur: 0.5, vel: 0.8, hand: 'R' });
+  mc.setMotif([60, 64, 67]);
+  for (let i = 0; i < 20; i++) { fall.draw(); tg.draw(); mc.draw(); }
+  assert.deepEqual([a.m.reads, b.m.reads, c.m.reads], base,
+    'draw 里读 clientWidth 会让浏览器每帧强制同步布局');
+}));
+
+test('MotifCard: 强调只在窗口内自排程重绘，窗口一关就停手', () => withDom(() => withFakeTimers((timers) => {
+  let now = 5000;
+  const { canvas } = fakeCanvas();
+  const mc = new MotifCard(canvas, { now: () => now });
+  mc.setMotif([60, 62, 64]);
+  mc.start();
+  assert.equal(timers.pending(), 0, '没有强调时机卡是静止的，不该有任何后台排程');
+
+  mc.markRestatement();
+  assert.equal(mc.restatements, 1);
+  assert.equal(timers.pending(), 1, '强调窗口内才有一次重绘排程');
+  now += 120; timers.flush();
+  assert.equal(timers.pending(), 1, '窗口内继续自排程');
+  now += 1000; timers.flush();
+  assert.equal(timers.pending(), 0, '窗口一关闭立刻停手');
+  assert.equal(mc.pulseAt, null, 'pulseAt 归 null = 描边已回到常态');
+})));
+
+test('MotifCard.stop(): 停播时清掉在途的强调排程', () => withDom(() => withFakeTimers((timers) => {
+  const { canvas } = fakeCanvas();
+  const mc = new MotifCard(canvas, { now: () => 0 });
+  mc.setMotif([60, 62]);
+  mc.start();
+  mc.markRestatement();
+  assert.equal(timers.pending(), 1);
+  mc.stop();
+  assert.equal(timers.pending(), 0, 'stop() 必须清定时器，否则停播后还在画');
+})));
+

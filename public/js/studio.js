@@ -592,13 +592,15 @@ function drawPlayhead() {
   if (beat < 0) return;
   const disp = loop ? beat % rp.totalBeats : Math.min(beat, rp.totalBeats);
   const x = disp * ZOOM;
+  // 30Hz 的循环里，**先读布局再写**：先写 style.left 再读 clientWidth 会让浏览器每帧强制一次同步 reflow。
+  const view = els.rollWrap.clientWidth;
+  const sl = els.rollWrap.scrollLeft;
+  const chord = piece ? chordAt(piece.barChords, disp) : null;
   els.playhead.style.left = `${x}px`;
   els.playhead.classList.remove('hidden');
-  const chord = piece ? chordAt(piece.barChords, disp) : null;
-  if (chord) els.chord.textContent = chord.symbol;
+  if (chord && els.chord.textContent !== chord.symbol) els.chord.textContent = chord.symbol; // 同一小节内和弦不变，别每帧写 DOM
   // 播放头跟随滚动
-  const view = els.rollWrap.clientWidth;
-  if (x < els.rollWrap.scrollLeft || x > els.rollWrap.scrollLeft + view - 60) {
+  if (x < sl || x > sl + view - 60) {
     els.rollWrap.scrollLeft = Math.max(0, x - view * 0.4);
   }
 }

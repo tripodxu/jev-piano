@@ -5,6 +5,18 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-18 · canvas 渲染预算：静止画布不再自我重绘 + draw 不再逐帧读布局（迭代轮次 51 · 优化）
+
+- **做了什么**（领地 `public/js/ui.js` + `public/js/studio.js` + `test/ui.test.mjs`；AGENTS.md §2 行数/测试数/两条高危区同 commit 更新）：
+  1. **尺寸缓存**：Fall / TensionGraph / MotifCard 都已有 `ResizeObserver`，但 `draw()` 仍每帧读 `canvas.clientWidth/clientHeight`。改为在 `_resize` 里存 `this.w/this.h`，`draw()` 只用缓存——**约 47 次/秒的强制同步布局 → 0**。
+  2. **静止画布按需重绘**：`TensionGraph.draw()` 完全静态（所有数据入口本来都各自调了 `draw()`），却由 `start()` 起了 `setInterval(draw,120)`；`MotifCard` 唯一要动画的是「承袭后 900ms 强调描边」。改为：前者 `start()` 只画一帧；后者窗口内**有限次自排程**（`_pulse()`），窗口一关就停手并补一帧常态描边。判据抽成纯函数 `pulseActive(pulseAt, now, ms)`，时钟可注入。
+  3. **工作室播放头（30Hz）先读后写**：`drawPlayhead()` 原来先写 `playhead.style.left` 再读 `rollWrap.clientWidth/scrollLeft`——**写后读 = 每帧一次强制 reflow**；且 `chord.textContent` 每帧无条件写。改为读全后再写，和弦只在真的换和弦时才写 DOM。
+- **实测（浏览器，non-cucumber）**：播放中 `clearRect` **47.6/s → 29.9/s**（Fall 27.7 仍在动画；张力带 8.3→1.2；动机卡 8.3→1.0）；三块 canvas 布局读取 **~47/s → 0/s**；工作室和弦文本写入 **30/s → 0.3/s**。
+- **坑（四条）**：① **我差点因指标选错而放过它**——先用 `PerformanceObserver('longtask')` 测 6 秒得到 **0 个长任务**（修完还是 0）。这不是卡顿问题，是持续电费；正确量度是「每秒重画次数」与「每秒布局读取次数」。② **本 harness 的 ego 浏览器 Performance/Profiler 域不可用**（`Profiler is not enabled` 且**直接终止 ego-browser 进程**，页面掉回 about:blank）——改用页面内 instrumentation（canvas 实例打 `clearRect` 计数、元素上覆盖 `clientWidth` 计数 getter）拿到同样的数字。③ `pulseAt` 原用 `0` 当「没有强调」的哨兵，时钟可注入后 `0` 是合法时间戳（`now=0` 会静默失效）→ 改 `null`。④ 一次失败的 `ego_click` 会带走 ego-browser 进程，连后台 dev-proxy 一起消失；恢复 = 重起服务 + 导航 + `Page.reload {ignoreCache:true}`（**改前端后必须硬刷新，否则量的是旧模块**）。
+- **验证**：npm test **189→194 全绿**（新增 5 条把「不读布局」「不起常驻定时器」变成红绿灯，用假 canvas+假 ResizeObserver+同步替身定时器）；`node --check` 通过；`npm run gate` 12 种子 **9.08/2.54/32.00/31.58，相邻重复 0**——与基线逐位一致（纯展示层）；实时/张力带/工作室截图无视觉差异，控制台零错误。
+- **为什么没写 ADR**：这是展示层的能耗/布局纪律，落在 AGENTS.md §2「修改高危区」就有约束力；ADR 留给架构级决策。
+- **下一步**：`Fall` 空档帧、桌面端 HiDPI 的 `shadowBlur`、`audio.js` 复音 32 时的节点数（~128）——三项已挂任务板。
+
 ## [完成] 2026-10-01 · 轮次 50 部署 + 部署后核验**首次全程通过**（结清轮次 48 挂账）
 
 - **部署**：`npx wrangler deploy` → Version `75337a4f`，上传 **3 个文件**（`ui.js`/`studio.js`/`main.js`，正是轮次 50 改的三份）。
@@ -634,6 +646,7 @@
 | ~~待办~~ | ~~**部署后核验**~~ → **轮次 50 部署时首次全程通过**（Version `75337a4f`，7/7 命中 + `/api/probe` 200 + `/api/jev` 200 真实模型；自定义域 `logicc.top` 同样 6/6）。脚本同时加固：网络异常重试 3 次、内容不符立即失败，退出码恢复可判定 | `scripts/verify-deploy.mjs` | 已完成 |
 | ~~已否决~~ | ~~**和声罗盘**~~ → 轮次 49 补完到「人眼可读」后**被用户否决并回退**（2026-10-01，理由：太丑）。内核 `fifthPos`/`compassPoints` 与设计存档保留在 `docs/superpowers/plans/2026-09-30-harmonic-compass.md`；**重启前必须先让用户看最小形态**，不要再「按清单做完再交付」 | `ui.js`/`styles.css`/`index.html`/`studio.js` | 已完成（回退） |
 | 待办 | **和声主题（改走替换候选通道）**：轮次 14 证伪了「给池内候选加权」的做法（撬不动进行池的基础权重）。若重启，需让主题和弦走 `subs` 那样的高权重替换项，并接受「主题段落重复同一和弦」的代价 | `candidates.js` / `composer.js` | 12 种子 + 段落首承袭率不退化 |
+| 待办 | **canvas/音频进一步压成本**（轮次 51 余项）：① `Fall` 在 `notes` 为空时也 clear+遍历；② 桌面端 HiDPI 的 `shadowBlur`（`lite` 只在 ≤980px 关）是单帧最大成本；③ `audio.js` 复音 32 时 ~128 个节点（每音 3 振荡器 + 1 滤波器）。**先量再改**，量法见 `docs/memory/2026-10-18-canvas-render-budget.md`（页面内 instrumentation，Profiler 域在本机不可用） | `ui.js` / `audio.js` | 每秒重画/布局读取/节点数不劣化，且有实测数字 |
 | 待办 | 音质升级评估：@tonejs/piano 采样（数 MB，违背轻量，需 ADR） | — | ADR 结论 |
 | ~~待办~~ | ~~钢琴卷帘量化与力度编辑~~ → 轮次 15 已完成（量化 + 力度轨，卷帘时间轴就位） | — | 已完成 |
 | ~~待办~~ | ~~把段落信息喂进 Jev `state`~~ → 轮次 10 已完成（含整份 `state.form`） | — | 已完成 |
