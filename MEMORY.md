@@ -5,6 +5,18 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-25 · studio.js 拆出 studio-roll.js，792→479 行回到安全区（迭代轮次 54 · 重构）
+
+- **为什么拆**：轮次 51/52 已实测「渲染/音频层没有剩余低垂果实，继续抠 CPU 是自娱」；逼近红线的是结构——`studio.js` 792 行，距 ADR-0004 的 800 行只剩 8 行，AGENTS.md §2 要求「逼近 800 行时就该规划拆分，而不是等它越线」。轮次 53 刚把红线变成 limits.test.mjs，本轮是红线生效后的第一次**主动**拆分。详见 [docs/memory/2026-10-25-studio-roll-split.md](docs/memory/2026-10-25-studio-roll-split.md)。
+- **做了什么**（领地 `public/js/studio.js` + 新增 `public/js/studio-roll.js`/`test/studio-roll.test.mjs` + AGENTS/README/MEMORY）：
+  1. **`studio.js` 792 → 479，新增 `studio-roll.js` 378**：搬出卷帘视图全家——`drawVelLane`/`bindVelLane`、`drawTimeline`（头部四段）、`drawRoll`/`rollPos`/`noteAt`/`bindRoll`、`hoverBar`、张力与非和声音两份分析缓存（唯一消费者就是绘制路径，缓存跟着消费方走）。
+  2. **状态不动、视图搬家**：与轮次 52 的自包含 canvas 类不同，卷帘深度耦合模块状态（piece 会被整体替换、撤销栈、muted、回放旗标）。解法是**工厂 + deps 闭包** `createRollView({ els, getPiece, playing, pushUndo, onCommit, muted })`——studio.js 保留单一真相源；`drawRoll`/`drawVelLane`/`invalidateTension` 留薄转发，setPiece/compose/undo/量化/静音等既有调用点**一行未改**；`invalidateTension()` 仍是缓存作废的唯一入口。
+  3. **对外契约一格未动**（搬走的全是模块内部函数）；新增 4 条接线契约测试（接口形状/两条绘制路径/指针编辑经 deps 落账/hover+力度拖动）——轮次 49「搬走的符号没人走过就是死代码」的直接对策。顺带删除 studio.js 三个零使用的残留 import（`chordMidis`/`scaleMidis`/`nearest`）。
+- **坑（一个）**：力度轨拖动测试第一版按下/抬起力度值没变（0.5→0.5），「快照没变不落账」是原实现的正确行为——测试必须先按下再**拖到不同力度**才构成真实编辑。
+- **发现未修（记录不隐瞒）**：`drawTimeline` 两处 `g.font='…px var(--mono, monospace)'`——canvas 的 font 不认 CSS 变量，赋值被静默忽略（段落名/「契合度」标签字体回退）。纯搬运未动，要修单独一轮（视觉变化需人工比对）。
+- **验证**：npm test **198→202 全绿**；`node --check` 通过；`npm run gate` 12 种子 **9.08/2.54/32.00/31.58，相邻重复 0——与基线逐位一致**（纯展示层）；grep 零残留引用。浏览器冒烟未跑（import 链已被测试加载、接线有测试守），**下次部署前人工过一遍工作室生成/编辑/回放**。
+- **下一步**：无挂账。studio.js 再逼近 800 时的下一个自然切点：回放集群（约 70 行）或 compose/revise 工作流（约 120 行）。
+
 ## [完成] 2026-10-18 · ui.js 拆出 canvas.js，全部文件回到 ADR-0004 的 800 行以内（迭代轮次 52 · 重构）
 
 - **先量后拆（这是本轮真正的方法论收获）**：轮次 51 之后用页面内 instrumentation 给实时演奏逐函数计时（15.5s）——`Fall.draw` **1.79 ms/s**、`audio.play` **0.73 ms/s**、张力带/动机卡各 0.01–0.06 ms/s，合计 ≈ **单核的 0.016%**；**冷启动 172ms 里 IR 生成只占 4.6ms**；**卷帘 hover 重绘平均 0.69ms**；6 秒 **0 个 long task**。→ **渲染/音频层没有剩余低垂果实，继续抠 CPU 是自娱**，于是转向真正在腐化的东西：结构。
