@@ -682,3 +682,6 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
   .fnseg { animation: none; }
   * { transition-duration: 0.01ms !important; }
 }
+
+/* 键盘试听回声（轮次 55）：跟弹时告诉你这个音在当前和声里的角色 */
+.kb-echo { color: var(--text-dim); font: 12px/1.8 var(--mono, monospace); text-align: center; min-height: 1.8em; padding: 4px 0 0; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   parseRoman, chordMidis, chordPcs, lhVoicing, scaleMidis, nearest, chordLabel, midiName,
   STYLES, LH_DEFS, STYLE_BY_ID, keywordPlan,
-  HARMONIC_FUNCTIONS, functionOf, modePalette,
+  HARMONIC_FUNCTIONS, functionOf, modePalette, chordRole,
 } from '../public/js/music.js';
 import { mulberry32 } from './rng-shim.mjs';
 
@@ -189,4 +189,22 @@ test('buildPlan: 总是带合法 sections（LLM 不可用时由模板派生）',
       assert.ok(s.level >= 0 && s.level <= 3);
     }
   }
+});
+
+/* ---------------- 和弦角色（轮次 55：键盘试听回声的乐理内核） ---------------- */
+
+test('chordRole: 和弦音按位置命名（根/三/五/七/九音），外音按音程命名；八度等价；脏输入 null', () => {
+  assert.deepEqual(chordRole(0, 0, 'm'), { inChord: true, label: '根音' });
+  assert.deepEqual(chordRole(3, 0, 'm'), { inChord: true, label: '三音' });
+  assert.deepEqual(chordRole(7, 0, 'm'), { inChord: true, label: '五音' });
+  assert.deepEqual(chordRole(10, 0, 'm7'), { inChord: true, label: '七音' });
+  assert.deepEqual(chordRole(2, 0, 'm9'), { inChord: true, label: '九音' });
+  assert.deepEqual(chordRole(19, 0, 'm'), { inChord: true, label: '五音' }, '八度等价：19 与 7 同音级类');
+  assert.deepEqual(chordRole(4, 0, 'm'), { inChord: false, label: '大三度' }, 'Cm 里的大三度是外音');
+  assert.deepEqual(chordRole(11, 0, ''), { inChord: false, label: '大七度' });
+  assert.deepEqual(chordRole(1, 0, '7'), { inChord: false, label: '小二度' });
+  assert.deepEqual(chordRole(5, 0, ''), { inChord: false, label: '纯四度' });
+  assert.equal(chordRole(NaN, 0, 'm'), null);
+  assert.equal(chordRole(60, null, 'm'), null);
+  assert.equal(chordRole(60, NaN, 'm'), null);
 });

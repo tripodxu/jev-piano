@@ -6,6 +6,7 @@
 import { sectionLabel } from './ui.js';
 import { tempoMultAt } from './candidates.js';
 import { barHarmonyFit } from './nct.js';
+import { cadenceIntoBar, CADENCE_ZH } from './cadence.js';
 import {
   clamp, snap, P_LO, P_HI, FN_COLOR, barIndexAt, barFunction, pieceTension, findNoteAt,
   nonChordIds as coreNonChordIds,
@@ -269,7 +270,9 @@ export function createRollView(deps) {
         g.textAlign = 'left'; g.textBaseline = 'top';
         g.fillStyle = 'rgba(240,205,138,0.95)';
         const speed = Math.round((Number(deps.els.bpm.value) || piece.plan.bpm) * mult);
-        g.fillText(`第 ${hoverBar + 1} 小节 · ${bc.symbol} · 张力 ${Number.isFinite(t) ? t.toFixed(2) : '—'} · 契合度 ${Math.round(fit * 100)}% · 速度 ${speed}`, 6, H_TENSION + 1);
+        // 终止式（轮次 55）：hover 到乐句末小节时，把「进入该小节」的终止式一并读出
+        const cad = cadenceIntoBar(piece.barChords, piece.plan.meterNum, piece.plan.barsPerPhrase, hoverBar);
+        g.fillText(`第 ${hoverBar + 1} 小节 · ${bc.symbol} · 张力 ${Number.isFinite(t) ? t.toFixed(2) : '—'} · 契合度 ${Math.round(fit * 100)}% · 速度 ${speed}${cad ? ` · ${CADENCE_ZH[cad]}` : ''}`, 6, H_TENSION + 1);
         g.restore();
       }
       // 音符。**一维一通道**：手别 = 填色，非和音 = 亮边（左手恒为纯色，不受此影响）

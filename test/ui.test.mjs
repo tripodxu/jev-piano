@@ -4,7 +4,7 @@
 // 只锁两条与画面无关、与耗电有关的契约——draw 不逐帧读布局、静止画布不自我重绘。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, Fall, TensionGraph, MotifCard, MOTIF_PULSE_MS, pulseActive } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, keyEchoText, Fall, TensionGraph, MotifCard, MOTIF_PULSE_MS, pulseActive } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -554,3 +554,14 @@ test('MotifCard.stop(): 停播时清掉在途的强调排程', () => withDom(() 
   assert.equal(timers.pending(), 0, 'stop() 必须清定时器，否则停播后还在画');
 })));
 
+
+/* ---------------- 键盘试听回声（轮次 55：跟弹的和声角色反馈） ---------------- */
+
+test('keyEchoText: 有和弦给「音名 · 和弦的度数（内外）」，无和弦/脏输入降级不抛', () => {
+  assert.equal(keyEchoText(60, { symbol: 'Cm', rootPc: 0, shape: 'm' }), 'C4 · Cm的根音（和弦音）');
+  assert.equal(keyEchoText(64, { symbol: 'Cm', rootPc: 0, shape: 'm' }), 'E4 · Cm的大三度（和弦外音）', 'E 自然音不在 Cm 里；midiName 保持升号（琴键物理名）');
+  assert.equal(keyEchoText(72, { symbol: 'G7', rootPc: 7, shape: '7' }), 'C5 · G7的纯四度（和弦外音）');
+  assert.equal(keyEchoText(61, null), 'C#4', '无和声上下文只报音名');
+  assert.equal(keyEchoText(NaN, { symbol: 'Cm', rootPc: 0, shape: 'm' }), '');
+  assert.equal(keyEchoText(60, { symbol: 'Cm', rootPc: NaN, shape: 'm' }), 'C4', '和弦脏输入降级为音名');
+});

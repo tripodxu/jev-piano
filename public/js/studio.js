@@ -7,7 +7,7 @@ import { buildPlan, Composer } from './composer.js';
 import { askJev } from './jev.js';
 import { getAudio } from './audio.js';
 import { exportMidi } from './midi.js';
-import { renderKeyboard, toast, setStatus, emptyLedger, accumulateLedger, ledgerPills, CHANNEL_LABEL } from './ui.js';
+import { renderKeyboard, toast, setStatus, emptyLedger, accumulateLedger, ledgerPills, CHANNEL_LABEL, keyEchoText } from './ui.js';
 import { loadSettings } from './settings.js';
 import { NOTE_NAMES } from './music.js';
 import { tempoMultAt } from './candidates.js';
@@ -69,6 +69,16 @@ let loop = true;
 let playheadTimer = null;
 let rp = null;               // 回放状态
 
+/** 键盘试听的和声上下文（轮次 55）：回放中取播放头所在小节的和弦，静止时取最后一小节 */
+function chordCtx() {
+  if (!piece?.barChords?.length) return null;
+  if (rp?.playing && rp.totalBeats > 0) {
+    const beat = (rp.audio.ctx.currentTime - rp.t0) / rp.beatDur;
+    if (beat >= 0) return chordAt(piece.barChords, beat % rp.totalBeats) ?? piece.barChords[piece.barChords.length - 1];
+  }
+  return piece.barChords[piece.barChords.length - 1];
+}
+
 export function ensureStudio() {
   if (inited) return;
   inited = true;
@@ -83,15 +93,18 @@ export function ensureStudio() {
     quant: $('stQuant'), quantGrid: $('stQuantGrid'),
     play: $('stPlay'), loopBtn: $('stLoop'), muteR: $('stMuteR'), muteL: $('stMuteL'),
     bpm: $('stBpm'), undo: $('stUndo'), redo: $('stRedo'),
-    chord: $('stChord'), info: $('stInfo'), keyboard: $('stKeyboard'),
+    chord: $('stChord'), info: $('stInfo'), keyboard: $('stKeyboard'), kbEcho: $('stKbEcho'),
     // 顶栏计费 pill 与实时界面**共用同一份 DOM**：工作室生成也必须记账，否则一次 32 小节的
     // 花费对用户完全不可见（轮次 50 修复）
     channel: $('stChannel'), tokens: $('stTokens'), cost: $('stCost'), latency: $('stLatency'),
   };
   kb = renderKeyboard(els.keyboard, {
-    onKey: (midi) => getAudio().ensure()
-      .then(() => getAudio().play(midi, getAudio().ctx.currentTime + 0.01, 0.9, 0.7))
-      .catch(() => { /* 同实时页：试听是增强 */ }),
+    onKey: (midi) => {
+      els.kbEcho.textContent = keyEchoText(midi, chordCtx()); // 跟弹回声（轮次 55）：同实时页
+      getAudio().ensure()
+        .then(() => getAudio().play(midi, getAudio().ctx.currentTime + 0.01, 0.9, 0.7))
+        .catch(() => { /* 同实时页：试听是增强 */ });
+    },
   });
   roll = createRollView({
     els,                           // DOM 引用表（卷帘用 vel/roll/bpm 三个键）

@@ -1,6 +1,6 @@
 // ui.js — 界面原语：键盘 DOM、和声功能轨、决策日志、计划卡、图例、台账、toast。
 // canvas 可视化三件套自轮次 52 起住在 canvas.js（本模块只转出，对外契约不变）。
-import { midiName, PREFERRED_NAME } from './music.js';
+import { midiName, PREFERRED_NAME, chordRole } from './music.js';
 import { tempoMultAt } from './candidates.js';
 
 import { LOW, HIGH, sectionLabel } from './canvas.js';
@@ -444,4 +444,15 @@ export function toast(el, msg, ms = 4000) {
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/** 键盘试听回声（轮次 55）：点击的琴键在当前和弦里的角色——「C4 · Cm的根音（和弦音）」。
+ *  把键盘从试听变成跟弹学习乐器：每个音立刻告诉你它在当前和声里站哪。
+ *  无和弦上下文只报音名；脏输入降级（空串/音名），绝不抛。 */
+export function keyEchoText(midi, chord) {
+  if (!Number.isFinite(midi)) return '';
+  const name = midiName(midi);
+  const role = chord ? chordRole(((midi % 12) + 12) % 12, chord.rootPc, chord.shape) : null;
+  if (!role) return name;
+  return `${name} · ${chord.symbol ?? ''}的${role.label}（${role.inChord ? '和弦音' : '和弦外音'}）`;
 }

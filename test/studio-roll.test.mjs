@@ -49,9 +49,12 @@ function mkPiece() {
   return {
     version: 1, totalBars: 4, nid: 100,
     plan: { keyPc: 0, meterNum: 4, mode: 'minor', bpm: 96, barsPerPhrase: 4 },
+    // 4 小节 = 一个乐句；第 4 小节由 G7(D)→Cm(T) 根音下行五度进入 = 完全终止（轮次 55 hover 读数用）
     barChords: [
       { startBeat: 0, symbol: 'Cm', rootPc: 0, shape: 'm', fn: 'T', intensity: 1 },
-      { startBeat: 4, symbol: 'G7', rootPc: 7, shape: '7', fn: 'D', intensity: 2 },
+      { startBeat: 4, symbol: 'Ab', rootPc: 8, shape: '', fn: 'Tp', intensity: 1 },
+      { startBeat: 8, symbol: 'G7', rootPc: 7, shape: '7', fn: 'D', intensity: 2 },
+      { startBeat: 12, symbol: 'Cm', rootPc: 0, shape: 'm', fn: 'T', intensity: 1 },
     ],
     notes: [
       { id: 1, midi: 48, startBeats: 0, durBeats: 2, vel: 0.5, hand: 'L' },
@@ -118,6 +121,23 @@ test('卷帘指针编辑：空白处按下建音 → 抬起经 deps 落账（und
     assert.equal(calls.pushUndo, 1, '编辑提交应压一次撤销');
     assert.equal(JSON.parse(calls.snap).length, before, 'undo 快照是编辑前的音符表');
     assert.equal(calls.onCommit, 1, '编辑提交应触发一次收尾（自动保存/信息行/按钮态）');
+  });
+});
+
+test('hover 到乐句末小节：读数带终止式（轮次 55）', () => {
+  withWindow(() => {
+    const piece = mkPiece();
+    const { view, roll } = mkView(piece);
+    view.bind();
+    // beat 14（clientX = 14×ZOOM）落在第 4 小节 = 乐句末；G7(D)→Cm(T) = 完全终止
+    roll.dispatch('pointermove', { clientX: 14 * ZOOM, clientY: 100 });
+    const line = roll.texts().find((t) => t.startsWith('第 4 小节'));
+    assert.ok(line, `应有第 4 小节读数，实际 ${JSON.stringify(roll.texts())}`);
+    assert.ok(line.includes('完全终止'), `乐句末应读出终止式，实际 ${line}`);
+    // 非乐句末不读——终止式是「乐句末的和声进行」，句中读出来就是噪音
+    roll.dispatch('pointermove', { clientX: 2 * ZOOM, clientY: 100 });
+    const mid = roll.texts().find((t) => t.startsWith('第 1 小节'));
+    assert.ok(mid && !mid.includes('终止'), '乐句中段不应有终止式读数');
   });
 });
 

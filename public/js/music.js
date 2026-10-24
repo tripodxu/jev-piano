@@ -82,6 +82,23 @@ export function chordPcs(rootPc, shape) {
   return (CHORD_SHAPES[shape] || CHORD_SHAPES['']).map((i) => (rootPc + i) % 12);
 }
 
+/** 和弦音的位置名与外音的音程名（半音 → 谱面称呼），给「你弹的音是什么角色」用（轮次 55）。 */
+const CHORD_TONE_ZH = ['根音', '三音', '五音', '七音', '九音'];
+const INTERVAL_ZH = ['同度', '小二度', '大二度', '小三度', '大三度', '纯四度', '三全音', '纯五度', '小六度', '大六度', '小七度', '大七度'];
+
+/** 音级类在和弦中的角色：{ inChord, label }。和弦音按**位置**命名（根/三/五/七/九音），
+ *  外音按**音程**命名（相对根音偏了几度）——两种命名各答一半问题：「在不在和弦里」与「偏了多远」。
+ *  八度等价（9 音与 2 音同 pc）；脏输入返回 null，调用方降级为只显示音名。 */
+export function chordRole(pc, rootPc, shape) {
+  if (!Number.isFinite(pc) || !Number.isFinite(rootPc)) return null;
+  const p = ((pc % 12) + 12) % 12;
+  const root = ((rootPc % 12) + 12) % 12;
+  const pcs = chordPcs(root, shape);
+  const idx = pcs.indexOf(p);
+  if (idx >= 0) return { inChord: true, label: CHORD_TONE_ZH[idx] ?? '和弦音' };
+  return { inChord: false, label: INTERVAL_ZH[(p - root + 12) % 12] ?? '和弦外音' };
+}
+
 /** 音阶内全部 midi（[low, high]） */
 export function scaleMidis(keyPc, mode, low, high) {
   const set = SCALES[mode] || SCALES.major;

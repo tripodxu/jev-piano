@@ -6,12 +6,13 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills } from './ui.js';
+import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, keyEchoText } from './ui.js';
 import { STYLE_BY_ID } from './music.js';
 import { GOAL_HINTS } from './composer.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { barHarmonyFit, NCT_ZH } from './nct.js';
 import { planTargetSeries, tempoMultAt } from './candidates.js';
+import { cadenceIntoBar, CADENCE_ZH } from './cadence.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -20,7 +21,7 @@ const els = {
   bpmAuto: $('bpmAuto'), bpmRange: $('bpmRange'), bpmVal: $('bpmVal'),
   playBtn: $('playBtn'), pauseBtn: $('pauseBtn'), stopBtn: $('stopBtn'), newBtn: $('newBtn'), midiBtn: $('midiBtn'), recBtn: $('recBtn'),
   planCard: $('planCard'), nowChord: $('nowChord'), nowBar: $('nowBar'),
-  fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), decisionLog: $('decisionLog'),
+  fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), kbEcho: $('kbEcho'), decisionLog: $('decisionLog'),
   fnRibbon: $('fnRibbon'), logEmpty: $('logEmpty'),
   tensionCanvas: $('tensionCanvas'), tensionStat: $('tensionStat'),
   motifCanvas: $('motifCanvas'), repStat: $('repStat'), stageWarm: $('stageWarm'), stageCool: $('stageCool'),
@@ -142,11 +143,16 @@ els.bpmRange.addEventListener('input', () => { if (!els.bpmAuto.checked) els.bpm
 
 /* ---------------- 音频与可视化 ---------------- */
 const audio = getAudio();
-// 点击琴键试听：点击本身是用户手势，ensure() 合法；未开演也能摸一摸这件乐器
+// 点击琴键试听：点击本身是用户手势，ensure() 合法；未开演也能摸一摸这件乐器。
+// 跟弹回声（轮次 55）：演奏中有和声上下文时，告诉用户这个音在当前和弦里是什么角色——
+// 键盘从「试听」变成「跟弹学习乐器」，弹错音也能听见偏了多远。
 const kb = renderKeyboard(els.keyboard, {
-  onKey: (midi) => audio.ensure()
-    .then(() => audio.play(midi, audio.ctx.currentTime + 0.01, 0.9, 0.7))
-    .catch(() => { /* 音频不可用时静默——试听是增强 */ }),
+  onKey: (midi) => {
+    els.kbEcho.textContent = keyEchoText(midi, lastChord);
+    audio.ensure()
+      .then(() => audio.play(midi, audio.ctx.currentTime + 0.01, 0.9, 0.7))
+      .catch(() => { /* 音频不可用时静默——试听是增强 */ });
+  },
 });
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);
 const tensionGraph = new TensionGraph(els.tensionCanvas);
@@ -156,6 +162,10 @@ const sigOfNotes = (ns) => ns.map((n) => `${Math.round(n.startBeats * 4)}:${n.mi
 const seenMel = new Set(), seenLh = new Set();
 let chorusChords = new Set(); // 本遍用过的和弦（曲终小结用）
 let chorusStartUsd = 0, chorusStartTokens = 0, chorusStartMel = 0, chorusStartLh = 0;
+// 跟弹回声与终止式（轮次 55）：lastChord 是键盘试听的和声上下文（onBar 更新）；
+// chorusBarChords 是本遍每小节的 { rootPc, fn }——终止式识别的输入，曲终清空
+let lastChord = null;
+let chorusBarChords = [];
 
 /* ---------------- 播放控制 ---------------- */
 let player = null;
@@ -195,6 +205,7 @@ async function start() {
   els.tensionStat.textContent = '';
   els.repStat.textContent = '';
   seenMel.clear(); seenLh.clear();
+  lastChord = null; chorusBarChords = [];
   chorusChords = new Set(); chorusStartUsd = 0; chorusStartTokens = 0; chorusStartMel = 0; chorusStartLh = 0;
   els.playBtn.disabled = true;
   els.playBtn.textContent = '… 编曲中';
@@ -231,9 +242,13 @@ async function start() {
     audio, composer, bpm,
     onBar(bar) {
       els.nowChord.textContent = bar.chord.symbol;
+      // 跟弹回声与终止式的输入（轮次 55）：最近和弦即试听上下文；终止式只认乐句末
+      lastChord = { symbol: bar.chord.symbol, rootPc: bar.chord.rootPc, shape: bar.chord.shape };
+      chorusBarChords.push({ rootPc: bar.chord.rootPc, fn: bar.decision.chordFn });
+      const cad = cadenceIntoBar(chorusBarChords, plan.meterNum, plan.barsPerPhrase, bar.index % plan.totalBars);
       // 实际速度 = 基速 × 该小节乘数：Coda 渐慢时这个数字当着用户的面掉下去
       const barSpeed = Math.round((60 / player.secPerBeat) * tempoMultAt(plan, bar.index));
-      els.nowBar.textContent = `第 ${bar.index + 1} 小节 ${bar.label} · 强度 ${bar.intensity.toFixed(1)} · 速度 ${barSpeed}${bar.loop > 0 ? `，第 ${bar.loop + 1} 遍` : ''}`;
+      els.nowBar.textContent = `第 ${bar.index + 1} 小节 ${bar.label} · 强度 ${bar.intensity.toFixed(1)} · 速度 ${barSpeed}${cad ? ` · ${CADENCE_ZH[cad]}` : ''}${bar.loop > 0 ? `，第 ${bar.loop + 1} 遍` : ''}`;
       addDecision(els.decisionLog, bar);
       // 动机卡：第 2 小节是动机诞生点；此后每次「承袭」计一次
       if (bar.index === 1) motifCard.setMotif(bar.notes.filter((n) => n.hand === 'R').map((n) => n.midi));
@@ -291,6 +306,7 @@ async function start() {
           els.decisionLog.prepend(li);
         }
         chorusChords = new Set();
+        chorusBarChords = [];
         chorusStartUsd = stats.usd; chorusStartTokens = stats.tokens;
         chorusStartMel = seenMel.size; chorusStartLh = seenLh.size;
       }
