@@ -4,6 +4,7 @@
 // 只锁两条与画面无关、与耗电有关的契约——draw 不逐帧读布局、静止画布不自我重绘。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, keyEchoText, Fall, TensionGraph, MotifCard, MOTIF_PULSE_MS, pulseActive } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
@@ -124,7 +125,7 @@ test('LEGEND_ITEMS: 每条都有名字与说明，且覆盖所有真实标记', 
   }
   // 覆盖面：四功能 + 五手法 + 断路器 + 驳回 + 段落 + 动机 + 张力 + 契合度 + 非和弦
   const text = LEGEND_ITEMS.map((i) => `${i.label}${i.desc}`).join('');
-  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '复读', '超预算', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句']) {
+  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '复读', '超预算', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句', '你的音符', 'AI 右手', 'AI 左手']) {
     assert.ok(text.includes(kw), `图例缺少「${kw}」的说明`);
   }
 });
@@ -564,4 +565,48 @@ test('keyEchoText: 有和弦给「音名 · 和弦的度数（内外）」，无
   assert.equal(keyEchoText(61, null), 'C#4', '无和声上下文只报音名');
   assert.equal(keyEchoText(NaN, { symbol: 'Cm', rootPc: 0, shape: 'm' }), '');
   assert.equal(keyEchoText(60, { symbol: 'Cm', rootPc: NaN, shape: 'm' }), 'C4', '和弦脏输入降级为音名');
+});
+
+/* ---------------- 跟弹与 canvas 字体契约（轮次 56） ---------------- */
+
+test('canvas 字体契约：任何 .font 赋值不得用 CSS var()——canvas 不解析 CSS 变量，赋值会被静默忽略', () => {
+  // 轮次 54 在 drawTimeline 发现两处、轮次 56 修复时又在 MotifCard 挖出第三处 var(--sans)。
+  // 三处全部静默落回上一字体——「写进文档不如写进测试」（轮次 53 方法论）。
+  const dir = new URL('../public/js/', import.meta.url);
+  const offenders = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
+    const src = readFileSync(new URL(f, dir), 'utf8');
+    for (const m of src.matchAll(/\.font\s*=\s*(['"`])([^'"`\n]*)\1/g)) {
+      if (m[2].includes('var(')) offenders.push(`${f}: ${m[0]}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `canvas 字体不得用 CSS 变量，违规：\n${offenders.join('\n')}`);
+});
+
+test('Fall 跟弹音符：用户音符紫色 + 近白描边，AI 双手配色不变', () => {
+  const styles = [];
+  const ctx = new Proxy({}, {
+    get(t, k) { if (k in t) return t[k]; return () => {}; },
+    set(t, k, v) { t[k] = v; if (k === 'fillStyle' || k === 'strokeStyle') styles.push(String(v)); return true; },
+  });
+  const canvas = {
+    width: 0, height: 0,
+    get clientWidth() { return 320; },
+    get clientHeight() { return 90; },
+    getContext: () => ctx,
+    addEventListener() {}, removeEventListener() {},
+  };
+  withDom(() => {
+    const fall = new Fall(canvas, () => 0);
+    fall.push({ midi: 60, t: 0, dur: 0.5, vel: 0.8, hand: 'R' });
+    fall.push({ midi: 55, t: 0, dur: 0.5, vel: 0.5, hand: 'L' });
+    fall.push({ midi: 64, t: 0, dur: 0.5, vel: 0.8, user: true });
+    fall.draw();
+    assert.ok(styles.some((s) => s.includes('235,197,116')), 'AI 右手仍是琥珀');
+    assert.ok(styles.some((s) => s.includes('147,199,189')), 'AI 左手仍是青绿');
+    assert.ok(styles.some((s) => s.includes('203,186,250')), '用户音符是紫色');
+    assert.ok(styles.some((s) => s.includes('246,243,255')), '用户音符有近白描边（形状通道，色弱可辨）');
+    // 用户音符的命中光斑也是紫色（不是 AI 的琥珀/青绿）
+    assert.ok(styles.filter((s) => s.includes('203,186,250')).length >= 2, '块体与光斑都应是紫色');
+  });
 });

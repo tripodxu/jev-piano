@@ -194,6 +194,9 @@ export const LEGEND_ITEMS = [
   { group: '分析读数（张力带与卷帘）', label: '张力', swatch: 'ten', desc: '这一小节有多紧：实线是实际，虚线是计划弧线' },
   { group: '分析读数（张力带与卷帘）', label: '契合度', swatch: 'fit', desc: '旋律里有多少音属于当前和弦——越高越「在调上」' },
   { group: '分析读数（张力带与卷帘）', label: '非和弦', swatch: 'nct', desc: '带亮边的旋律音：不属于当前和弦，但正是调式的呼吸' },
+  { group: '跟弹（下落音符，轮次 56）', label: '你的音符', swatch: 'you', desc: '演奏中你点下琴键的音：紫色亮边块在击键线上原地亮起（键盘下方一行字会说明它在当前和弦里的角色）' },
+  { group: '跟弹（下落音符，轮次 56）', label: 'AI 右手', swatch: 'fallR', desc: 'Jev 右手旋律的下落块（琥珀色）' },
+  { group: '跟弹（下落音符，轮次 56）', label: 'AI 左手', swatch: 'fallL', desc: 'Jev 左手织体的下落块（青绿色）' },
 ];
 
 /** 渲染图例 HTML（label/desc 一律转义——图例是纯文本通道，不是注入面） */

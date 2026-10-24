@@ -33,9 +33,9 @@ export class Fall {
     this._ro.observe(canvas);
     this._resize();
   }
-  push({ midi, t, dur, vel, hand }) {
+  push({ midi, t, dur, vel, hand, user }) {
     if (this.notes.length > 500) this.notes.splice(0, this.notes.length - 500);
-    this.notes.push({ midi, t, dur, vel: vel ?? 0.7, hand });
+    this.notes.push({ midi, t, dur, vel: vel ?? 0.7, hand, user: !!user });
   }
   /** 用 setInterval 而非 rAF：标签页被遮挡时 rAF 会被浏览器暂停，画面就此冻结 */
   start() {
@@ -65,7 +65,9 @@ export class Fall {
       const hPx = Math.max(5, (n.dur / this.approach) * H);
       const x = (n.midi - this.low) * colW + colW * 0.12;
       const wPx = colW * 0.76;
-      const base = n.hand === 'L' ? [147, 199, 189] : [235, 197, 116];
+      // 跟弹用户音符（轮次 56）：紫色独立于 AI 双手（琥珀/青绿），另加近白描边——
+      // 颜色之外还有形状通道，色弱也能分辨「这个音是你弹的」
+      const base = n.user ? [203, 186, 250] : n.hand === 'L' ? [147, 199, 189] : [235, 197, 116];
       const alpha = 0.34 + n.vel * 0.5;
       g.save();
       if (!this.lite) { g.shadowColor = `rgba(${base[0]},${base[1]},${base[2]},0.6)`; g.shadowBlur = 10; }
@@ -73,6 +75,7 @@ export class Fall {
       g.beginPath();
       if (g.roundRect) g.roundRect(x, yBottom - hPx, wPx, hPx, 3); else g.rect(x, yBottom - hPx, wPx, hPx);
       g.fill();
+      if (n.user) { g.strokeStyle = 'rgba(246,243,255,0.85)'; g.lineWidth = 1; g.stroke(); }
       g.restore();
       // 命中瞬间：键床上的光斑
       if (n.t <= now && end >= now) {
@@ -373,7 +376,8 @@ export class MotifCard {
     if (!W || !H) return;
     g.clearRect(0, 0, W, H);
     g.save();
-    g.font = '10px var(--sans, sans-serif)';
+    // canvas 的 font 不解析 CSS 变量（var(--sans) 会被静默忽略）——字面字体栈，与 styles.css --sans 同族（有契约测试守）
+    g.font = '10px "PingFang SC", "Microsoft YaHei", sans-serif';
     g.fillStyle = 'rgba(154,144,120,0.95)';
     g.textAlign = 'left'; g.textBaseline = 'top';
     g.fillText('动机', 0, 0);

@@ -179,7 +179,8 @@ export function createRollView(deps) {
       g.setLineDash([2, 3]);
       g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, HEADER); g.stroke();
       g.setLineDash([]);
-      g.font = '600 9px var(--mono, monospace)';
+      // canvas 的 font 不解析 CSS 变量（轮次 54 发现、56 修复）——字面字体栈，与 styles.css --mono 同族（有契约测试守）
+      g.font = '600 9px "Cascadia Mono", Consolas, monospace';
       g.fillStyle = 'rgba(240,205,138,0.85)';
       g.textBaseline = 'top';
       g.fillText(sectionLabel(s), x + 3, 1);
@@ -198,7 +199,7 @@ export function createRollView(deps) {
       g.fillRect(bc.startBeat * ZOOM, fitTop + (H_FIT - h), Math.max(1, meter2 * ZOOM - 1), h);
     }
     g.save();
-    g.font = '8px var(--mono, monospace)';
+    g.font = '8px "Cascadia Mono", Consolas, monospace';
     g.fillStyle = 'rgba(154,144,120,0.8)';
     g.textAlign = 'left'; g.textBaseline = 'top';
     g.fillText('契合度', 2, fitTop + 1);

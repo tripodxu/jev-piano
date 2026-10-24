@@ -149,6 +149,8 @@ const audio = getAudio();
 const kb = renderKeyboard(els.keyboard, {
   onKey: (midi) => {
     els.kbEcho.textContent = keyEchoText(midi, lastChord);
+    // 跟弹可视化（轮次 56）：演奏中你弹的音以紫色亮边落在击键线上——AI 的音符向下落，你的音符原地亮起
+    if (player?.running && audio.ctx) fall.push({ midi, t: audio.ctx.currentTime + 0.01, dur: 0.45, vel: 0.8, user: true });
     audio.ensure()
       .then(() => audio.play(midi, audio.ctx.currentTime + 0.01, 0.9, 0.7))
       .catch(() => { /* 音频不可用时静默——试听是增强 */ });

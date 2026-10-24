@@ -685,3 +685,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 
 /* 键盘试听回声（轮次 55）：跟弹时告诉你这个音在当前和声里的角色 */
 .kb-echo { color: var(--text-dim); font: 12px/1.8 var(--mono, monospace); text-align: center; min-height: 1.8em; padding: 4px 0 0; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+/* 跟弹（轮次 56）：下落音符的三种来源——你的（紫+近白描边）/ AI 右手（琥珀）/ AI 左手（青绿） */
+.lg-sw.you { background: #cbbafa; box-shadow: 0 0 0 1.5px rgba(246,243,255,0.85); }
+.lg-sw.fallR { background: #ebc574; }
+.lg-sw.fallL { background: #93c7bd; }
