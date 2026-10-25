@@ -11,7 +11,7 @@
 - **发现（已定性，非部署回归）**：`/api/jev` 502 `upstream 451`，复现两次——**上游策略性拒绝**。证据链：TYPESAFE_API_KEY 仍在（secret list）；worker.js 自轮次 43 未改；轮次 50 同端点同 key 是通的。**影响**：真实 Jev 决策暂不可用，前端自动落离线随机（兜底 toast 一次告知，播放永不中断），界面全部可用、台账如实显示 0 tok。**修复在仓库外**：换新 key 或上游解封；用户可即时在设置里配 OpenRouter key 绕开（无需重部署）。
 - **教训（老规矩再应验）**：「部署成功 ≠ 部署正确 ≠ 上游活着」是三件事——本次正是核验脚本把第三件从「内容正确」里分出来的：11/11 绿灯与 451 同时出现在同一次运行里。
 - **验证**：部署前 216/216 全绿；部署后内容核验 exit 0。浏览器端到端冒烟未做（无浏览器环境），新 UI 功能建议用户硬刷新 https://jevpiano.logicc.top/ 过一遍。
-- **任务板**：**[进行中] 真实 Jev 渠道 451 → 根因确证：官方端点地区封锁**。用户提供新 key（已写入 TYPESAFE_API_KEY secret），线上仍 451；**本机直连 api.typesafe.ai 同样 451**（`Typesafe is not available in your region`）——封的是地区不是 key，本机出口与 Workers 出口都在封锁区。**OpenRouter 中继本地区可达**（探测 401=到鉴权层）。出路：用户给 OpenRouter key（`wrangler secret put OPENROUTER_API_KEY` 即刻生效）或浏览器设置直配 openrouter 渠道；恢复后重跑 verify-deploy。
+- **任务板**：**[完成] 真实 Jev 渠道 451 → 结案（代理方案）**。根因：TypeSafe 官方端点地区封锁（本机直连 451 `not available in your region`，与 key 无关）。解法（零代码改动）：**用户开代理访问生产站即可**——Cloudflare 按访问者出口调度边缘节点，Worker 上游 fetch 出口随之落在未封锁区。实测：新 key 已入 `TYPESAFE_API_KEY` secret；经本机代理（127.0.0.1:10808）打生产 `/api/jev` → **200，jev-1.14.0 八问全答**（2.4s）；同一请求不走代理则 451。**无代理时**：前端自动落离线随机（兜底告知 + 0 tok，红线 7 兜住）。注意：浏览器直连 `typesafe` 渠道走不通（官方端点 CORS 不放行外部 Origin——这正是同源 proxy 渠道存在的理由），**用户应保持渠道 = 同源代理（默认自动探测即选它）**。
 
 ## [完成] 2026-10-25 · 新增蓝调曲风——候选词汇表扩容（迭代轮次 58 · 音乐内容）
 

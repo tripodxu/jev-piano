@@ -23,4 +23,4 @@
 
 ## 下一步（任务板）
 
-- **[进行中] 真实 Jev 渠道 451——根因升级：官方端点地区封锁**。用户提供了新 TypeSafe key（已 `wrangler secret put TYPESAFE_API_KEY`，留待解封日用），线上仍 451；**本机直连同端点同样 451**，响应体明说 `Typesafe is not available in your region`——**封锁的是地区（本机出口与 Workers 出口都在内），与 key 无关**。已探测 **OpenRouter 中继（openrouter.ai/api/v1/systemone）本地区可达**（无 key 探测得 401 = 到达鉴权层）。出路：(a) 用户提供 OpenRouter key → `wrangler secret put OPENROUTER_API_KEY` 即刻生效（链式降级自动走它）；(b) 用户在浏览器设置里直配 OpenRouter 渠道；(c) 等 TypeSafe 解封。上游恢复后重跑 `node scripts/verify-deploy.mjs` 确认。
+- **[完成] 真实 Jev 渠道 451 → 结案（代理方案，零代码改动）**。定性链：新 TypeSafe key 有效（经代理直打官方端点 200，`jev-1.14.0`）；官方端点对**本地区**封锁（本机直连 451 `Typesafe is not available in your region`）；浏览器直连渠道另被 CORS 挡（preflight 无 `access-control-allow-origin`）。**解法 = 用户开代理访问生产站**：Cloudflare 按访问者出口调度边缘节点，Worker 上游 fetch 出口随之落在未封锁区——实测经本机代理（127.0.0.1:10808，v2rayN 系）打生产 `/api/jev` → **200，八问全答 2.4s**；同一端点不走代理 451。无代理访问时前端自动落离线随机（播放永不中断）。渠道保持**同源代理**（首访自动探测即选它，服务端已配新 key）。备选仍有效：OpenRouter key（本地区可直连，`wrangler secret put OPENROUTER_API_KEY` 即刻生效）。
