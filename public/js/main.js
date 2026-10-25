@@ -7,7 +7,7 @@ import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
 import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, keyEchoText } from './ui.js';
-import { STYLE_BY_ID } from './music.js';
+import { STYLE_BY_ID, chordPcs } from './music.js';
 import { GOAL_HINTS } from './composer.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { barHarmonyFit, NCT_ZH } from './nct.js';
@@ -246,6 +246,7 @@ async function start() {
       els.nowChord.textContent = bar.chord.symbol;
       // 跟弹回声与终止式的输入（轮次 55）：最近和弦即试听上下文；终止式只认乐句末
       lastChord = { symbol: bar.chord.symbol, rootPc: bar.chord.rootPc, shape: bar.chord.shape };
+      kb.mark(chordPcs(bar.chord.rootPc, bar.chord.shape)); // 和弦键亮起（轮次 57）：跟着亮键弹就在和声里
       chorusBarChords.push({ rootPc: bar.chord.rootPc, fn: bar.decision.chordFn });
       const cad = cadenceIntoBar(chorusBarChords, plan.meterNum, plan.barsPerPhrase, bar.index % plan.totalBars);
       // 实际速度 = 基速 × 该小节乘数：Coda 渐慢时这个数字当着用户的面掉下去
@@ -337,6 +338,7 @@ function stopAll() {
   tensionGraph.stop();
   motifCard.stop();
   kb.clear();
+  kb.mark(null); // 和弦键熄灭（轮次 57）：演奏结束，键盘回到无和声上下文的常态
   if (recording) { recording.stop().then((blob) => download(blob, `${plan?.title ?? 'jev-piano'}.webm`)); recording = null; els.recBtn.textContent = '● 录音'; }
   setButtons(false); // player 保留引用：已演奏的 records 仍可导出 MIDI
 }

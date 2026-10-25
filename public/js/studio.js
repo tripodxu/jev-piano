@@ -9,7 +9,7 @@ import { getAudio } from './audio.js';
 import { exportMidi } from './midi.js';
 import { renderKeyboard, toast, setStatus, emptyLedger, accumulateLedger, ledgerPills, CHANNEL_LABEL, keyEchoText } from './ui.js';
 import { loadSettings } from './settings.js';
-import { NOTE_NAMES } from './music.js';
+import { NOTE_NAMES, chordPcs } from './music.js';
 import { tempoMultAt } from './candidates.js';
 import { createRollView } from './studio-roll.js';
 import {
@@ -79,6 +79,12 @@ function chordCtx() {
   return piece.barChords[piece.barChords.length - 1];
 }
 
+/** 和弦键亮起（轮次 57）：把和声上下文亮到键盘上——与 chordCtx 同源；diff 更新见 ui.js 的 mark() */
+function syncKeyMarks() {
+  const c = chordCtx();
+  kb?.mark(c ? chordPcs(c.rootPc, c.shape) : null);
+}
+
 export function ensureStudio() {
   if (inited) return;
   inited = true;
@@ -143,6 +149,7 @@ function setPiece(p) {
   piece = p;
   undoStack = []; redoStack = [];
   invalidateTension();
+  syncKeyMarks();
   els.bpm.value = p.bpm ?? p.plan.bpm;
   drawRoll();
   drawVelLane();
@@ -191,6 +198,7 @@ async function compose(newSeed) {
       const off = i * plan.meterNum;
       for (const n of bar.notes) p.notes.push({ id: p.nid++, midi: n.midi, startBeats: off + n.startBeats, durBeats: n.durBeats, vel: n.vel, hand: n.hand });
       p.barChords.push({ startBeat: off, symbol: bar.chord.symbol, rootPc: chordRoot(bar.chord), shape: bar.chord.shape, fn: bar.decision.chordFn, intensity: bar.intensity });
+      syncKeyMarks(); // 和弦键亮起（轮次 57）：边生成边亮，生成完最后一小节的和弦留在键盘上
       ledger = accumulateLedger(ledger, bar.decision); // 每小节记账（fixture 不计——离线随机无费用）
       els.progress.style.transform = `scaleX(${(i + 1) / bars})`; // scaleX 而非 width：进度动画不触发布局
       els.progressText.textContent = `第 ${i + 1}/${bars} 小节 · ${bar.chord.symbol}`;
@@ -273,7 +281,7 @@ function drawPlayhead() {
   const chord = piece ? chordAt(piece.barChords, disp) : null;
   els.playhead.style.left = `${x}px`;
   els.playhead.classList.remove('hidden');
-  if (chord && els.chord.textContent !== chord.symbol) els.chord.textContent = chord.symbol; // 同一小节内和弦不变，别每帧写 DOM
+  if (chord && els.chord.textContent !== chord.symbol) { els.chord.textContent = chord.symbol; syncKeyMarks(); } // 同一小节内和弦不变，别每帧写 DOM；换和弦时同步键盘和弦键
   // 播放头跟随滚动
   if (x < sl || x > sl + view - 60) {
     els.rollWrap.scrollLeft = Math.max(0, x - view * 0.4);
@@ -286,6 +294,7 @@ function stopPlay() {
   els.play.querySelector('span').textContent = '播放';
   els.playhead.classList.add('hidden');
   rp = null;
+  syncKeyMarks(); // 停下后和声上下文回落到最后一小节（轮次 57）
 }
 
 /* ---------------- 撤销 / 重做 / 自动保存 ---------------- */
@@ -408,7 +417,7 @@ function bindControls() {
   els.newBtn.addEventListener('click', () => {
     stopPlay(); piece = null; undoStack = []; redoStack = [];
     localStorage.removeItem(STORE_KEY);
-    drawRoll(); drawVelLane(); updateInfo(); updateButtons();
+    drawRoll(); drawVelLane(); updateInfo(); updateButtons(); syncKeyMarks();
     els.chord.textContent = '—';
     toastify('已清空工作台');
   });

@@ -7,6 +7,7 @@ import { sectionLabel } from './ui.js';
 import { tempoMultAt } from './candidates.js';
 import { barHarmonyFit } from './nct.js';
 import { cadenceIntoBar, CADENCE_ZH } from './cadence.js';
+import { chordRole, midiName } from './music.js';
 import {
   clamp, snap, P_LO, P_HI, FN_COLOR, barIndexAt, barFunction, pieceTension, findNoteAt,
   nonChordIds as coreNonChordIds,
@@ -28,6 +29,7 @@ export function createRollView(deps) {
   let nctCache = null;
   // 卷帘 hover（轮次 34）：光标所在小节的读数（编辑主战场的逐小节检视，与实时界面的张力带 hover 同源）
   let hoverBar = null;
+  let hoverNote = null; // 悬停的具体音符（轮次 57）：读出它在所在小节和弦里的角色，null = 空白处
 
   /** 张力与非和声音两份缓存随音符编辑作废（密度/音域/和声贴合分量都会变） */
   function invalidate() { tensionCache = null; nctCache = null; }
@@ -273,7 +275,13 @@ export function createRollView(deps) {
         const speed = Math.round((Number(deps.els.bpm.value) || piece.plan.bpm) * mult);
         // 终止式（轮次 55）：hover 到乐句末小节时，把「进入该小节」的终止式一并读出
         const cad = cadenceIntoBar(piece.barChords, piece.plan.meterNum, piece.plan.barsPerPhrase, hoverBar);
-        g.fillText(`第 ${hoverBar + 1} 小节 · ${bc.symbol} · 张力 ${Number.isFinite(t) ? t.toFixed(2) : '—'} · 契合度 ${Math.round(fit * 100)}% · 速度 ${speed}${cad ? ` · ${CADENCE_ZH[cad]}` : ''}`, 6, H_TENSION + 1);
+        // 悬停音符角色（轮次 57）：具体到「这个音」在所在小节和弦里是什么——与键盘跟弹回声同一内核
+        let notePart = '';
+        if (hoverNote != null) {
+          const role = chordRole(((hoverNote % 12) + 12) % 12, bc.rootPc, bc.shape);
+          if (role) notePart = ` · 悬停 ${midiName(hoverNote)}=${role.label}${role.inChord ? '' : '·外音'}`;
+        }
+        g.fillText(`第 ${hoverBar + 1} 小节 · ${bc.symbol} · 张力 ${Number.isFinite(t) ? t.toFixed(2) : '—'} · 契合度 ${Math.round(fit * 100)}% · 速度 ${speed}${cad ? ` · ${CADENCE_ZH[cad]}` : ''}${notePart}`, 6, H_TENSION + 1);
         g.restore();
       }
       // 音符。**一维一通道**：手别 = 填色，非和音 = 亮边（左手恒为纯色，不受此影响）
@@ -357,15 +365,17 @@ export function createRollView(deps) {
       drawRoll();
     });
     deps.els.roll.addEventListener('pointerup', () => { if (drag) { drag = null; commit(); } });
-    deps.els.roll.addEventListener('pointermove', (e) => {
-      const piece = deps.getPiece();
-      if (!piece) return;
-      const { beat } = rollPos(e);
-      const i = barIndexAt(beat, piece.plan.meterNum, piece.totalBars);
-      const next = i >= 0 ? i : null;
-      if (next !== hoverBar) { hoverBar = next; drawRoll(); }
-    });
-    deps.els.roll.addEventListener('pointerleave', () => { if (hoverBar != null) { hoverBar = null; drawRoll(); } });
+  deps.els.roll.addEventListener('pointermove', (e) => {
+    const piece = deps.getPiece();
+    if (!piece) return;
+    const { beat, pitch } = rollPos(e);
+    const i = barIndexAt(beat, piece.plan.meterNum, piece.totalBars);
+    const next = i >= 0 ? i : null;
+    const hit = i >= 0 ? noteAt(beat, pitch) : null; // 悬停音符（轮次 57）
+    const nextNote = hit ? hit.midi : null;
+    if (next !== hoverBar || nextNote !== hoverNote) { hoverBar = next; hoverNote = nextNote; drawRoll(); }
+  });
+  deps.els.roll.addEventListener('pointerleave', () => { if (hoverBar != null || hoverNote != null) { hoverBar = null; hoverNote = null; drawRoll(); } });
     deps.els.roll.addEventListener('dblclick', (e) => {
       const piece = deps.getPiece();
       if (!piece || deps.playing()) return;

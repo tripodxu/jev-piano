@@ -689,3 +689,8 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .lg-sw.you { background: #cbbafa; box-shadow: 0 0 0 1.5px rgba(246,243,255,0.85); }
 .lg-sw.fallR { background: #ebc574; }
 .lg-sw.fallL { background: #93c7bd; }
+/* 和弦键（轮次 57）：当前小节和弦内的琴键底部亮一道金线——跟着亮键弹就在和声里。
+   用 border 而非伪元素：.bk::after 已被黑键前斜面占用 */
+.wk.mk { border-bottom: 3px solid rgba(216, 171, 92, 0.92); }
+.bk.mk { border-bottom: 3px solid rgba(216, 171, 92, 0.92); }
+.lg-sw.mk { background: none; border-bottom: 3px solid var(--brass); height: 0; border-radius: 0; }

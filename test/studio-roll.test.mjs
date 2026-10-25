@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRollView } from '../public/js/studio-roll.js';
-import { ZOOM } from '../public/js/studio-core.js';
+import { ZOOM, HEADER, P_HI, ROW } from '../public/js/studio-core.js';
 
 /** 假 2D 上下文：任何方法 no-op；fillText 单独记录文本——用来证明"该画的确实画了"。 */
 function fakeCtx() {
@@ -157,5 +157,23 @@ test('hover 读数与力度轨拖动：hover 画出逐小节读数，力度改�
     vel.dispatch('pointerup', {});
     assert.equal(calls.pushUndo, 1, '力度编辑应压撤销');
     assert.equal(calls.onCommit, 1);
+  });
+});
+
+test('hover 到具体音符：读出它在所在小节和弦里的角色（轮次 57）', () => {
+  withWindow(() => {
+    const piece = mkPiece();
+    const { view, roll } = mkView(piece);
+    view.bind();
+    const lastLine = () => roll.texts().filter((t) => t.startsWith('第 1 小节')).at(-1);
+    // note id=3：midi 72（C5）、startBeats 0、dur 1 → beat 0.5 / pitch 72 处应命中
+    roll.dispatch('pointermove', { clientX: 0.5 * ZOOM, clientY: HEADER + (P_HI - 72) * ROW + 1 });
+    const hit = lastLine();
+    assert.ok(hit, `应有第 1 小节读数，实际 ${JSON.stringify(roll.texts())}`);
+    assert.ok(hit.includes('C5=根音'), `悬停音符应读出和弦角色（C5 是 Cm 的根音），实际 ${hit}`);
+    // 同小节移到无音符的行：音符读数消失，小节读数保留
+    roll.dispatch('pointermove', { clientX: 0.5 * ZOOM, clientY: HEADER + (P_HI - 74) * ROW });
+    const miss = lastLine();
+    assert.ok(miss && !miss.includes('悬停'), `空白处不应有音符读数，实际 ${miss}`);
   });
 });

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, keyEchoText, Fall, TensionGraph, MotifCard, MOTIF_PULSE_MS, pulseActive } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, keyEchoText, keyMarks, markDiff, Fall, TensionGraph, MotifCard, MOTIF_PULSE_MS, pulseActive } from '../public/js/ui.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -125,7 +125,7 @@ test('LEGEND_ITEMS: 每条都有名字与说明，且覆盖所有真实标记', 
   }
   // 覆盖面：四功能 + 五手法 + 断路器 + 驳回 + 段落 + 动机 + 张力 + 契合度 + 非和弦
   const text = LEGEND_ITEMS.map((i) => `${i.label}${i.desc}`).join('');
-  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '复读', '超预算', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句', '你的音符', 'AI 右手', 'AI 左手']) {
+  for (const kw of ['主', '下属', '属', '色彩', '承', '模', '倒', '装', '断路', '驳回', '复读', '超预算', '段落', '动机', '张力', '契合', '非和弦', '问句', '答句', '你的音符', 'AI 右手', 'AI 左手', '和弦键']) {
     assert.ok(text.includes(kw), `图例缺少「${kw}」的说明`);
   }
 });
@@ -609,4 +609,26 @@ test('Fall 跟弹音符：用户音符紫色 + 近白描边，AI 双手配色不
     // 用户音符的命中光斑也是紫色（不是 AI 的琥珀/青绿）
     assert.ok(styles.filter((s) => s.includes('203,186,250')).length >= 2, '块体与光斑都应是紫色');
   });
+});
+
+/* ---------------- 和弦键亮起（轮次 57） ---------------- */
+
+test('keyMarks: midi 范围内按音级类筛选；null/脏 pcs 返回空集（= 熄灭）', () => {
+  const set = keyMarks(36, 48, [0, 4, 7]);
+  assert.deepEqual([...set].sort((a, b) => a - b), [36, 40, 43, 48], 'C 大三和弦落在 C2..C3：36/40/43/48');
+  assert.equal(keyMarks(36, 48, null).size, 0, 'null = 熄灭全部');
+  assert.equal(keyMarks(36, 48, 'x').size, 0, '脏 pcs 不炸不亮');
+  const one = keyMarks(60, 60, [0]);
+  assert.equal(one.size, 1);
+  assert.ok(one.has(60), 'C4 的音级类是 0');
+});
+
+test('markDiff: 只动变化的键——add/remove 互斥，不变时零写入', () => {
+  const prev = new Set([36, 40, 44]);
+  const next = new Set([40, 44, 47]);
+  const { add, remove } = markDiff(prev, next);
+  assert.deepEqual([...add].sort((a, b) => a - b), [47]);
+  assert.deepEqual([...remove].sort((a, b) => a - b), [36]);
+  assert.deepEqual(markDiff(prev, prev), { add: [], remove: [] }, '和弦没换就不碰 DOM');
+  assert.deepEqual(markDiff(new Set(), new Set([1, 2])).add.sort((a, b) => a - b), [1, 2], '从熄灭到点亮');
 });

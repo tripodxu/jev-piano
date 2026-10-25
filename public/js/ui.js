@@ -11,6 +11,22 @@ export { Fall, TensionGraph, MotifCard, motifShape, pulseActive, MOTIF_PULSE_MS,
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
 const BLACK_PCS = [1, 3, 6, 8, 10];
 
+/** 和弦键集合（轮次 57）：midi 范围内、音级类落在 pcs 里的键。null/脏 pcs → 空集（= 熄灭全部）。 */
+export function keyMarks(low, high, pcs) {
+  const set = new Set();
+  if (!Array.isArray(pcs)) return set;
+  for (let m = low; m <= high; m++) if (pcs.includes(((m % 12) + 12) % 12)) set.add(m);
+  return set;
+}
+
+/** 最小 DOM 写入的差集（轮次 57）：只返回要点亮/熄灭的键——逐小节全量重写 49 个键是浪费，diff 后通常只剩几个。 */
+export function markDiff(prev, next) {
+  const add = [], remove = [];
+  for (const m of next) if (!prev.has(m)) add.push(m);
+  for (const m of prev) if (!next.has(m)) remove.push(m);
+  return { add, remove };
+}
+
 /** 渲染键盘。opts.onKey(midi) 提供时，点击琴键立即回调（试听）——事件委托到容器，49 键一个监听器。
  *  键帽仍是 aria-hidden 的视觉元素：指针试听是增强，完整键盘导航属独立无障碍工程。 */
 export function renderKeyboard(container, { low = LOW, high = HIGH, onKey = null } = {}) {
@@ -52,6 +68,7 @@ export function renderKeyboard(container, { low = LOW, high = HIGH, onKey = null
       onKey(midi);
     });
   }
+  let marked = new Set();
   return {
     flash(midi, durSec) {
       const el = keyMap.get(midi);
@@ -59,6 +76,14 @@ export function renderKeyboard(container, { low = LOW, high = HIGH, onKey = null
       el.classList.add('on');
       const t = setTimeout(() => { el.classList.remove('on'); timeouts.delete(t); }, Math.max(80, durSec * 1000));
       timeouts.add(t);
+    },
+    /** 和弦键亮起（轮次 57）：pcs = 当前和弦的音级类数组（null = 熄灭）。diff 更新，只动变化的键。 */
+    mark(pcs) {
+      const next = keyMarks(low, high, pcs);
+      const { add, remove } = markDiff(marked, next);
+      for (const m of add) keyMap.get(m)?.classList.add('mk');
+      for (const m of remove) keyMap.get(m)?.classList.remove('mk');
+      marked = next;
     },
     clear() {
       for (const t of timeouts) clearTimeout(t);
@@ -194,9 +219,10 @@ export const LEGEND_ITEMS = [
   { group: '分析读数（张力带与卷帘）', label: '张力', swatch: 'ten', desc: '这一小节有多紧：实线是实际，虚线是计划弧线' },
   { group: '分析读数（张力带与卷帘）', label: '契合度', swatch: 'fit', desc: '旋律里有多少音属于当前和弦——越高越「在调上」' },
   { group: '分析读数（张力带与卷帘）', label: '非和弦', swatch: 'nct', desc: '带亮边的旋律音：不属于当前和弦，但正是调式的呼吸' },
-  { group: '跟弹（下落音符，轮次 56）', label: '你的音符', swatch: 'you', desc: '演奏中你点下琴键的音：紫色亮边块在击键线上原地亮起（键盘下方一行字会说明它在当前和弦里的角色）' },
-  { group: '跟弹（下落音符，轮次 56）', label: 'AI 右手', swatch: 'fallR', desc: 'Jev 右手旋律的下落块（琥珀色）' },
-  { group: '跟弹（下落音符，轮次 56）', label: 'AI 左手', swatch: 'fallL', desc: 'Jev 左手织体的下落块（青绿色）' },
+  { group: '跟弹（下落音符与琴键，轮次 56/57）', label: '你的音符', swatch: 'you', desc: '演奏中你点下琴键的音：紫色亮边块在击键线上原地亮起（键盘下方一行字会说明它在当前和弦里的角色）' },
+  { group: '跟弹（下落音符与琴键，轮次 56/57）', label: 'AI 右手', swatch: 'fallR', desc: 'Jev 右手旋律的下落块（琥珀色）' },
+  { group: '跟弹（下落音符与琴键，轮次 56/57）', label: 'AI 左手', swatch: 'fallL', desc: 'Jev 左手织体的下落块（青绿色）' },
+  { group: '跟弹（下落音符与琴键，轮次 56/57）', label: '和弦键', swatch: 'mk', desc: '当前小节和弦里的琴键底部亮一道金线——跟着亮键弹，就在和声里' },
 ];
 
 /** 渲染图例 HTML（label/desc 一律转义——图例是纯文本通道，不是注入面） */

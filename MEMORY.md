@@ -5,6 +5,16 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-25 · 和弦键亮起 + 卷帘悬停音符角色（迭代轮次 57 · 前端）
+
+- **做了什么**（跟弹体验闭环：**亮键告诉你能弹什么，回声告诉你弹的是什么，下落可视化记住你弹过什么**；领地 `ui.js`/`main.js`/`studio.js`/`studio-roll.js`/`styles.css` + 两份测试）：详见 [docs/memory/2026-10-25-chord-keys-and-note-hover.md](docs/memory/2026-10-25-chord-keys-and-note-hover.md)。
+  1. **和弦键亮起**：当前小节和弦内的琴键底部亮一道金线。`ui.js` 新增 `keyMarks`/`markDiff` 纯函数 + `renderKeyboard.mark(pcs)`——**diff 更新**（和弦没换零写入）；实时页 onBar 亮/stopAll 熄；工作室 `syncKeyMarks()` 与 `chordCtx()` 同源，回放中挂在 drawPlayhead 的**换和弦分支**（30Hz 里只按数据变化写）。金线用 `border-bottom`——`.bk::after` 已被黑键斜面占用，伪元素路线冲突。
+  2. **卷帘悬停音符角色**：hover 具体音符读出 `悬停 C5=根音` / `大三度·外音`——与键盘回声同一 `chordRole` 内核；轮次 55 最后一个候选结清。
+  3. 图例「跟弹」组补第 4 条「和弦键」，关键词断言同步。
+- **坑**：无新坑（轮次 55/56 的教训——断言抄准分隔符、关键词断言标记名——本轮直接避开）。
+- **验证**：npm test **212→215 全绿**；gate 12 种子 **9.08/2.54/32.00/31.58 与基线逐位一致**（纯展示层）；行数最大 501。**下次部署前人工过**：琴键金线随和弦换（两个界面）、卷帘悬停音符角色、图例第 4 条。
+- **下一步**：候选池渐空。下一个大方向：**部署积压**（轮次 51 起的改动都还没上边缘，verify-deploy 片段清单需同步）或音乐内容侧（听感/曲式/风格扩展）。
+
 ## [完成] 2026-10-25 · 跟弹音符进下落可视化 + canvas 字体回退修复（迭代轮次 56 · 前端）
 
 - **做了什么**（轮次 55 两个余项一次结清；领地 `canvas.js`/`studio-roll.js`/`ui.js`/`main.js`/`styles.css` + `ui.test.mjs`）：详见 [docs/memory/2026-10-25-fall-user-notes-and-canvas-font.md](docs/memory/2026-10-25-fall-user-notes-and-canvas-font.md)。
