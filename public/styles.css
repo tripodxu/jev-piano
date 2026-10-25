@@ -725,3 +725,22 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 /* 键位字母（轮次 65）对比度提升：白键 0.45→0.62、黑键 0.55→0.72 */
 .khint { color: rgba(52, 40, 24, 0.62); }
 .bk .khint { color: rgba(240, 235, 220, 0.72); }
+
+/* ---------- ui-ux-pro-max 规则落地（轮次 67）：触控目标与状态过渡 ---------- */
+/* Toast / 抽屉的入场过渡：display 切换无法 transition，用 animation 在出现瞬间播放——
+   「Instant state changes (0ms)」是反模式；退场保持即时（消失不该让人等） */
+.toast { animation: toastIn .28s cubic-bezier(.16, 1, .3, 1); }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.drawer { animation: drawerIn .32s cubic-bezier(.16, 1, .3, 1); }
+@keyframes drawerIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+/* 触屏设备（≤980px 断点与既有布局共用手）：交互件向 44px 看齐
+   （桌面指针上下文 WCAG 24px 已满足，44pt 是原生平台口径——分上下文对待） */
+@media (max-width: 980px) {
+  .btn, .tab { min-height: 44px; }
+  .chip { min-height: 40px; padding: 8px 16px; }
+  .iconbtn { width: 44px; height: 44px; }
+  .lg-more { padding: 8px 0; }        /* 行内文字链接的命中区扩到指腹尺度 */
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast, .drawer { animation: none; }
+}
