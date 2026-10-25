@@ -284,6 +284,17 @@ export const STYLES = [
     lh: ['shell', 'stride', 'walk'], density: 0.5, swing: 0.3, brightness: 0.5,
   },
   {
+    id: 'blues', name: '蓝调 · Shuffle', desc: '属七骨架 I7–IV7–V7 回环，bVII 色彩，shuffle 摇摆',
+    meters: ['4/4'], bpm: [66, 96], modes: ['mixolydian', 'minor'],
+    // 进行刻意避开相邻同和弦（I7 I7 这种 12 小节原型的直译）：循环锁死断路器会把
+    // 连续重复根音剔出候选，回环改用 V7–IV7–I7 转位式走向，听感等价且不与护栏打架
+    progs: {
+      mixolydian: [['I7', 'IV7', 'I7', 'V7'], ['I7', 'bVII', 'IV7', 'I7'], ['V7', 'IV7', 'I7', 'bVII'], ['I7', 'V7', 'IV7', 'I7']],
+      minor: [['i7', 'iv7', 'i7', 'V7'], ['i7', 'bVI', 'iv7', 'i7']],
+    },
+    lh: ['shell', 'stride', 'walk', 'octave'], density: 0.45, swing: 0.55, brightness: 0.5,
+  },
+  {
     id: 'pop', name: '流行 · 抒情', desc: 'I-V-vi-IV 骨架，琶音推进，副歌上扬',
     meters: ['4/4'], bpm: [70, 104], modes: ['major', 'minor'],
     progs: {
@@ -338,7 +349,8 @@ const KEYWORD_HINTS = [
   { re: /雨|rain|夜|night|lonely|孤|泪|tear/i, style: 'romantic', mode: 'minor', arc: 'fall', mood: ['rainy', 'melancholy'], word: '雨夜' },
   { re: /星|star|梦|dream|云|cloud|仙/i, style: 'newage', mode: 'major', arc: 'arch', mood: ['dreamy', 'floating'], word: '星辰' },
   { re: /咖啡|cafe|慢|slow|懒|lazy|雨窗|黄昏|dusk/i, style: 'lofi', mode: 'major', arc: 'flat', mood: ['cosy', 'hazy'], word: '午后' },
-  { re: /爵士|jazz|蓝调|blues|摇摆|swing|酒吧|bar\b/i, style: 'jazz', mode: 'major', arc: 'arch', mood: ['smoky', 'groovy'], word: '蓝调' },
+  { re: /爵士|jazz|摇摆|swing|酒吧|bar\b/i, style: 'jazz', mode: 'major', arc: 'arch', mood: ['smoky', 'groovy'], word: '酒馆' },
+  { re: /蓝调|blues|布鲁斯|shuffle/i, style: 'blues', mode: 'mixolydian', arc: 'flat', mood: ['smoky', 'gritty'], word: '蓝调' },
   { re: /战斗|战|燃|epic|英雄|hero|龙|dragon|江湖/i, style: 'oriental', mode: 'pentatonic', arc: 'rise', mood: ['heroic', 'flowing'], word: '江湖' },
   { re: /欢|喜|happy|阳光|sun|春|spring|节|庆典|fest/i, style: 'classical', mode: 'major', arc: 'rise', mood: ['bright', 'playful'], word: '春日' },
   { re: /海|sea|ocean|溪|stream|林|forest|风|wind/i, style: 'newage', mode: 'pentatonic', arc: 'flat', mood: ['serene', 'wide'], word: '山水' },

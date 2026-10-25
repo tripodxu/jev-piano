@@ -59,7 +59,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 
 | 文件 | 行数 | 职责 | 修改高危区 |
 |---|---|---|---|
-| `music.js` | 374 | 罗马数字解析、和弦声位、音阶、8 种曲风预设、关键词计划、**和声功能分类 + 调式全色板**（`functionOf`/`functionOfPc`/`modePalette`）、**和声拼写约定**（`PREFERRED_NAME`）、**和弦角色**（`chordRole`：和弦音按位置（根/三/五/七/九音）、外音按音程——轮次 55 跟弹回声的内核） | `STYLES` 完整性被 `theory.test.mjs` 全量断言，改预设必跑测试；`PALETTE_QUALITY` 决定色板的"质"，改它等于改全项目词汇；`PREFERRED_NAME` 是和弦显示的唯一真相源——**但 `midiName` 必须保持升号**（它标的是琴键的物理键名，钢琴上没有 Ab 键） |
+| `music.js` | 386 | 罗马数字解析、和弦声位、音阶、9 种曲风预设（含蓝调，轮次 58）、关键词计划、**和声功能分类 + 调式全色板**（`functionOf`/`functionOfPc`/`modePalette`）、**和声拼写约定**（`PREFERRED_NAME`）、**和弦角色**（`chordRole`：和弦音按位置（根/三/五/七/九音）、外音按音程——轮次 55 跟弹回声的内核） | `STYLES` 完整性被 `theory.test.mjs` 全量断言，改预设必跑测试；`PALETTE_QUALITY` 决定色板的"质"，改它等于改全项目词汇；`PREFERRED_NAME` 是和弦显示的唯一真相源——**但 `midiName` 必须保持升号**（它标的是琴键的物理键名，钢琴上没有 Ab 键） |
 | `candidates.js` | 357 | **候选集构造**（= 给模型的可选域）+ **曲式**：两条断路器、声部进行加权、功能转移矩阵、`FORM_TEMPLATES`/`deriveSections`/`sectionAt`/段落感知 `intensityTarget`/`planTargetSeries`、速度弧线 `tempoMultAt`、**`developCandidates`（段落首偏承袭）** | 兜底判据是「候选够用 ≥3」不是「非空」；`W_SMOOTH` 锁在 0.5；断路器取舍先放疲劳、留锁死；**`rise` 曲式的 Coda level 必须高于 A**；**段落首 `repeat += 1.6` / `new *= 0.3` 是锁值**（改了 A→A' 的再现关系就没了） |
 | `render.js` | 398 | **渲染内核**：旋律渲染（轮廓/锚定/摇摆/人味）、左手 11 种织体（block/ballad 带声部抽稀变体）、动机发展四手法、反重复护栏（指纹/变形）；全部纯函数（rng 注入），只依赖 `music.js` |
 | `jev.js` | 215 | 四渠道客户端（fixture/typesafe/openrouter/proxy）、归一化、429/529 退避重试、fixture 采样、LLM 扩写（**系统二：可选的 sections 字段 = 曲式规划**） | `stripPrivate`：发送前剥离 `_` 前缀字段 |
@@ -91,7 +91,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | 路径 | 职责 |
 |---|---|
 | `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
-| `test/*.test.mjs` | `node --test`，共 215 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
+| `test/*.test.mjs` | `node --test`，共 216 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
 | `scripts/probe-jev.mjs` `scripts/probe-bar.mjs` | 真实 API 冒烟（需 key，计费） |
 | `scripts/verify-deploy.mjs` | **部署后核验**：拉线上的 js/api，断言刚改的代码片段真的在边缘上（`npm test` 只证明磁盘对，不证明线上对）；退出码可接 CI。**每次 `wrangler deploy` 后必跑**。默认打生产自定义域 `https://jevpiano.logicc.top`，可传 URL 参数或 `VEV_BASE` 覆盖。**只对网络异常重试 3 次；HTTP 非 200 与片段缺失立即判失败**——把「可重试的噪声」与「确定性的信号」分开，退出码才有意义 |
 | `scripts/regression-gate.mjs` | **决策指标回归门**（`npm run gate`）：12 种子多样性均值 + 相邻重复硬不变量；门槛单一真相源 `GATE_CONFIG`，CI 每次推送执行 |
@@ -116,7 +116,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 2. 读 MEMORY.md 顶部 3 条 + 任务相关 memory 条目（最新在最上，先看有没有人踩过坑）
 3. 实现：先改/加测试，再改实现（本项目测试驱动传统，见 docs/adr/0004）
 4. 验证关卡（全部通过才算完成）：
-   a. npm test                        全绿（215 个，只增不减）
+   a. npm test                        全绿（216 个，只增不减）
    b. node --check 改动的新 .js        语法
    c. 涉及真实 API 的：scripts/probe-*.mjs 冒烟（可选，计费）
    d. 涉及听感/反重复的：analyze-repetition.mjs 对比指标不退化
@@ -183,7 +183,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 ## 6. 常用命令
 
 ```bash
-npm test                                  # 215 个单测（node --test）
+npm test                                  # 216 个单测（node --test）
 npm run gate                              # 12 种子决策指标回归门（CI 同步执行）
 python dev-proxy.py --port 8000           # 本地开发（或 npm run dev）→ http://127.0.0.1:8000
 node scripts/analyze-repetition.mjs 32 2026 random   # 重复度指标（结论至少 12 种子求均值）

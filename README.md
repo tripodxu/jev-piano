@@ -79,7 +79,7 @@ Worker 安全边界：`/api/llm` 只转发服务端 env 配置的端点（忽略
 ## 测试
 
 ```bash
-npm test          # 215 个单测：乐理内核 / 候选集构造 / 曲式 / Jev 客户端 / 决策器 / 调度器 / SMF 导出 / 张力分析 / 非和声音分析 / 终止式识别 / 界面层 / 工作室编辑 / 卷帘视图接线 / Worker 边界 / 回归门 / 决策预算与迟到小节 / 归因标记 / 模块行数上限（ADR-0004）
+npm test          # 216 个单测：乐理内核 / 候选集构造 / 曲式 / Jev 客户端 / 决策器 / 调度器 / SMF 导出 / 张力分析 / 非和声音分析 / 终止式识别 / 界面层 / 工作室编辑 / 卷帘视图接线 / Worker 边界 / 回归门 / 决策预算与迟到小节 / 归因标记 / 模块行数上限（ADR-0004）
 node scripts/probe-jev.mjs   # 真实 API 冒烟（需 TYPESAFE_API_KEY，单次 ~$0.00002）
 node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 ```
@@ -103,7 +103,7 @@ node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 
 ```
 public/            纯静态前端（index.html + 18 个 ES Module，零构建、零依赖）
-  js/music.js      乐理内核：罗马数字解析、和弦声位、8 种曲风预设、和声功能分类、调式全色板
+  js/music.js      乐理内核：罗马数字解析、和弦声位、9 种曲风预设、和声功能分类、调式全色板
   js/candidates.js 候选集构造 + 曲式：反重复断路器、声部进行加权、功能转移矩阵、A–B–A'–Coda 段落模板
   js/jev.js        Jev 四渠道客户端（归一化/重试/超时）+ fixture 采样 + LLM 扩写
   js/composer.js   决策器：八问设计、音符渲染内核、动机记忆、双声部指纹护栏、决策归因

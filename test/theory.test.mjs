@@ -81,7 +81,7 @@ test('midiName: 保持升号——它标的是琴键的物理键名，不是和�
 });
 
 test('STYLES 完整性：所有进行可解析、bpm 有序、lh 有定义、拍号合理', () => {
-  assert.ok(STYLES.length >= 8);
+  assert.ok(STYLES.length >= 9, '轮次 58 起含 blues');
   for (const s of STYLES) {
     assert.ok(s.bpm[0] <= s.bpm[1], `${s.id} bpm 区间倒置`);
     for (const lh of s.lh) assert.ok(LH_DEFS[lh], `${s.id} 未知织体 ${lh}`);
@@ -207,4 +207,34 @@ test('chordRole: 和弦音按位置命名（根/三/五/七/九音），外音�
   assert.equal(chordRole(NaN, 0, 'm'), null);
   assert.equal(chordRole(60, null, 'm'), null);
   assert.equal(chordRole(60, NaN, 'm'), null);
+});
+
+/* ---------------- 蓝调曲风（轮次 58：属七骨架进入候选词汇） ---------------- */
+
+test('blues 预设：双模式进行池可解析、功能归因成立、关键词路由正确', () => {
+  const b = STYLE_BY_ID.blues;
+  assert.ok(b, 'blues 预设必须存在');
+  for (const mode of b.modes) {
+    assert.ok(b.progs[mode].length >= 2, `${mode} 至少两条进行`);
+    for (const prog of b.progs[mode]) for (const sym of prog) assert.ok(parseRoman(sym), `${sym} 可解析`);
+  }
+  // 骨架形状：大写罗马 + 7 = 属七；小写 + 7 = 小七
+  assert.equal(parseRoman('I7').shape, '7');
+  assert.equal(parseRoman('i7').shape, 'm7');
+  // 功能归因：属七骨架在功能轨上读出 T/S/D（mixolydian 走小调功能表）
+  assert.equal(functionOf('I7', 'mixolydian'), 'T');
+  assert.equal(functionOf('IV7', 'mixolydian'), 'S');
+  assert.equal(functionOf('V7', 'mixolydian'), 'D');
+  assert.equal(functionOf('bVII', 'mixolydian'), 'Tp', 'bVII 是 mixolydian 的自然色彩');
+  // 进行池刻意避开相邻同和弦（循环锁死断路器会把连续重复根音剔出候选）
+  for (const mode of b.modes) for (const prog of b.progs[mode]) {
+    for (let i = 1; i < prog.length; i++) {
+      assert.notEqual(parseRoman(prog[i]).rootPc, parseRoman(prog[i - 1]).rootPc, `${mode} 进行 ${prog} 存在相邻同根音`);
+    }
+  }
+  // 关键词路由（轮次 58 修正：蓝调/blues 此前错路由到爵士）
+  assert.equal(keywordPlan('来一段蓝调', mulberry32(1)).styleId, 'blues');
+  // 输入别带「夜/night」这类歧义词——关键词路由是首个命中制，第 1 条「雨夜」会先劫走它
+  assert.equal(keywordPlan('布鲁斯 shuffle', mulberry32(1)).mode, 'mixolydian');
+  assert.equal(keywordPlan('爵士摇摆', mulberry32(1)).styleId, 'jazz', '爵士关键词仍路由到爵士');
 });
