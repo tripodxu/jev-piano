@@ -107,3 +107,24 @@ test('attachKeyboard: 挂到可注入的 target 上，detach 后解绑', () => {
   kbd.detach();
   assert.ok(!listeners.has('keydown'), 'detach 后解绑');
 });
+
+test('attachKeyboard: enabled 谓词——非激活视图的监听器不响应（双挂接防双触发，轮次 68）', () => {
+  // 复现路径的纯函数化：两个界面各自挂接且常驻 window，不查视图会在另一视图双发声
+  const notes = [];
+  let liveActive = false;
+  const live = attachKeyboard({ onKey: (m) => notes.push(m), enabled: () => liveActive });
+  live.handle(ev('KeyA'));
+  assert.deepEqual(notes, [], 'enabled=false 时一个音都不弹');
+  liveActive = true;
+  live.handle(ev('KeyA'));
+  assert.deepEqual(notes, [60], 'enabled=true 时恢复正常');
+  // enabled 检查先于八度切换：非激活视图连换挡都不动（否则两边八度状态互踩）
+  let studioActive = false;
+  const octs = [];
+  const studio = attachKeyboard({ onKey: () => {}, onOctave: (b) => octs.push(b), enabled: () => studioActive });
+  studio.handle(ev('KeyZ'));
+  assert.deepEqual(octs, [], '非激活视图不换八度');
+  studioActive = true;
+  studio.handle(ev('KeyZ'));
+  assert.deepEqual(octs, [48], '激活视图正常换挡');
+});

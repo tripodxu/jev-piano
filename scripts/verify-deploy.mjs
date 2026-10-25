@@ -33,7 +33,8 @@ const CHECKS = [
   { file: '/js/main.js', needles: ['user: true', 'CADENCE_ZH', 'kbEcho'], why: '轮次 55-57 跟弹接线（回声/终止式/下落音符）' },
   // 轮次 49：三个静默 bug 的现场——线上必须同时具备「布局常量」与「舞台灯光 DOM」
   { file: '/js/studio-core.js', needles: ['export const ZOOM', 'export const HEADER', 'H_TENSION'], why: '轮次 49：布局常量回填（此前卷帘整条绘制路径 ReferenceError）' },
-  { file: '/index.html', needles: ['stageWarm', 'kbEcho', 'stKbEcho', 'data-style="blues"'], why: '轮次 49 舞台灯光 + 55 回声条 + 58 蓝调选项' },
+  { file: '/js/kbd.js', needles: ['KEY_SEMITONES', 'attachKeyboard', 'enabled'], why: '轮次 65/68：电脑键盘弹奏 + 视图路由（防双触发）' },
+  { file: '/index.html', needles: ['stageWarm', 'kbEcho', 'stKbEcho', 'data-style="blues"', 'stage-idle'], why: '轮次 49 舞台灯光 + 55 回声条 + 58 蓝调选项 + 66 空态覆盖层' },
 ];
 
 // 网络抖动会让 fetch 抛 TypeError（本沙箱对目标域时通时断），而内容不符是**确定信号**。

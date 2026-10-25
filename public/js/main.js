@@ -158,7 +158,9 @@ const pressKey = (midi) => {
     .catch(() => { /* 音频不可用时静默——试听是增强 */ });
 };
 const kb = renderKeyboard(els.keyboard, { onKey: pressKey });
-// 电脑键盘弹奏（轮次 65）：A–L 一行白键、W/E/T/Y/U/O/P 黑键、; 再跨三半音；Z/X 上下换八度
+// 电脑键盘弹奏（轮次 65）：A–L 一行白键、W/E/T/Y/U/O/P 黑键、; 再跨三半音；Z/X 上下换八度。
+// enabled：仅实时视图激活时响应——工作室开过一次后它的监听器也常驻 window，
+// 两边不查视图会让实时页的每次按键双触发（双发声，轮次 68 修复）
 kb.setKeyHints(hintsFor(60));
 attachKeyboard({
   onKey: pressKey,
@@ -166,6 +168,7 @@ attachKeyboard({
     kb.setKeyHints(hintsFor(base));
     els.kbEcho.textContent = `八度 → ${midiName(base)} 起（Z/X 切换）`;
   },
+  enabled: () => !document.getElementById('viewStudio').classList.contains('active'),
 });
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);
 const tensionGraph = new TensionGraph(els.tensionCanvas);
@@ -208,7 +211,6 @@ async function start() {
     return;
   }
   audio.setVolume(0.9);
-  els.stage.classList.remove('idle'); // 开演：摘掉空态覆盖层（轮次 66）
   els.decisionLog.innerHTML = '';
   els.fnRibbon.innerHTML = '';
   els.logEmpty.classList.remove('hidden');
@@ -349,6 +351,7 @@ async function start() {
   tensionGraph.start();
   motifCard.start();
   player.start();
+  els.stage.classList.remove('idle'); // 第一个音即将落地才摘空态（轮次 68）：计划期最长 12s，舞台不该两头都空着
   els.playBtn.textContent = '▶ 开始演奏';
   setButtons(true);
 }

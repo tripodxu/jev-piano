@@ -113,7 +113,9 @@ export function ensureStudio() {
       .catch(() => { /* 同实时页：试听是增强 */ });
   };
   kb = renderKeyboard(els.keyboard, { onKey: pressKey });
-  // 电脑键盘弹奏（轮次 65）：与实时页同一套键位；工作室的回放中上下文跟随播放头所在小节
+  // 电脑键盘弹奏（轮次 65）：与实时页同一套键位；工作室的回放中上下文跟随播放头所在小节。
+  // enabled：仅工作室视图激活时响应（与下方 ctrl+z 守卫同一判据）——两个界面的监听器都
+  // 常驻 window，不查视图会在实时页双触发（双发声，轮次 68 修复）
   kb.setKeyHints(hintsFor(60));
   attachKeyboard({
     onKey: pressKey,
@@ -121,6 +123,7 @@ export function ensureStudio() {
       kb.setKeyHints(hintsFor(base));
       els.kbEcho.textContent = `八度 → ${midiName(base)} 起（Z/X 切换）`;
     },
+    enabled: () => document.getElementById('viewStudio').classList.contains('active'),
   });
   roll = createRollView({
     els,                           // DOM 引用表（卷帘用 vel/roll/bpm 三个键）

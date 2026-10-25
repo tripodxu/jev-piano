@@ -45,11 +45,14 @@ export function hintsFor(base) {
 /**
  * 挂接电脑键盘弹奏。onKey(midi) 走与琴键点击完全相同的路径（回声/下落/发声）；
  * onOctave(base) 在 Z/X 换挡时回调（调用方更新键位提示与读数）。
+ * enabled()（可选）：本界面是否处于激活视图——两个界面各自挂接且监听器常驻 window，
+ * 不检查视图的话，开过一次工作室后实时页的每次按键都会双触发（双发声/八度互踩，轮次 68 修复）。
  * target 可注入（默认 globalThis）；返回的 handle 供测试直调，detach 供界面卸载。
  */
-export function attachKeyboard({ onKey, onOctave }, { base = 60, target = globalThis } = {}) {
+export function attachKeyboard({ onKey, onOctave, enabled = null }, { base = 60, target = globalThis } = {}) {
   let b = clampBase(base);
   const handle = (e) => {
+    if (enabled && !enabled()) return;
     if (!shouldHandle(e)) return;
     if (e.code === 'KeyZ' || e.code === 'KeyX') {
       const next = clampBase(b + (e.code === 'KeyX' ? 12 : -12));
