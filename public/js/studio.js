@@ -9,7 +9,8 @@ import { getAudio } from './audio.js';
 import { exportMidi } from './midi.js';
 import { renderKeyboard, toast, setStatus, emptyLedger, accumulateLedger, ledgerPills, CHANNEL_LABEL, keyEchoText } from './ui.js';
 import { loadSettings } from './settings.js';
-import { NOTE_NAMES, chordPcs } from './music.js';
+import { NOTE_NAMES, chordPcs, midiName } from './music.js';
+import { attachKeyboard, hintsFor } from './kbd.js';
 import { tempoMultAt } from './candidates.js';
 import { createRollView } from './studio-roll.js';
 import {
@@ -104,12 +105,21 @@ export function ensureStudio() {
     // 花费对用户完全不可见（轮次 50 修复）
     channel: $('stChannel'), tokens: $('stTokens'), cost: $('stCost'), latency: $('stLatency'),
   };
-  kb = renderKeyboard(els.keyboard, {
-    onKey: (midi) => {
-      els.kbEcho.textContent = keyEchoText(midi, chordCtx()); // 跟弹回声（轮次 55）：同实时页
-      getAudio().ensure()
-        .then(() => getAudio().play(midi, getAudio().ctx.currentTime + 0.01, 0.9, 0.7))
-        .catch(() => { /* 同实时页：试听是增强 */ });
+  // 弹一个音的共用路径（轮次 65）：琴键点击与电脑键盘同路——回声用当前和声上下文
+  const pressKey = (midi) => {
+    els.kbEcho.textContent = keyEchoText(midi, chordCtx()); // 跟弹回声（轮次 55）：同实时页
+    getAudio().ensure()
+      .then(() => getAudio().play(midi, getAudio().ctx.currentTime + 0.01, 0.9, 0.7))
+      .catch(() => { /* 同实时页：试听是增强 */ });
+  };
+  kb = renderKeyboard(els.keyboard, { onKey: pressKey });
+  // 电脑键盘弹奏（轮次 65）：与实时页同一套键位；工作室的回放中上下文跟随播放头所在小节
+  kb.setKeyHints(hintsFor(60));
+  attachKeyboard({
+    onKey: pressKey,
+    onOctave: (base) => {
+      kb.setKeyHints(hintsFor(base));
+      els.kbEcho.textContent = `八度 → ${midiName(base)} 起（Z/X 切换）`;
     },
   });
   roll = createRollView({

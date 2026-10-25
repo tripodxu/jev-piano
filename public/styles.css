@@ -694,3 +694,7 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .wk.mk { border-bottom: 3px solid rgba(216, 171, 92, 0.92); }
 .bk.mk { border-bottom: 3px solid rgba(216, 171, 92, 0.92); }
 .lg-sw.mk { background: none; border-bottom: 3px solid var(--brass); height: 0; border-radius: 0; }
+/* 键位字母提示（轮次 65 电脑键盘弹奏）：绑定到电脑键的琴键上标出字母，Z/X 换八度时 diff 更新 */
+.khint { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+  font: 600 9px/1 var(--mono, monospace); color: rgba(60, 48, 30, 0.45); pointer-events: none; user-select: none; }
+.bk .khint { color: rgba(240, 235, 220, 0.55); bottom: 4px; }

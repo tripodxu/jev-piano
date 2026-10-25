@@ -5,6 +5,13 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-25 · 电脑键盘弹奏——跟弹真正可玩（迭代轮次 65 · 前端）
+
+- **做了什么**（领地 新增 `kbd.js`/`kbd.test.mjs` + `ui.js`/`main.js`/`studio.js`/`styles.css`/`index.html`）：标准在线钢琴键位（A–L 白键、W/E/T/Y/U/O/P 黑键、`; ` 跨三半音）+ Z/X 换八度接到**两个界面**的既有 onKey 路径（pressKey 共用——回声/和弦键上下文/跟弹下落/发声一条路）；`e.code` 物理键位（与输入法/布局无关）；`shouldHandle` 守卫（按住重触、ctrl/meta/alt 组合、表单焦点内不弹——ctrl+z 仍是撤销）；琴键上 diff 更新的字母提示（`setKeyHints`，换八度只动 17 个键）；回声行默认文案提示键位。八度 base **只落在 C 上**（36/48/60——17 键跨度 × 音域 36..84 共同决定，钳到任意音会让提示错位到黑键）。
+- **验证**：npm test **226→233 全绿**（kbd.test 7 条：映射/守卫/八度落点/挂接全路径）；gate 均值不变；**浏览器实测**（dev-proxy + IAB）：A→`C4`、K→`C5`、Z 换八度后提示字母整体搬家、输入框内派发不弹、工作室页 G→`G4` + 17 个提示。
+- **坑**：合成 KeyboardEvent 派发在 window 上时 target 是 window 而非焦点元素——守卫的浏览器验证必须在输入框元素上 bubbles 派发（单测用 target:INPUT 构造，语义等价真实按键）。
+- **下一步**：无挂账。候选：prefers-reduced-motion 降级 Fall 动画（a11y）、跟弹连击/乐句回声模式（游戏化）。
+
 ## [完成] 2026-10-25 · 性能轮 64：契合度缓存 + 护栏免展平 + 长会话上限（审计 P1/P2/D1/P3）
 
 - **做了什么**（领地 studio-roll/render/composer/player/ui + 三份测试）：① **P1** 卷帘第三份分析缓存 `fitCache`（逐小节 fit 是 O(bars×notes)，hover 重绘不再反复付，随 `invalidate()` 作废）；② **P2** `mutateMelody` 加 `softSet` 参数——软层指纹直接传 Set 查 `.has`，不再每次撞车展平成数组（长会话数千条的白付 O(N)）；③ **D1** `SIG_MEMORY_CAP=2000`（软层指纹保最近一半）+ `RECORDS_CAP=20000`（records 丢最旧）；④ **P3** addDecision 单次 innerHTML。详见 [docs/memory/2026-10-25-perf-round64.md](docs/memory/2026-10-25-perf-round64.md)。

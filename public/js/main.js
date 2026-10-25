@@ -7,7 +7,8 @@ import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
 import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, keyEchoText } from './ui.js';
-import { STYLE_BY_ID, chordPcs } from './music.js';
+import { STYLE_BY_ID, chordPcs, midiName } from './music.js';
+import { attachKeyboard, hintsFor } from './kbd.js';
 import { GOAL_HINTS } from './composer.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { barHarmonyFit, NCT_ZH } from './nct.js';
@@ -146,14 +147,24 @@ const audio = getAudio();
 // 点击琴键试听：点击本身是用户手势，ensure() 合法；未开演也能摸一摸这件乐器。
 // 跟弹回声（轮次 55）：演奏中有和声上下文时，告诉用户这个音在当前和弦里是什么角色——
 // 键盘从「试听」变成「跟弹学习乐器」，弹错音也能听见偏了多远。
-const kb = renderKeyboard(els.keyboard, {
-  onKey: (midi) => {
-    els.kbEcho.textContent = keyEchoText(midi, lastChord);
-    // 跟弹可视化（轮次 56）：演奏中你弹的音以紫色亮边落在击键线上——AI 的音符向下落，你的音符原地亮起
-    if (player?.running && audio.ctx) fall.push({ midi, t: audio.ctx.currentTime + 0.01, dur: 0.45, vel: 0.8, user: true });
-    audio.ensure()
-      .then(() => audio.play(midi, audio.ctx.currentTime + 0.01, 0.9, 0.7))
-      .catch(() => { /* 音频不可用时静默——试听是增强 */ });
+// 弹一个音的共用路径（轮次 65）：琴键点击与电脑键盘（kbd.js）从这里进——
+// 回声、跟弹下落、发声一条路，两个入口不各有各的账
+const pressKey = (midi) => {
+  els.kbEcho.textContent = keyEchoText(midi, lastChord);
+  // 跟弹可视化（轮次 56）：演奏中你弹的音以紫色亮边落在击键线上——AI 的音符向下落，你的音符原地亮起
+  if (player?.running && audio.ctx) fall.push({ midi, t: audio.ctx.currentTime + 0.01, dur: 0.45, vel: 0.8, user: true });
+  audio.ensure()
+    .then(() => audio.play(midi, audio.ctx.currentTime + 0.01, 0.9, 0.7))
+    .catch(() => { /* 音频不可用时静默——试听是增强 */ });
+};
+const kb = renderKeyboard(els.keyboard, { onKey: pressKey });
+// 电脑键盘弹奏（轮次 65）：A–L 一行白键、W/E/T/Y/U/O/P 黑键、; 再跨三半音；Z/X 上下换八度
+kb.setKeyHints(hintsFor(60));
+attachKeyboard({
+  onKey: pressKey,
+  onOctave: (base) => {
+    kb.setKeyHints(hintsFor(base));
+    els.kbEcho.textContent = `八度 → ${midiName(base)} 起（Z/X 切换）`;
   },
 });
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);

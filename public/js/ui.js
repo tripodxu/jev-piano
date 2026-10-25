@@ -69,6 +69,7 @@ export function renderKeyboard(container, { low = LOW, high = HIGH, onKey = null
     });
   }
   let marked = new Set();
+  let hintEls = new Map(); // midi → 提示字母元素（轮次 65 电脑键盘弹奏的键位标注）
   return {
     flash(midi, durSec) {
       const el = keyMap.get(midi);
@@ -84,6 +85,23 @@ export function renderKeyboard(container, { low = LOW, high = HIGH, onKey = null
       for (const m of add) keyMap.get(m)?.classList.add('mk');
       for (const m of remove) keyMap.get(m)?.classList.remove('mk');
       marked = next;
+    },
+    /** 键位字母提示（轮次 65）：pairs = [[midi, label], …]。diff 更新——八度切换只动 17 个键各一次，不重排键盘。 */
+    setKeyHints(pairs) {
+      const want = new Map((pairs ?? []).filter(([m]) => keyMap.has(m)));
+      for (const [midi, el] of hintEls) {
+        if (!want.has(midi)) { el.remove(); hintEls.delete(midi); }
+      }
+      for (const [midi, label] of want) {
+        let el = hintEls.get(midi);
+        if (!el) {
+          el = document.createElement('i');
+          el.className = 'khint';
+          keyMap.get(midi).appendChild(el);
+          hintEls.set(midi, el);
+        }
+        if (el.textContent !== label) el.textContent = label;
+      }
     },
     clear() {
       for (const t of timeouts) clearTimeout(t);
