@@ -276,3 +276,13 @@ test('布局常量：拆分后必须仍可从 studio.js 导入（轮次 38 曾�
   assert.equal(HEADER, H_TENSION + H_FN + H_CHORD + H_FIT, '头部高度是四段的合成——不能各写各的');
   assert.equal(HEADER, 66);
 });
+
+test('validatePiece: barChords 逐项校验；nid 类型漂移重算（轮次 62）', () => {
+  const badBc = JSON.parse(JSON.stringify({ ...mkPiece(), version: 1 }));
+  badBc.barChords[1] = { symbol: 'G' }; // 缺 startBeat/rootPc/shape
+  assert.equal(validatePiece(badBc), null, '畸形和弦项在导入门口就拒');
+  const badNid = JSON.parse(JSON.stringify({ ...mkPiece(), version: 1 }));
+  badNid.nid = 'oops';
+  const fixed = validatePiece(badNid);
+  assert.ok(fixed && Number.isInteger(fixed.nid) && fixed.nid >= 6, `非法 nid 应重算为整数，实际 ${fixed?.nid}`);
+});

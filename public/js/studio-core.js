@@ -187,7 +187,12 @@ export function validatePiece(data) {
   const ok = data.notes.every((n) => n && Number.isFinite(n.midi) && Number.isFinite(n.startBeats)
     && Number.isFinite(n.durBeats) && Number.isFinite(n.vel) && (n.hand === 'R' || n.hand === 'L'));
   if (!ok) return null;
-  data.nid = data.nid ?? Math.max(0, ...data.notes.map((n) => n.id ?? 0)) + 1;
+  // barChords 逐项校验（轮次 62）：畸形和弦项会让分析层产出垃圾值——多数被降级路径
+  // 兜住不炸，但张力/契合度/终止式的读数全是脏的；导入门口就该拒
+  const bcOk = data.barChords.every((b) => b && Number.isFinite(b.startBeat) && Number.isFinite(b.rootPc) && typeof b.shape === 'string');
+  if (!bcOk) return null;
+  // nid 类型漂移（老存档/手改 JSON）重算而不是拒——notes 的 id 才是事实
+  data.nid = Number.isInteger(data.nid) ? data.nid : Math.max(0, ...data.notes.map((n) => n.id ?? 0)) + 1;
   return data;
 }
 

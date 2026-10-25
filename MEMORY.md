@@ -5,6 +5,14 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-25 · 审计修复轮 62：LLM 清单漂移 + expandPlan 超时 + 启动恢复 + 导入校验（迭代轮次 62 · 修复）
+
+- **背景**：轮次 61 全量审计（19 文件 ~5000 行，~20 项发现）的第一批修复。详见 [docs/memory/2026-10-25-audit-fix-round62.md](docs/memory/2026-10-25-audit-fix-round62.md)。
+- **做了什么**（领地 jev/main/studio-core/composer + 三份测试）：① **B2 产品缺陷**：PLAN_SYS_PROMPT 曲风/调式清单**从 STYLES 派生**——轮次 58 字面量漏 blues/mixolydian，LLM 扩写永远选不了蓝调；② **B1**：expandPlan 补默认 12s 超时（挂住的 LLM 端点此前会楔死 buildPlan，实时页卡「… 编曲中」数分钟；用户取消仍上抛）；③ **B3**：start() 的 buildPlan await 包 try/catch，失败恢复按钮；④ **B4**：validatePiece 逐项校验 barChords + nid 漂移重算。顺手：`chordSymRawRaw` 改名、probe 陈旧版本标签。
+- **新守卫**：PLAN_SYS_PROMPT↔STYLES 同源断言；STYLES↔index.html 两处静态 UI 对账（dom-contract 只对 id 不对 option 的洞补上）；validatePiece 两条。
+- **坑**：**AbortSignal.timeout 的定时器不保持 Node 事件循环存活**（unref）——假 fetch 只挂 abort 监听器会让 promise 在空循环里永不落定；测试要用真 setTimeout 轮询。
+- **验证**：npm test **216→220 全绿**；gate 均值不变（fixture 路径零改动）。**下一步**：轮次 63 worker 同源防护 + 部署；轮次 64 性能（契合度缓存/avoid 展平/状态上限）。
+
 ## [完成] 2026-10-25 · 真实路径 E2E + 线上浏览器冒烟（迭代轮次 60 · 测试）
 
 - **做了什么**（零源码改动，领地 = 一次性脚手架（已删）+ MEMORY）：①**真实生产路径 E2E**：Node 22 fetch 不认代理变量，脚手架用 **curl 猴补 `globalThis.fetch`**（`askJev` 默认参数调用时才解析全局 fetch）跑 `buildPlan`+`nextBar`×8，渠道 = 生产 `/api/jev`——**0 兜底 0 超预算**，`Cm→Fm7→G7→Fm7→Ab` 正是轮次 58 的 `i7–iv7–V7–bVI` 骨架，~2000tok/$0.00008/小节。②**线上浏览器冒烟**（55–57 轮功能首次真浏览器验证）：静态 9/9（回声条/蓝调 chip+option/图例「和弦键」「你的音符」/49 键）+ 交互 2/2（实时点 C4→回声 `C4`；工作室初始化正常、点 E4→回声 `E4`）。详见 [docs/memory/2026-10-25-test-round60.md](docs/memory/2026-10-25-test-round60.md)。

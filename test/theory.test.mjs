@@ -1,5 +1,6 @@
 // theory.test.mjs — music.js 乐理内核与曲风预设的完整性校验
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import {
   parseRoman, chordMidis, chordPcs, lhVoicing, scaleMidis, nearest, chordLabel, midiName,
@@ -237,4 +238,14 @@ test('blues 预设：双模式进行池可解析、功能归因成立、关键�
   // 输入别带「夜/night」这类歧义词——关键词路由是首个命中制，第 1 条「雨夜」会先劫走它
   assert.equal(keywordPlan('布鲁斯 shuffle', mulberry32(1)).mode, 'mixolydian');
   assert.equal(keywordPlan('爵士摇摆', mulberry32(1)).styleId, 'jazz', '爵士关键词仍路由到爵士');
+});
+
+/* ---------------- 轮次 62：STYLES 与静态 UI 清单对账 ---------------- */
+
+test('STYLES 与 index.html 两处静态清单对账（一处登记、多处引用必须有对账）', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  for (const s of STYLES) {
+    assert.ok(html.includes(`data-style="${s.id}"`), `实时页 chip 缺曲风 ${s.id}`);
+    assert.ok(html.includes(`<option value="${s.id}"`), `工作室 select 缺曲风 ${s.id}`);
+  }
 });

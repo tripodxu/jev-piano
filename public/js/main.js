@@ -213,19 +213,28 @@ async function start() {
   els.playBtn.textContent = '… 编曲中';
 
   const seed = Math.floor(Math.random() * 2 ** 31);
-  plan = await buildPlan({
-    prompt: els.prompt.value.trim() || '一段安静的即兴',
-    goal: els.goal.value,
-    styleId: settings.styleId || 'random',
-    seed,
-    bars: Number(els.barsSelect.value),
-    keyPc: settings.keySel && settings.keySel !== 'auto' ? Number(settings.keySel) : null,
-  }, {
-    llm: settings.llmEnabled ? {
-      enabled: true, baseUrl: settings.llmBaseUrl, model: settings.llmModel,
-      apiKey: settings.llmKey, proxy: settings.llmProxy,
-    } : { enabled: false },
-  });
+  // 轮次 62：buildPlan 是启动路径上唯一的外部 await（LLM 端点/计划装配），失败必须把按钮
+  // 还给学生——旧实现先禁用 playBtn 再裸奔这个 await，异常路径让「… 编曲中」挂到刷新为止。
+  try {
+    plan = await buildPlan({
+      prompt: els.prompt.value.trim() || '一段安静的即兴',
+      goal: els.goal.value,
+      styleId: settings.styleId || 'random',
+      seed,
+      bars: Number(els.barsSelect.value),
+      keyPc: settings.keySel && settings.keySel !== 'auto' ? Number(settings.keySel) : null,
+    }, {
+      llm: settings.llmEnabled ? {
+        enabled: true, baseUrl: settings.llmBaseUrl, model: settings.llmModel,
+        apiKey: settings.llmKey, proxy: settings.llmProxy,
+      } : { enabled: false },
+    });
+  } catch (e) {
+    els.playBtn.disabled = false;
+    els.playBtn.textContent = '▶ 开始演奏';
+    toast(els.toast, '编曲失败：' + (e?.message ?? e));
+    return;
+  }
   renderPlan(els.planCard, plan);
   if (!settings.llmEnabled) els.planCard.querySelector('.badge')?.classList.add('dim');
   // 张力对照带：计划弧线在演奏前就位，实际张力随小节逐条长出来

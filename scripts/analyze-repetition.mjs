@@ -43,7 +43,7 @@ let H = 0;
 for (const v of hist.values()) { const p = v / total; H -= p * Math.log2(p); }
 const leaps = intervals.filter((x) => x >= 5).length;
 console.log(JSON.stringify({
-  style: plan.styleId, bars, seed, channel: real ? 'typesafe(jev-1.13)' : 'fixture',
+  style: plan.styleId, bars, seed, channel: real ? 'typesafe' : 'fixture',
   melody_unique_bars: `${uniq.size}/${bars}`,
   melody_adjacent_repeat: adjMel,
   melody_2gram_repeat: rep2,

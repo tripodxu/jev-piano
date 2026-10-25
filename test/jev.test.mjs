@@ -1,8 +1,9 @@
 // jev.test.mjs — 注入假 fetch / 假 sleep，验证四渠道、重试、归一化与 fixture 采样
 import { test } from 'node:test';
+import { STYLES } from '../public/js/music.js';
 import assert from 'node:assert/strict';
 import {
-  askJev, fixtureAnswer, stripPrivate, normalizeAnswer, expandPlan, CHANNELS, TYPESAFE_USD_PER_TOKEN,
+  askJev, fixtureAnswer, stripPrivate, normalizeAnswer, expandPlan, PLAN_SYS_PROMPT, CHANNELS, TYPESAFE_USD_PER_TOKEN,
 } from '../public/js/jev.js';
 
 const Q = {
@@ -128,4 +129,39 @@ test('expandPlan: JSON 提取与失败返回 null', async () => {
 
   const err = async () => new Response('{}', { status: 401 });
   assert.equal(await expandPlan('雨夜', {}, { baseUrl: 'https://x/v1', model: 'm', apiKey: 'k' }, err), null);
+});
+
+/* ---------------- 轮次 62：清单派生与超时保护 ---------------- */
+
+test('PLAN_SYS_PROMPT: 曲风/调式清单与 STYLES 同源（此前蓝调对 LLM 扩写不可达）', () => {
+  for (const s of STYLES) {
+    assert.ok(PLAN_SYS_PROMPT.includes(s.id), `提示词缺曲风 ${s.id}`);
+  }
+  const modes = new Set(STYLES.flatMap((s) => s.modes));
+  for (const m of modes) {
+    assert.ok(PLAN_SYS_PROMPT.includes(m), `提示词缺调式 ${m}`);
+  }
+  // 轮次 62 的原始事故：字面量清单漏了这两个，LLM 永远选不了蓝调
+  assert.ok(PLAN_SYS_PROMPT.includes('blues') && PLAN_SYS_PROMPT.includes('mixolydian'));
+});
+
+test('expandPlan: 挂住的端点按超时快速失败返回 null（不再无限等）', async () => {
+  // 假 fetch 用轮询而不是 abort 监听器：AbortSignal.timeout 的定时器不保持事件循环存活
+  // （Node 的 unref 语义），只挂监听器会让 promise 在空循环里永不落定
+  const hang = (url, opts = {}) => new Promise((_, rej) => {
+    const check = () => {
+      if (opts.signal?.aborted) rej(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      else setTimeout(check, 5);
+    };
+    check();
+  });
+  const t0 = Date.now();
+  const out = await expandPlan('x', {}, { baseUrl: 'https://x/v1', model: 'm', apiKey: 'k', timeoutMs: 40 }, hang);
+  assert.equal(out, null, '超时走失败路径（回退关键词计划），不上抛');
+  assert.ok(Date.now() - t0 < 5000, '应按 timeoutMs 快速返回，而不是等浏览器默认超时');
+  // 用户主动取消（外部 signal）仍须原样上抛——取消不是失败
+  await assert.rejects(
+    expandPlan('x', {}, { baseUrl: 'https://x/v1', model: 'm', apiKey: 'k', signal: AbortSignal.abort() }, hang),
+    (e) => e.name === 'AbortError',
+  );
 });

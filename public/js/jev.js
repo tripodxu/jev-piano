@@ -4,6 +4,7 @@
 //   → {model, answers:{id:{type,'choice'|'score'|'noul', confidence?, probabilities?}}, usage:{input_tokens,output_tokens}}
 //   choice 的值在 answer.choice；score 的值是等级序号(整数)，criteria 必须是数组；noul 的值是 0..1 概率。
 // 本模块对外统一归一化成 answers[id] = { value, confidence?, probabilities? }。
+import { STYLES } from './music.js';
 
 export const CHANNELS = {
   typesafe: { endpoint: 'https://api.typesafe.ai/v1/systemone', model: 'jev-latest' },
@@ -158,12 +159,18 @@ export async function probeProxy(baseUrl = '') {
   } catch { return null; }
 }
 
-/** LLM 扩写的系统提示词（只输出 JSON） */
+/** LLM 扩写的系统提示词（只输出 JSON）。
+ *  曲风/调式清单**从 STYLES 派生，不写字面量**（轮次 62 修复）：轮次 58 新增蓝调时
+ *  字面量清单漏了 blues/mixolydian——LLM 扩写永远选不了蓝调，而 UI 与关键词路由都能选。
+ *  「一处登记、多处引用」的清单必须派生或有对账测试，这次两个都做（theory.test 对账 UI 两处）。 */
+const STYLE_IDS = STYLES.map((s) => s.id).join('|');
+const MODE_IDS = [...new Set(STYLES.flatMap((s) => s.modes))].join('|');
+
 export const PLAN_SYS_PROMPT = [
   '你是作曲助理，把用户的一句话扩写成钢琴即兴曲的创作计划。只输出一个 JSON 对象，不要任何其他文字或代码块标记。',
   '字段与取值：',
-  '{"title":"诗意曲名，不超过12个字","style":"classical|romantic|jazz|pop|lofi|newage|waltz|oriental 之一",',
-  ' "mode":"major|minor|dorian|pentatonic 之一","keyPc":0-11 的整数(C=0,D=1,...,B=11),"bpm":50-140 的整数,',
+  `{"title":"诗意曲名，不超过12个字","style":"${STYLE_IDS} 之一",`,
+  ` "mode":"${MODE_IDS} 之一","keyPc":0-11 的整数(C=0,D=1,...,B=11),"bpm":50-140 的整数,`,
   ' "mood":["两个英文情绪词"],"arc":"flat|rise|arch|fall 之一","swing":0-0.35,"density":0-1,"brightness":0-1,',
   ' "notes":"给演奏者的一句中文提示，20字内"}',
   '可选字段 "sections"（曲式，系统二职责）：把整曲拆成 2-5 个段落，按出现顺序，形如 ',
@@ -175,8 +182,10 @@ export const PLAN_SYS_PROMPT = [
 
 /**
  * LLM 扩写：任意 OpenAI 兼容 /chat/completions。
- * llmCfg = { baseUrl, model, apiKey, proxy?:bool, signal? }
+ * llmCfg = { baseUrl, model, apiKey, proxy?:bool, signal?, timeoutMs? }
  * 返回解析后的 JSON 对象；失败返回 null（调用方回退到 keyword 计划）。
+ * 超时保护（轮次 62）：与 askJev 同纪律——端点挂住时不能无限等，否则 buildPlan 楔死、
+ * 实时页卡在「… 编曲中」数分钟。默认 12s；用户主动取消（signal）仍原样抛出。
  */
 export async function expandPlan(prompt, hint, llmCfg, fetchImpl = fetch) {
   const url = llmCfg.proxy ? 'api/llm' : llmCfg.baseUrl?.replace(/\/+$/, '') + '/chat/completions';
@@ -194,9 +203,13 @@ export async function expandPlan(prompt, hint, llmCfg, fetchImpl = fetch) {
     max_tokens: 400,
     ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
   });
+  const timeoutSig = AbortSignal.timeout(llmCfg.timeoutMs ?? 12_000);
+  const signal = llmCfg.signal
+    ? (AbortSignal.any ? AbortSignal.any([llmCfg.signal, timeoutSig]) : llmCfg.signal)
+    : timeoutSig;
   for (const jsonMode of [true, false]) {
     try {
-      const res = await fetchImpl(url, { method: 'POST', headers, signal: llmCfg.signal, body: JSON.stringify(build(jsonMode)) });
+      const res = await fetchImpl(url, { method: 'POST', headers, signal, body: JSON.stringify(build(jsonMode)) });
       if (!res.ok) {
         if (jsonMode) continue; // 有些端点不支持 response_format，去掉重试一次
         return null;
@@ -206,7 +219,8 @@ export async function expandPlan(prompt, hint, llmCfg, fetchImpl = fetch) {
       const jsonText = /{[\s\S]*}/.exec(String(content ?? ''))?.[0];
       return jsonText ? JSON.parse(jsonText) : null;
     } catch (e) {
-      if (e?.name === 'AbortError') throw e;
+      // 只有**用户自己的 signal** 触发的中止才上抛；超时中止走失败路径（回退关键词计划）
+      if (e?.name === 'AbortError' && llmCfg.signal?.aborted) throw e;
       if (jsonMode) continue;
       return null;
     }

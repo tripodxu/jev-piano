@@ -371,8 +371,8 @@ export class Composer {
     // 解析答案（越界/非法一律回退到本地期望值）
     const ans = dec.answers ?? {};
     // jevthoven 铁律：候选集之外的答案一律拒绝（否则真实模型会用标签报出被排除的循环和弦）
-    const chordSymRawRaw = String(ans.chord?.value ?? '');
-    const picked = cands.find((c) => c.sym === chordSymRawRaw || c.label === chordSymRawRaw);
+    const modelChordAnswer = String(ans.chord?.value ?? '');
+    const picked = cands.find((c) => c.sym === modelChordAnswer || c.label === modelChordAnswer);
     // 模型声明的功能（非法作答则取转移权重最高的那个功能）
     const fnAnswer = String(ans.function?.value ?? '');
     const declaredFn = fnCands[fnAnswer] ? fnAnswer : (Object.entries(fnCands).sort((a, b) => b[1].w - a[1].w)[0]?.[0] ?? 'T');
