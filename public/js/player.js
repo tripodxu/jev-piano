@@ -7,6 +7,10 @@ export const LOOKAHEAD = 0.15;  // 秒：提前交给 AudioContext 精确排程�
 export const TICK_MS = 30;
 export const AHEAD_BARS = 2;    // 决策管线深度
 
+/** records 上限（轮次 64，审计 D1）：连续即兴数小时会累积十几万条记录对象（~20MB+），
+ *  超限丢最旧——MIDI 导出覆盖最近的演奏，比把标签页拖到 OOM 更重要。 */
+export const RECORDS_CAP = 20000;
+
 /* 决策预算（轮次 48）：决策时间必须由音频时钟封顶，否则「播放永不中断」只是一句愿望。
  * 缓冲只有 AHEAD_BARS=2 小节，而单次真实请求最坏 ~17s（attempts=2 × 8s）——渠道只要慢于
  * 一小节，缓冲就会被抽干，用户听到的就是「只能弹两小节」。 */
@@ -122,6 +126,7 @@ export class Player {
       const ev = this.queue.shift();
       try { this.audio?.play?.(ev.midi, ev.t, ev.dur, ev.vel); } catch (e) { console.error('[jev] audio.play 异常（跳过该音）', e); }
       this.records.push({ midi: ev.midi, startBeats: ev.beat, durBeats: ev.dur / this.secPerBeat, vel: ev.vel, hand: ev.hand });
+      if (this.records.length > RECORDS_CAP) this.records.splice(0, this.records.length - RECORDS_CAP);
       try { this.onNoteCb(ev); } catch (e) { console.error('[jev] onNote 展示层异常（已跳过）', e); }
     }
     // 3) 决策管线：保持提前 AHEAD_BARS 个小节

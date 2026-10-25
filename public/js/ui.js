@@ -311,6 +311,8 @@ export function addDecision(ul, bar) {
   const guards = decisionGuards(d)
     .map((g) => `<span class="guard${g.cls ? ' ' + g.cls : ''}" title="${escapeHtml(g.title)}">${escapeHtml(g.label)}</span>`)
     .join('');
+  // 概率条：真渠道返回分布时展示「模型在什么之间犹豫」；离线随机渠道没有分布，整行不输出
+  const strip = probabilityStrip(d.answers?.chord?.probabilities, d.answers?.chord?.value);
   li.innerHTML =
     `<span class="log-no">${bar.index + 1}<small>${bar.label}</small></span>` +
     `<span class="log-chord">${escapeHtml(bar.chord.symbol)}</span>` +
@@ -325,10 +327,8 @@ export function addDecision(ul, bar) {
     `${d.breathe ? '<span class="q">呼吸</span>' : ''}` +
     `${guards}` +
     `</span>` +
-    `<span class="log-stats">${stats}</span>`;
-  // 概率条：真渠道返回分布时展示「模型在什么之间犹豫」；离线随机渠道没有分布，整行不输出
-  const strip = probabilityStrip(d.answers?.chord?.probabilities, d.answers?.chord?.value);
-  li.innerHTML = li.innerHTML + (strip ? `<div class="prob-strip">${strip}</div>` : ''); // 靠 li 的 flex-wrap 换行
+    `<span class="log-stats">${stats}</span>` +
+    (strip ? `<div class="prob-strip">${strip}</div>` : ''); // 单次赋值；靠 li 的 flex-wrap 换行
   ul.prepend(li);
   ul.scrollTop = 0; // 最新一条始终在顶部可见（抵消浏览器滚动锚定）
   while (ul.children.length > 60) ul.lastChild.remove();

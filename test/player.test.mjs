@@ -1,7 +1,7 @@
 // player.test.mjs — 假时钟下的调度顺序、管线深度、停止、记录
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Player, AHEAD_BARS } from '../public/js/player.js';
+import { Player, AHEAD_BARS, RECORDS_CAP } from '../public/js/player.js';
 import { buildPlan, Composer } from '../public/js/composer.js';
 
 function makeHarness() {
@@ -203,4 +203,14 @@ test('迟到小节顺延到现在：不把音符排进过去（Web Audio 对过�
   p._enqueueBar({ index: 1, notes: [] });
   const m1 = p.barMarks.at(-1);
   assert.ok(Math.abs(m1.t - (mark.t + barLen)) < 1e-9, '后续小节从新锚点继续，节奏不断');
+});
+
+test('records 上限：超限丢最旧（连续即兴数小时的内存护栏，轮次 64）', async () => {
+  const h = await makeHarness();
+  const p = await makePlayer(h);
+  p.records = Array.from({ length: RECORDS_CAP }, (_, i) => ({ midi: 60, startBeats: i, durBeats: 1, vel: 0.5, hand: 'R' }));
+  p.start();
+  await h.advance(1.5);
+  assert.ok(p.records.length <= RECORDS_CAP, `records 应封顶在 ${RECORDS_CAP}，实际 ${p.records.length}`);
+  p.stop();
 });

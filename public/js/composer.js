@@ -57,6 +57,11 @@ const MODES = ['major', 'minor', 'dorian', 'mixolydian', 'pentatonic'];
 export const INTENSITY_DEV = 0.5;
 export const INTENSITY_SLEW = 1.0;
 
+/** 软层指纹记忆上限（轮次 64，审计 D1）：软层只防「远处复读」，但数小时连续即兴下
+ *  Set 无限增长（每小节 2 条 × 35 小节/分钟）——超限后保留最近一半，最旧的复读记忆
+ *  先忘（连续即兴里几十分钟前的字面重复已不在听觉记忆里，忘掉无伤）。 */
+export const SIG_MEMORY_CAP = 2000;
+
 /** 目标（goal）对计划参数的偏置 */
 export const GOAL_HINTS = {
   '放松助眠': { arc: 'flat', density: -0.15, brightness: -0.15 },
@@ -458,12 +463,13 @@ export class Composer {
       : pos.isPhraseEnd ? (ns) => snapLastToChord(ns, chord) : (ns) => ns;
     rh = post(rh);
     if (this.lastSigs.includes(sigOf(rh)) || this.allSigs.has(sigOf(rh))) {
-      rh = mutateMelody(rh, { scale, rng: this.rng, avoid: [...this.lastSigs, ...this.allSigs], post });
+      rh = mutateMelody(rh, { scale, rng: this.rng, avoid: this.lastSigs, softSet: this.allSigs, post });
     }
     this.lastSigs = [sigOf(rh), ...this.lastSigs].slice(0, 2);
     // 软层的诚实账本（轮次 27）：变形后仍与全曲某小节字面相同 → 归因字段如实标记（UI 显示「复读」）
     const farRepeat = this.allSigs.has(sigOf(rh));
     this.allSigs.add(sigOf(rh));
+    if (this.allSigs.size > SIG_MEMORY_CAP) this.allSigs = new Set([...this.allSigs].slice(-SIG_MEMORY_CAP / 2));
 
     // 记录本小节旋律素材（供下一小节模进/倒影）
     this.prevMelody = {
@@ -500,6 +506,7 @@ export class Composer {
     this.lastLhSigs = [sigOf(lhNotes), ...this.lastLhSigs].slice(0, 2);
     const lhFarRepeat = this.allLhSigs.has(sigOf(lhNotes));
     this.allLhSigs.add(sigOf(lhNotes));
+    if (this.allLhSigs.size > SIG_MEMORY_CAP) this.allLhSigs = new Set([...this.allLhSigs].slice(-SIG_MEMORY_CAP / 2));
 
     const notes = [...lhNotes, ...rh];
     this.lastEndMidi = rh.length ? rh.at(-1).midi : this.lastEndMidi;

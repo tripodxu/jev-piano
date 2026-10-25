@@ -27,12 +27,13 @@ import {
 export function createRollView(deps) {
   let tensionCache = null;
   let nctCache = null;
+  let fitCache = null; // 契合度带（轮次 64）：第三份分析缓存——对每小节 filter 全部音符是 O(bars×notes)，hover 触发的重绘不该反复付
   // 卷帘 hover（轮次 34）：光标所在小节的读数（编辑主战场的逐小节检视，与实时界面的张力带 hover 同源）
   let hoverBar = null;
   let hoverNote = null; // 悬停的具体音符（轮次 57）：读出它在所在小节和弦里的角色，null = 空白处
 
-  /** 张力与非和声音两份缓存随音符编辑作废（密度/音域/和声贴合分量都会变） */
-  function invalidate() { tensionCache = null; nctCache = null; }
+  /** 张力/非和声音/契合度三份缓存随音符编辑作废（密度/音域/和声贴合分量都会变） */
+  function invalidate() { tensionCache = null; nctCache = null; fitCache = null; }
 
   function tensionOf(piece) {
     if (!piece) return [];
@@ -190,15 +191,20 @@ export function createRollView(deps) {
     }
 
     // 4) 契合度带：每小节一根竖条，高度 = 和弦音占比。越高越「在调上」。
+    //    逐小节 fit 要 filter 全部音符（O(bars×notes)），hover 触发的重绘不该反复付——缓存（轮次 64）
     const fitTop = H_TENSION + H_FN + H_CHORD;
+    if (!fitCache) {
+      fitCache = piece.barChords.map((bc, i) => {
+        const mel = piece.notes.filter((n) => n.hand === 'R' && Math.floor(n.startBeats / meter) === i);
+        return mel.length ? barHarmonyFit({ chord: { rootPc: bc.rootPc, shape: bc.shape }, notes: mel }).fit : 1;
+      });
+    }
     for (let i = 0; i < piece.barChords.length; i++) {
       const bc = piece.barChords[i];
-      const meter2 = meter;
-      const mel = piece.notes.filter((n) => n.hand === 'R' && Math.floor(n.startBeats / meter2) === i);
-      const fit = mel.length ? barHarmonyFit({ chord: { rootPc: bc.rootPc, shape: bc.shape }, notes: mel }).fit : 1;
+      const fit = fitCache[i];
       const h = Math.max(1, fit * H_FIT);
       g.fillStyle = `rgba(216,171,92,${0.18 + fit * 0.5})`;
-      g.fillRect(bc.startBeat * ZOOM, fitTop + (H_FIT - h), Math.max(1, meter2 * ZOOM - 1), h);
+      g.fillRect(bc.startBeat * ZOOM, fitTop + (H_FIT - h), Math.max(1, meter * ZOOM - 1), h);
     }
     g.save();
     g.font = '8px "Cascadia Mono", Consolas, monospace';

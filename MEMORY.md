@@ -5,6 +5,13 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-25 · 性能轮 64：契合度缓存 + 护栏免展平 + 长会话上限（审计 P1/P2/D1/P3）
+
+- **做了什么**（领地 studio-roll/render/composer/player/ui + 三份测试）：① **P1** 卷帘第三份分析缓存 `fitCache`（逐小节 fit 是 O(bars×notes)，hover 重绘不再反复付，随 `invalidate()` 作废）；② **P2** `mutateMelody` 加 `softSet` 参数——软层指纹直接传 Set 查 `.has`，不再每次撞车展平成数组（长会话数千条的白付 O(N)）；③ **D1** `SIG_MEMORY_CAP=2000`（软层指纹保最近一半）+ `RECORDS_CAP=20000`（records 丢最旧）；④ **P3** addDecision 单次 innerHTML。详见 [docs/memory/2026-10-25-perf-round64.md](docs/memory/2026-10-25-perf-round64.md)。
+- **验证**：npm test **223→226 全绿**；**gate 均值逐位一致**（上限在 32 小节不触发、softSet 与展平等价——数字即证明）。
+- **坑**：浮点 alpha 别写死（`0.18+0.5=0.6799999…`，断言用 `0.6` 前缀）；假 ctx 记录历史累计，二次 draw 断言要 `slice(mark)`。
+- **审计收尾账**：高/中优先项全部修完（62 修复轮 / 63 安全轮已部署 `b573ed74`；64 的前端优化在磁盘，下次部署生效，无行为变化无需单独部署）。有意不修项与理由已逐条记录在当日 memory（S2/S3/D3/D7）。
+
 ## [完成] 2026-10-25 · 安全轮 63：Worker 计费端点同源防护（审计 S1 · 已部署 b573ed74）
 
 - **做了什么**（领地 worker.js/worker.test/verify-deploy + 文档）：`checkSameOrigin(headers, host)` 三道闸——**Content-Type 强制 application/json**（掐掉 text/plain 简单请求这个盲 CSRF 载体，违者 415）、**Sec-Fetch-Site** 非 same-origin/same-site/none 拒（403）、无它时回退 **Origin/Referer 主机核对**；curl/脚本不带元数据头放行。详见 [docs/memory/2026-10-25-security-round63.md](docs/memory/2026-10-25-security-round63.md)。

@@ -7,9 +7,9 @@ import assert from 'node:assert/strict';
 import { createRollView } from '../public/js/studio-roll.js';
 import { ZOOM, HEADER, P_HI, ROW } from '../public/js/studio-core.js';
 
-/** 假 2D 上下文：任何方法 no-op；fillText 单独记录文本——用来证明"该画的确实画了"。 */
+/** 假 2D 上下文：任何方法 no-op；fillText 记文本、fillStyle 记颜色——文本证明"画没画"，颜色证明"画的值对不对"（契合度带 alpha 随 fit 变）。 */
 function fakeCtx() {
-  const calls = { fillText: [] };
+  const calls = { fillText: [], fillStyle: [] };
   const target = {};
   return new Proxy(target, {
     get(t, k) {
@@ -17,7 +17,7 @@ function fakeCtx() {
       if (k in t) return t[k];
       return (...a) => { if (k === 'fillText') calls.fillText.push(String(a[0])); };
     },
-    set(t, k, v) { t[k] = v; return true; },
+    set(t, k, v) { t[k] = v; if (k === 'fillStyle') calls.fillStyle.push(String(v)); return true; },
   });
 }
 
@@ -28,6 +28,7 @@ function fakeCanvas() {
   return {
     ctx, style: {}, width: 0, height: 0,
     texts: () => ctx.__calls.fillText,
+    styles: () => ctx.__calls.fillStyle,
     getContext: () => ctx,
     addEventListener(type, fn) { if (!listeners.has(type)) listeners.set(type, []); listeners.get(type).push(fn); },
     dispatch(type, ev) { for (const fn of listeners.get(type) ?? []) fn(ev); },
@@ -175,5 +176,26 @@ test('hover 到具体音符：读出它在所在小节和弦里的角色（轮�
     roll.dispatch('pointermove', { clientX: 0.5 * ZOOM, clientY: HEADER + (P_HI - 74) * ROW });
     const miss = lastLine();
     assert.ok(miss && !miss.includes('悬停'), `空白处不应有音符读数，实际 ${miss}`);
+  });
+});
+
+test('契合度带缓存：音符编辑 + invalidate 后带的颜色更新（缓存不吐旧值，轮次 64）', () => {
+  withWindow(() => {
+    const piece = mkPiece();
+    // bar0 旋律 = C5（Cm 根音，和弦音）+ C#5（外音）→ 契合度 50% → 带 alpha 0.18+0.25=0.43
+    piece.notes.push({ id: 9, midi: 73, startBeats: 2, durBeats: 1, vel: 0.6, hand: 'R' });
+    const { view, roll } = mkView(piece);
+    view.draw();
+    assert.ok(roll.styles().some((s) => /rgba\(216,171,92,0\.43/.test(s)), `50% 契合度的带色应在场，实际 ${roll.styles().filter((s) => s.includes('216,171,92')).join(' | ')}`);
+    // 外音改成和弦音（C5）→ 100% → alpha 0.68；invalidate 后缓存必须作废重算。
+    // 假 ctx 记录的是历史累计——第二次 draw 的断言只看增量（slice(mark) 之后的新记录）
+    const mark = roll.styles().length;
+    piece.notes.find((n) => n.id === 9).midi = 72;
+    view.invalidate();
+    view.draw();
+    const fresh = roll.styles().slice(mark);
+    assert.ok(!fresh.some((s) => /rgba\(216,171,92,0\.43/.test(s)), `编辑+作废后不应再画 50% 的带色（缓存未失效会吐旧值），实际 ${fresh.filter((s) => s.includes('216,171,92')).join(' | ')}`);
+    // 100% 契合度 → alpha = 0.18+0.5 = 0.679999…（0.18 非精确浮点）——断言用 0.6 前缀，别写死 0.68
+    assert.ok(fresh.some((s) => /rgba\(216,171,92,0\.6/.test(s)), '100% 契合度的带色应在场');
   });
 });

@@ -61,17 +61,17 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 |---|---|---|---|
 | `music.js` | 386 | 罗马数字解析、和弦声位、音阶、9 种曲风预设（含蓝调，轮次 58）、关键词计划、**和声功能分类 + 调式全色板**（`functionOf`/`functionOfPc`/`modePalette`）、**和声拼写约定**（`PREFERRED_NAME`）、**和弦角色**（`chordRole`：和弦音按位置（根/三/五/七/九音）、外音按音程——轮次 55 跟弹回声的内核） | `STYLES` 完整性被 `theory.test.mjs` 全量断言，改预设必跑测试；`PALETTE_QUALITY` 决定色板的"质"，改它等于改全项目词汇；`PREFERRED_NAME` 是和弦显示的唯一真相源——**但 `midiName` 必须保持升号**（它标的是琴键的物理键名，钢琴上没有 Ab 键） |
 | `candidates.js` | 357 | **候选集构造**（= 给模型的可选域）+ **曲式**：两条断路器、声部进行加权、功能转移矩阵、`FORM_TEMPLATES`/`deriveSections`/`sectionAt`/段落感知 `intensityTarget`/`planTargetSeries`、速度弧线 `tempoMultAt`、**`developCandidates`（段落首偏承袭）** | 兜底判据是「候选够用 ≥3」不是「非空」；`W_SMOOTH` 锁在 0.5；断路器取舍先放疲劳、留锁死；**`rise` 曲式的 Coda level 必须高于 A**；**段落首 `repeat += 1.6` / `new *= 0.3` 是锁值**（改了 A→A' 的再现关系就没了） |
-| `render.js` | 398 | **渲染内核**：旋律渲染（轮廓/锚定/摇摆/人味）、左手 11 种织体（block/ballad 带声部抽稀变体）、动机发展四手法、反重复护栏（指纹/变形）；全部纯函数（rng 注入），只依赖 `music.js` |
+| `render.js` | 403 | **渲染内核**：旋律渲染（轮廓/锚定/摇摆/人味）、左手 11 种织体（block/ballad 带声部抽稀变体）、动机发展四手法、反重复护栏（指纹/变形）；全部纯函数（rng 注入），只依赖 `music.js` |
 | `jev.js` | 229 | 四渠道客户端（fixture/typesafe/openrouter/proxy）、归一化、429/529 退避重试、fixture 采样、LLM 扩写（**系统二：可选的 sections 字段 = 曲式规划**） | `stripPrivate`：发送前剥离 `_` 前缀字段；**提示词的曲风/调式清单从 STYLES 派生，禁止字面量**（轮次 62 前字面量漏了 blues，LLM 扩写永远选不了蓝调）；`expandPlan` 有默认 12s 超时（挂住的端点不再楔死 buildPlan） |
-| `composer.js` | 544 | **决策器**：`buildPlan`（**曲式 `sections`**）、`Composer.nextBar()`（八问 + 强度连续化 + 段落边界语义 + 动机调度 + **决策预算**）、动机记忆、决策归因字段；渲染细节在 `render.js` | 候选集与曲式都不在本文件；旋律护栏必须在乐句尾锚定**之后**判定碰撞；`INTENSITY_DEV`/`INTENSITY_SLEW` 锁值；**发展手法的素材来源有分工**：`repeat` 用动机、其余用 `prevMelody`；**「呼吸」是时值指令（`breatheDelay` 延后进入）不是否决指令**——四条变形手法在有呼吸时也必须用上素材，兜底走 `fresh()` 后**归因强制改为 `new`**；左手护栏重试 6 次仍撞车则去掉末音；**实时 `nextBar({budget})` 把决策时间交给音频时钟封顶**——预算先耗尽则该小节 fixture 顶替（`decision.deadlineMiss`），下一小节重试真实渠道；**只有预算耗尽才走 fixture，真实答案先到必须用真实的** |
+| `composer.js` | 551 | **决策器**：`buildPlan`（**曲式 `sections`**）、`Composer.nextBar()`（八问 + 强度连续化 + 段落边界语义 + 动机调度 + **决策预算**）、动机记忆、决策归因字段（软层指纹 `SIG_MEMORY_CAP`=2000 上限，轮次 64——长会话护栏）；渲染细节在 `render.js` | 候选集与曲式都不在本文件；旋律护栏必须在乐句尾锚定**之后**判定碰撞；`INTENSITY_DEV`/`INTENSITY_SLEW` 锁值；**发展手法的素材来源有分工**：`repeat` 用动机、其余用 `prevMelody`；**「呼吸」是时值指令（`breatheDelay` 延后进入）不是否决指令**——四条变形手法在有呼吸时也必须用上素材，兜底走 `fresh()` 后**归因强制改为 `new`**；左手护栏重试 6 次仍撞车则去掉末音；**实时 `nextBar({budget})` 把决策时间交给音频时钟封顶**——预算先耗尽则该小节 fixture 顶替（`decision.deadlineMiss`），下一小节重试真实渠道；**只有预算耗尽才走 fixture，真实答案先到必须用真实的** |
 | `audio.js` | 136 | 合成钢琴（三角波+泛音+包络+低通+生成式混响）、录音 | `envFor` 纯函数有单测；voices 由主振荡器 `onended` 事件驱动清理（不靠 setTimeout） |
-| `player.js` | 181 | lookahead 调度器（提前 2 小节），`now/setIntervalFn` 可注入 | 时钟注入契约被测试锁定；**展示层异常不得炸调度循环**（轮次 47）；**决策预算由本文件的音频时钟给出**（`_decisionBudget`/`_settleBudgets`，只用注入的 `now()`，不起新定时器；暂停/停止时结算掉未兑现预算）；**迟到小节必须顺延到现在**——Web Audio 对排程在过去乐曲是立即发声，整小节会炸成一声；`stop()` 后不得再排程 |
+| `player.js` | 186 | lookahead 调度器（提前 2 小节），`now/setIntervalFn` 可注入 | 时钟注入契约被测试锁定；**展示层异常不得炸调度循环**（轮次 47）；**决策预算由本文件的音频时钟给出**（`_decisionBudget`/`_settleBudgets`，只用注入的 `now()`，不起新定时器；暂停/停止时结算掉未兑现预算）；**迟到小节必须顺延到现在**——Web Audio 对排程在过去乐曲是立即发声，整小节会炸成一声；`stop()` 后不得再排程；`records` 封顶 `RECORDS_CAP`=20000 丢最旧（轮次 64——连续即兴数小时的内存护栏） |
 | `midi.js` | 88 | SMF Type-1 双轨导出 | 字节格式有单测 |
 | `ui.js` | 487 | 界面原语：键盘 DOM（含**和弦键亮起** `mark`/`keyMarks`/`markDiff`，轮次 57：diff 更新只动变化的键）、**和声功能轨** + 段落标注、决策日志（`addDecision`/`decisionGuards`）、**图例**（`LEGEND_ITEMS`/`renderLegend`）、**计费台账**（`emptyLedger`/`accumulateLedger`/`ledgerPills`/`CHANNEL_LABEL`）、**键盘试听回声**（`keyEchoText`，轮次 55）、计划卡、toast | 功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；**颜色归功能、形态归手法**；段落/手法标注都必须有文字通道；**`LEGEND_ITEMS` 必须与真实标记同源**（标记改了图例没改，比没图例更糟，有测试守）；**归因标记一律走 `decisionGuards()` 纯函数**（断路/驳回/复读/超预算四类，返回描述符而非 HTML）——加标记必须同时加图例条目与关键词断言；canvas 三件套的能耗契约见 `canvas.js` 行；**台账是 tokens/费用/延迟的唯一口径**，两个界面共用（工作室此前完全不记账）；`setStatus` 同时接受裸数值与已格式化字符串——**格式化只做一遍** |
 | `canvas.js` | 417 | **canvas 可视化三件套**（轮次 52 从 `ui.js` 拆出）：下落音符 `Fall`（含**跟弹用户音符**：紫色 + 近白描边，轮次 56）、张力对照带 `TensionGraph`、动机卡 `MotifCard`，外加它们专用的纯辅助（`motifShape`/`pulseActive`/`sectionLabel`/`chorusView`/`hoverBarAt`/`LOW`·`HIGH`）。**零 import** | **能耗契约**：动画类（`Fall`）用 setInterval 而非 rAF（标签页遮挡时 rAF 会暂停）；**静止类（`TensionGraph`/`MotifCard`）只在数据变化与强调窗口内重绘，`start()` 不得起常驻定时器**；三者尺寸一律由 `ResizeObserver` 缓存，**`draw()` 里禁止读 `clientWidth`**（每帧读 = 每帧强制同步布局），全部有单测守；**`.font` 赋值禁止 CSS 变量**——canvas 不解析 `var()`，赋值被静默忽略（轮次 56 修复三处并加契约测试）；`ui.js` 对它**只做转出**，调用方 import 路径不变（有单测锁同一绑定）；`LOW`/`HIGH` 是键盘与键跨度的共同真相源 |
 | `main.js` | 458 | 实时即兴接线：设置持久化、渠道探测、开始/停止/导出、张力/功能轨/动机卡喂数、**图例抽屉开合与「不再提示」记忆**、**两种兜底的分别告知**、**跟弹回声与乐句末终止式读数**（轮次 55）、**跟弹音符进下落可视化**（轮次 56）、**和弦键亮起**（轮次 57） | 元素 id 契约见 `index.html`；**兜底必须分因**：`deadlineMiss`（渠道跟不上，设计在保节奏）与渠道故障（429/断网/CORS/无 key）是两件事，toast 文案与状态栏后缀都不同（`·跟不上` vs `·兜底`），各自一次性告知、恢复即复位 |
 | `studio.js` | 501 | 工作室界面的**状态与工作流层**（轮次 54 拆出卷帘视图）：批量生成 job、回放（lookahead 调度 + 播放头 + 循环）、撤销/重做/自动保存、量化、Jev 路由的自然语言修改、JSON/MIDI 导入导出、键盘跟弹回声与**和弦键亮起**（`chordCtx`/`syncKeyMarks`，轮次 55/57）；持有 piece/撤销栈/回放/台账等状态，经 deps 闭包喂给卷帘视图（studio-roll.js） | **`drawPlayhead()` 跑在 30Hz 上：必须「先读完布局再写」，写后再读会让浏览器每帧强制一次 reflow；和弦文本只在真的换和弦时才写 DOM**（和弦键亮起挂在同一分支）；张力与 `nonChordIds` 两份缓存的**作废入口**仍是本文件的 `invalidateTension()`（缓存本体住在 studio-roll.js）；**布局常量（`ZOOM`/`ROW`/`VEL_H`/`HEADER` 等）住在 studio-core.js**——轮次 38 拆分时漏了导出，让卷帘整条绘制路径死了 10 轮，见 MEMORY 轮次 49；**生成循环必须逐小节 `accumulateLedger`**——顶栏 pill 与实时界面共用同一份 DOM，不记账用户就看不到一次生成花了多少钱 |
-| `studio-roll.js` | 392 | **工作室钢琴卷帘视图**（轮次 54 从 studio.js 拆出）：卷帘与力度轨的绘制、指针交互（移动/缩放/双击删音/拖力度）、hover 逐小节读数（含乐句末终止式（轮次 55）与**悬停音符角色**（轮次 57））、时间轴头部（张力面积/功能带/段落界/契合度带）、张力与非和声音两份分析缓存。**只画不决策**：piece 单一真相源在 studio.js，经 `createRollView(deps)` 闭包读取 | **与 studio.js 的 deps 契约（`els`/`getPiece`/`playing`/`pushUndo`/`onCommit`/`muted`）——少传一个，那条交互路径就静默失效**（studio-roll.test.mjs 守接线与绘制路径）；**力度轨与卷帘同在 `.rollwrap` 内，播放头 `top:0/bottom:0` 自动覆盖两条轨——不要另建同步**；卷帘头部四段与音符区**共用 `ZOOM`**（常量住在 studio-core.js） |
+| `studio-roll.js` | 398 | **工作室钢琴卷帘视图**（轮次 54 从 studio.js 拆出）：卷帘与力度轨的绘制、指针交互（移动/缩放/双击删音/拖力度）、hover 逐小节读数（含乐句末终止式（轮次 55）与**悬停音符角色**（轮次 57））、时间轴头部（张力面积/功能带/段落界/契合度带）、张力/非和声音/契合度三份分析缓存（契合度带缓存：轮次 64——逐小节 fit 是 O(bars×notes)，hover 重绘不该反复付）。**只画不决策**：piece 单一真相源在 studio.js，经 `createRollView(deps)` 闭包读取 | **与 studio.js 的 deps 契约（`els`/`getPiece`/`playing`/`pushUndo`/`onCommit`/`muted`）——少传一个，那条交互路径就静默失效**（studio-roll.test.mjs 守接线与绘制路径）；**力度轨与卷帘同在 `.rollwrap` 内，播放头 `top:0/bottom:0` 自动覆盖两条轨——不要另建同步**；卷帘头部四段与音符区**共用 `ZOOM`**（常量住在 studio-core.js） |
 | `settings.js` | 21 | localStorage 设置读写（含 `legendHintOff`：图例提示记不记） | — |
 
 ### 分析层
@@ -91,7 +91,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | 路径 | 职责 |
 |---|---|
 | `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；**同源防护 `checkSameOrigin`（轮次 63）**：Content-Type 强制 application/json + Sec-Fetch-Site/Origin/Referer 核对——掐掉 text/plain 简单请求这个盲 CSRF 载体；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
-| `test/*.test.mjs` | `node --test`，共 223 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
+| `test/*.test.mjs` | `node --test`，共 226 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
 | `scripts/probe-jev.mjs` `scripts/probe-bar.mjs` | 真实 API 冒烟（需 key，计费） |
 | `scripts/verify-deploy.mjs` | **部署后核验**：拉线上的 js/api，断言刚改的代码片段真的在边缘上（`npm test` 只证明磁盘对，不证明线上对）；退出码可接 CI。**每次 `wrangler deploy` 后必跑**。默认打生产自定义域 `https://jevpiano.logicc.top`，可传 URL 参数或 `VEV_BASE` 覆盖。**只对网络异常重试 3 次；HTTP 非 200 与片段缺失立即判失败**——把「可重试的噪声」与「确定性的信号」分开，退出码才有意义 |
 | `scripts/regression-gate.mjs` | **决策指标回归门**（`npm run gate`）：12 种子多样性均值 + 相邻重复硬不变量；门槛单一真相源 `GATE_CONFIG`，CI 每次推送执行 |
@@ -116,7 +116,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 2. 读 MEMORY.md 顶部 3 条 + 任务相关 memory 条目（最新在最上，先看有没有人踩过坑）
 3. 实现：先改/加测试，再改实现（本项目测试驱动传统，见 docs/adr/0004）
 4. 验证关卡（全部通过才算完成）：
-   a. npm test                        全绿（223 个，只增不减）
+   a. npm test                        全绿（226 个，只增不减）
    b. node --check 改动的新 .js        语法
    c. 涉及真实 API 的：scripts/probe-*.mjs 冒烟（可选，计费）
    d. 涉及听感/反重复的：analyze-repetition.mjs 对比指标不退化
@@ -183,7 +183,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 ## 6. 常用命令
 
 ```bash
-npm test                                  # 223 个单测（node --test）
+npm test                                  # 226 个单测（node --test）
 npm run gate                              # 12 种子决策指标回归门（CI 同步执行）
 python dev-proxy.py --port 8000           # 本地开发（或 npm run dev）→ http://127.0.0.1:8000
 node scripts/analyze-repetition.mjs 32 2026 random   # 重复度指标（结论至少 12 种子求均值）

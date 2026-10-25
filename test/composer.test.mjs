@@ -1,7 +1,7 @@
 // composer.test.mjs — 决策器：确定性、音域、终止式、呼吸、buildPlan、fixture 兜底
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPlan, Composer } from '../public/js/composer.js';
+import { buildPlan, Composer, SIG_MEMORY_CAP } from '../public/js/composer.js';
 import { chordPcs, STYLE_BY_ID, STYLES } from '../public/js/music.js';
 
 async function makeComposer(overrides = {}, cfg = { channel: 'fixture' }) {
@@ -637,4 +637,13 @@ test('渠道挂住（fetch 永不返回）：预算内切 fixture，管线不楔
   // 管线必须还能继续：下一小节照样出声（楔死 = 线上「只能弹两小节」的终局）
   const bar2 = await composer.nextBar({ budget: new Promise(() => {}) });
   assert.equal(bar2.index, 1, '超预算之后管线必须继续推进');
+});
+
+test('软层指纹上限：超限保留最近一半（长会话内存护栏，轮次 64）', async () => {
+  const { composer: c } = await makeComposer();
+  c.allSigs = new Set(Array.from({ length: SIG_MEMORY_CAP + 50 }, (_, i) => `mel${i}`));
+  c.allLhSigs = new Set(Array.from({ length: SIG_MEMORY_CAP + 50 }, (_, i) => `lh${i}`));
+  await c.nextBar();
+  assert.ok(c.allSigs.size <= SIG_MEMORY_CAP / 2 + 2, `旋律指纹应裁到最近一半，实际 ${c.allSigs.size}`);
+  assert.ok(c.allLhSigs.size <= SIG_MEMORY_CAP / 2 + 2, `左手指纹应裁到最近一半，实际 ${c.allLhSigs.size}`);
 });

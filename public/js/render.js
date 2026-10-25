@@ -98,9 +98,14 @@ function compressRhythm(notes, k) {
 /** 反重复护栏：与最近两小节指纹撞车时，依次尝试整句上移/下移/加装饰/倒影/节奏压缩/音高扫掠，
  *  直到避开全部已存指纹。**任何情况下都不得原样返回撞车的旋律**——那会让"绝不逐字重复"变成谎话。
  *  post：候选的最终形态改写（乐句尾的末端锚定）。护栏必须在 post 之后的形态上判定，
- *  否则会出现"逃出去了又被锚定改回撞车"——比对的是未锚定 vs 已锚定两种形态，语义不一致。 */
-export function mutateMelody(rh, { scale, rng, avoid = [], post = (x) => x }) {
-  const blocked = (cand) => avoid.some((s) => s === sigOf(cand));
+ *  否则会出现"逃出去了又被锚定改回撞车"——比对的是未锚定 vs 已锚定两种形态，语义不一致。
+ *  avoid = 硬层指纹数组（最近 2 条）；softSet = 软层指纹 Set（全曲，轮次 64 起直接传 Set 不再展平——
+ *  长会话下 Set 数千条，每次撞车都 [...spread] 成数组是白付的 O(N)）。 */
+export function mutateMelody(rh, { scale, rng, avoid = [], softSet = null, post = (x) => x }) {
+  const blocked = (cand) => {
+    const s = sigOf(cand);
+    return avoid.includes(s) || (softSet != null && softSet.has(s));
+  };
   // 试一个候选：先做最终形态改写，再判定；不撞车就把改写后的结果交出去
   const attempt = (make) => {
     const fin = post(make(rh));
