@@ -698,3 +698,30 @@ input[type="range"] { flex: 1; accent-color: var(--brass); height: 4px; cursor: 
 .khint { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
   font: 600 9px/1 var(--mono, monospace); color: rgba(60, 48, 30, 0.45); pointer-events: none; user-select: none; }
 .bk .khint { color: rgba(240, 235, 220, 0.55); bottom: 4px; }
+
+/* ---------- 空态观感（轮次 66）：黑块不死黑，空态有节目单式引导 ---------- */
+/* 舞台地板反光：底缘一抹极淡的暖光，让下落区像有聚光灯打在地面上 */
+.stage { background:
+  radial-gradient(90% 120% at 50% 0%, rgba(216, 171, 92, 0.1), transparent 55%),
+  radial-gradient(70% 42% at 50% 103%, rgba(216, 171, 92, 0.06), transparent 70%),
+  linear-gradient(180deg, #0e0b09, #080605); }
+/* 空态覆盖层：serif 斜体的节目单排版；开演时 .stage.idle 被移除，整层消失 */
+.stage-idle {
+  position: absolute; left: 0; right: 0; top: 47%; transform: translateY(-50%);
+  text-align: center; pointer-events: none; z-index: 0;
+  opacity: 0; transition: opacity .5s ease;
+}
+.stage.idle .stage-idle { opacity: 1; }
+.stage-idle::before {
+  content: ""; display: block; width: 46px; height: 1px; margin: 0 auto 18px;
+  background: linear-gradient(90deg, transparent, var(--brass), transparent);
+}
+.si-title {
+  margin: 0 0 10px; font-family: var(--serif); font-style: italic; font-weight: 600;
+  font-size: 24px; letter-spacing: 0.12em; color: rgba(240, 205, 138, 0.62);
+  text-shadow: 0 0 30px rgba(216, 171, 92, 0.12);
+}
+.si-sub { margin: 0; font-size: 12.5px; line-height: 2.1; letter-spacing: 0.14em; color: rgba(179, 168, 146, 0.7); }
+/* 键位字母（轮次 65）对比度提升：白键 0.45→0.62、黑键 0.55→0.72 */
+.khint { color: rgba(52, 40, 24, 0.62); }
+.bk .khint { color: rgba(240, 235, 220, 0.72); }

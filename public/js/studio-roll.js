@@ -55,7 +55,9 @@ export function createRollView(deps) {
     const piece = deps.getPiece();
     const dpr = window.devicePixelRatio || 1;
     const beats = piece ? piece.totalBars * piece.plan.meterNum : 32;
-    const W = Math.max(720, beats * ZOOM + 4);
+    // 空态宽度铺满容器（轮次 66），与 drawRoll 同理——无 piece 时本函数只在初始化跑
+    const idleW = !piece && canvas.parentElement ? canvas.parentElement.clientWidth : 0;
+    const W = Math.max(720, beats * ZOOM + 4, idleW);
     canvas.style.width = `${W}px`;
     canvas.style.height = `${VEL_H}px`;
     canvas.width = Math.round(W * dpr);
@@ -221,7 +223,10 @@ export function createRollView(deps) {
     const piece = deps.getPiece();
     const dpr = window.devicePixelRatio || 1;
     const beats = piece ? piece.totalBars * piece.plan.meterNum : 32;
-    const W = Math.max(720, beats * ZOOM + 4);
+    // 空态宽度铺满容器（轮次 66）：固定 772px 会在宽容器右缘露出底色断层。
+    // 空态本函数只被 ensureStudio 调一次（无 piece 时指针交互全部早退），读一次布局无碍。
+    const idleW = !piece && deps.els.roll.parentElement ? deps.els.roll.parentElement.clientWidth : 0;
+    const W = Math.max(720, beats * ZOOM + 4, idleW);
     const H = HEADER + (P_HI - P_LO + 1) * ROW;
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
@@ -306,10 +311,16 @@ export function createRollView(deps) {
         g.fill(); g.stroke();
       }
     } else {
-      g.font = '14px "PingFang SC", "Microsoft YaHei", sans-serif';
-      g.fillStyle = 'rgba(139,129,104,0.8)';
-      g.fillText('点左侧「生成编曲」——每一小节仍由 Jev 逐小节决策。', 24, H / 2 - 16);
-      g.fillText('生成后这里会出现可编辑的整曲：可量化、拖力度、导出 MIDI。', 24, H / 2 + 2);
+      // 空态排版（轮次 66）：节目单式居中引导，而不是左上角的两行小字
+      g.textAlign = 'center';
+      g.font = 'italic 600 20px Georgia, serif';
+      g.fillStyle = 'rgba(240,205,138,0.6)';
+      g.fillText('工作台是空的', W / 2, H / 2 - 14);
+      g.font = '13px "PingFang SC", "Microsoft YaHei", sans-serif';
+      g.fillStyle = 'rgba(154,144,120,0.75)';
+      g.fillText('点左侧「生成编曲」——每一小节仍由 Jev 逐小节决策', W / 2, H / 2 + 16);
+      g.fillText('生成后可编辑整曲：拖动、量化、改力度、导出 MIDI', W / 2, H / 2 + 38);
+      g.textAlign = 'left';
     }
   }
 

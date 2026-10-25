@@ -199,3 +199,21 @@ test('契合度带缓存：音符编辑 + invalidate 后带的颜色更新（缓
     assert.ok(fresh.some((s) => /rgba\(216,171,92,0\.6/.test(s)), '100% 契合度的带色应在场');
   });
 });
+
+test('卷帘空态：宽度铺满容器（不露断层）、节目单式居中文案（轮次 66）', () => {
+  withWindow(() => {
+    const empty = mkView(null);
+    // fake canvas 挂一个 1200px 宽的容器：空态画布应铺满它而不是固定 772px
+    empty.roll.parentElement = { clientWidth: 1200 };
+    empty.view.draw();
+    assert.ok(empty.roll.width >= 1200, `空态宽度应铺满容器，实际 ${empty.roll.width}`);
+    const texts = empty.roll.texts();
+    assert.ok(texts.some((t) => t.includes('工作台是空的')), `应有标题文案，实际 ${JSON.stringify(texts)}`);
+    assert.ok(texts.some((t) => t.includes('生成编曲')), '引导文案保留「生成编曲」关键词');
+    // 有曲时空态文案消失、宽度回到拍数×ZOOM
+    const piece = mkPiece();
+    const filled = mkView(piece);
+    filled.view.draw();
+    assert.ok(!filled.roll.texts().some((t) => t.includes('工作台是空的')));
+  });
+});

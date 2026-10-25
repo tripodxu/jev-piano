@@ -25,7 +25,7 @@ const els = {
   fallCanvas: $('fallCanvas'), keyboard: $('keyboard'), kbEcho: $('kbEcho'), decisionLog: $('decisionLog'),
   fnRibbon: $('fnRibbon'), logEmpty: $('logEmpty'),
   tensionCanvas: $('tensionCanvas'), tensionStat: $('tensionStat'),
-  motifCanvas: $('motifCanvas'), repStat: $('repStat'), stageWarm: $('stageWarm'), stageCool: $('stageCool'),
+  motifCanvas: $('motifCanvas'), repStat: $('repStat'), stageWarm: $('stageWarm'), stageCool: $('stageCool'), stage: $('stage'),
   stChannel: $('stChannel'), stTokens: $('stTokens'), stCost: $('stCost'), stLatency: $('stLatency'),
   settingsBtn: $('settingsBtn'), settingsDrawer: $('settingsDrawer'), settingsClose: $('settingsClose'),
   legendBtn: $('legendBtn'), legendDrawer: $('legendDrawer'), legendClose: $('legendClose'),
@@ -208,6 +208,7 @@ async function start() {
     return;
   }
   audio.setVolume(0.9);
+  els.stage.classList.remove('idle'); // 开演：摘掉空态覆盖层（轮次 66）
   els.decisionLog.innerHTML = '';
   els.fnRibbon.innerHTML = '';
   els.logEmpty.classList.remove('hidden');
@@ -359,6 +360,7 @@ function stopAll() {
   motifCard.stop();
   kb.clear();
   kb.mark(null); // 和弦键熄灭（轮次 57）：演奏结束，键盘回到无和声上下文的常态
+  els.stage.classList.add('idle'); // 回到空态：节目单式引导重新出现（轮次 66）
   if (recording) { recording.stop().then((blob) => download(blob, `${plan?.title ?? 'jev-piano'}.webm`)); recording = null; els.recBtn.textContent = '● 录音'; }
   setButtons(false); // player 保留引用：已演奏的 records 仍可导出 MIDI
 }

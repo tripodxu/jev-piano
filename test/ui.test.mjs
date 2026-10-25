@@ -424,7 +424,7 @@ test('setStatus 必须能吃下 ledgerPills 的输出（一次集成断言，防
 
 /** 假 2D 上下文：任何方法都是 no-op；clearRect 单独计数，用来证明"该画的时候确实画了"。 */
 function fakeCtx() {
-  const calls = { clearRect: 0 };
+  const calls = { clearRect: 0, fillText: 0 };
   const target = {};
   return new Proxy(target, {
     get(t, k) {
@@ -631,4 +631,17 @@ test('markDiff: 只动变化的键——add/remove 互斥，不变时零写入',
   assert.deepEqual([...remove].sort((a, b) => a - b), [36]);
   assert.deepEqual(markDiff(prev, prev), { add: [], remove: [] }, '和弦没换就不碰 DOM');
   assert.deepEqual(markDiff(new Set(), new Set([1, 2])).add.sort((a, b) => a - b), [1, 2], '从熄灭到点亮');
+});
+
+/* ---------------- 空态观感（轮次 66） ---------------- */
+
+test('TensionGraph 空态整块留白：不画刻度残影（0.0/0.5/1.0 像渲染失败）', () => {
+  withDom(() => {
+    const { canvas, ctx } = fakeCanvas();
+    const tg = new TensionGraph(canvas);
+    tg.draw();
+    assert.equal(ctx.__calls.fillText, 0, '空态一个字都不该画');
+    tg.push(0.5);
+    assert.ok(ctx.__calls.fillText > 0, '有数据后刻度恢复');
+  });
 });

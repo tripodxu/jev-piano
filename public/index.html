@@ -143,11 +143,16 @@
     </section>
 
     <section class="right-col">
-      <div class="stage reveal" style="--d:.15s">
+      <div class="stage reveal idle" id="stage" style="--d:.15s">
         <!-- 舞台灯光（轮次 31）：随张力呼吸的纯氛围层。轮次 49 补上这两个元素——
              此前 CSS 与 main.js 都已就位，唯独 DOM 缺席，导致 onBar 每小节抛异常。 -->
         <div class="stage-light warm" id="stageWarm" aria-hidden="true"></div>
         <div class="stage-light cool" id="stageCool" aria-hidden="true"></div>
+        <!-- 空态覆盖层（轮次 66）：下落区中央的节目单式引导，开演时由 main.js 摘掉 -->
+        <div class="stage-idle" aria-hidden="true">
+          <p class="si-title">今夜的节目尚未开始</p>
+          <p class="si-sub">写下一句灵感 · 按下「开始演奏」<br>每一小节都由 Jev 现场决策，逐小节长出整首曲子</p>
+        </div>
         <div class="chordbox">
           <div class="now-chord" id="nowChord">—</div>
           <div class="now-bar" id="nowBar" aria-live="polite">准备就绪</div>

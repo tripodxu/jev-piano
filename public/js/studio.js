@@ -140,6 +140,9 @@ export function ensureStudio() {
     const saved = validatePiece(JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null'));
     if (saved) { setPiece(saved); toastify('已恢复上次的工作台'); }
   } catch { /* ignore */ }
+  // 无存档也要画空态（轮次 66）：不画则两块 canvas 停在默认 300×150 透明尺寸——
+  // 力度轨的 CSS 底色在容器上显出一块突兀的浅斑，看起来像渲染失败
+  if (!piece) { drawRoll(); drawVelLane(); }
   updateButtons();
 }
 

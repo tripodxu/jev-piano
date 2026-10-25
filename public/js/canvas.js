@@ -188,6 +188,8 @@ export class TensionGraph {
     const W = this.w, H = this.h;
     if (!W || !H) return;
     g.clearRect(0, 0, W, H);
+    // 空态（轮次 66）：没有实际/计划数据时整块留白——只有刻度的残影看起来像渲染失败
+    if (!this.actual.length && !this.target.length) return;
     const padL = 26, padR = 6, padT = 6, padB = 12;
     const iw = Math.max(1, W - padL - padR), ih = Math.max(1, H - padT - padB);
     const yOf = (v) => padT + (1 - Math.min(1, Math.max(0, v))) * ih;
