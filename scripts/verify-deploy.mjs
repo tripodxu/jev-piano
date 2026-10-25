@@ -75,6 +75,19 @@ try {
   if (!r.ok) bad++;
 } catch (e) { console.log(`✗ /api/probe 取不到：${e.message}`); bad++; }
 
+// 轮次 63 的可执行断言：同源防护必须在边缘上活着——text/plain 简单请求（盲 CSRF 载体）必须被拒。
+// 这个检查不花上游的钱（在我们的边缘就被 415 挡下），也是 worker.js 部署内容的核验
+// （worker 源码不是静态资产，CHECKS 拉不到它，行为检查是唯一途径）。
+try {
+  const r = await fetch(BASE + '/api/jev', {
+    method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}',
+    signal: AbortSignal.timeout(20000),
+  });
+  const ok = r.status === 415 || r.status === 403;
+  console.log(`${ok ? '✓' : '✗'} 同源防护：text/plain POST → HTTP ${r.status}（应 415/403，拒绝即证明新 worker 已上线）`);
+  if (!ok) bad++;
+} catch (e) { console.log(`✗ 同源防护检查失败：${e.message}`); bad++; }
+
 if (withApi) {
   try {
     const body = {

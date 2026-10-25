@@ -5,6 +5,14 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-25 · 安全轮 63：Worker 计费端点同源防护（审计 S1 · 已部署 b573ed74）
+
+- **做了什么**（领地 worker.js/worker.test/verify-deploy + 文档）：`checkSameOrigin(headers, host)` 三道闸——**Content-Type 强制 application/json**（掐掉 text/plain 简单请求这个盲 CSRF 载体，违者 415）、**Sec-Fetch-Site** 非 same-origin/same-site/none 拒（403）、无它时回退 **Origin/Referer 主机核对**；curl/脚本不带元数据头放行。详见 [docs/memory/2026-10-25-security-round63.md](docs/memory/2026-10-25-security-round63.md)。
+- **部署与线上验证**：Version `b573ed74`；verify-deploy **新增负向检查**（text/plain→415，同时是新 Worker 上线的行为证明——worker 源码不是静态资产，行为检查是唯一核验途径）；直打三分支 415/502（过闸撞已知上游封锁）/403 全符合预期；**经代理合法形态 200（jev-1.14.0 正常回答）**——合法路径零影响。
+- **取舍**：不校验 Referer 缺失（隐私模式剥 Referer，校验存在性会误伤真实用户）；same-site 放行（主载体是 cross-site）。
+- **验证**：npm test **220→223 全绿**（worker.test +3）；gate 均值不变。
+- **下一步**：轮次 64 性能（契合度缓存/avoid 展平/状态上限/addDecision 单次 innerHTML）。
+
 ## [完成] 2026-10-25 · 审计修复轮 62：LLM 清单漂移 + expandPlan 超时 + 启动恢复 + 导入校验（迭代轮次 62 · 修复）
 
 - **背景**：轮次 61 全量审计（19 文件 ~5000 行，~20 项发现）的第一批修复。详见 [docs/memory/2026-10-25-audit-fix-round62.md](docs/memory/2026-10-25-audit-fix-round62.md)。

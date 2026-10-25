@@ -52,6 +52,32 @@ async function readJson(request) {
   try { return await request.json(); } catch { return null; }
 }
 
+/**
+ * 同源防护（轮次 63，审计 S1）：收窄**盲 CSRF 消耗面**。
+ * 跨站 fetch 用 `Content-Type: text/plain` 发 POST 属"简单请求"——不触发预检，
+ * 任何恶意网页都能借访问者的浏览器静默打这两个计费端点（响应因无 CORS 头不可读，
+ * 但上游调用已发生、部署者的 key 已被烧）。三道闸：
+ *  ① Content-Type 必须 application/json（掐掉简单请求载体）；
+ *  ② Sec-Fetch-Site（现代浏览器全量发送）非 same-origin/same-site/none → 拒；
+ *  ③ 无 Sec-Fetch-Site 时回退 Origin/Referer 主机核对（老浏览器/服务端调用方）。
+ * 返回 null（放行）或 { status, error }。curl/脚本不带这些元数据头 → 放行。
+ */
+export function checkSameOrigin(headers, host) {
+  const get = (k) => (typeof headers.get === 'function' ? headers.get(k) : null);
+  const ct = String(get('content-type') ?? '');
+  if (!/^application\/json\b/i.test(ct)) return { status: 415, error: 'content-type must be application/json' };
+  const sfs = get('sec-fetch-site');
+  if (sfs != null && !['same-origin', 'same-site', 'none'].includes(sfs)) {
+    return { status: 403, error: `cross-site request rejected (${sfs})` };
+  }
+  const sameHost = (raw) => { try { return new URL(raw).host === host; } catch { return false; } };
+  const origin = get('origin');
+  if (origin != null && origin !== '' && !sameHost(origin)) return { status: 403, error: 'cross-origin request rejected' };
+  const referer = get('referer');
+  if (referer != null && referer !== '' && !sameHost(referer)) return { status: 403, error: 'cross-site referer rejected' };
+  return null;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -63,6 +89,12 @@ export default {
     const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
     const limit = Number(env.RATE_LIMIT_PER_MIN ?? 90);
     if (limiter.check(ip, limit)) return json({ error: 'rate limited, retry in a minute' }, 429, { 'Retry-After': '60' });
+
+    // 计费端点的同源防护（轮次 63）：在限流之后、转发之前——最便宜的拒绝路径
+    if (request.method === 'POST' && (url.pathname === '/api/jev' || url.pathname === '/api/llm')) {
+      const deny = checkSameOrigin(request.headers, url.host);
+      if (deny) return json({ error: deny.error }, deny.status);
+    }
 
     if (url.pathname === '/api/jev' && request.method === 'POST') return handleJev(request, env);
     if (url.pathname === '/api/llm' && request.method === 'POST') return handleLlm(request, env);

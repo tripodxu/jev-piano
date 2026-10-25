@@ -90,8 +90,8 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 
 | 路径 | 职责 |
 |---|---|
-| `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
-| `test/*.test.mjs` | `node --test`，共 220 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
+| `src/worker.js` | CF Worker：静态资产 + `/api/probe` `/api/jev` `/api/llm`；Jev 后端链式降级；每 IP 限流；**同源防护 `checkSameOrigin`（轮次 63）**：Content-Type 强制 application/json + Sec-Fetch-Site/Origin/Referer 核对——掐掉 text/plain 简单请求这个盲 CSRF 载体；`/api/llm` 封闭转发（防 SSRF，只认服务端 env） |
+| `test/*.test.mjs` | `node --test`，共 223 个。**纯逻辑可测；浏览器行为靠人工冒烟** |
 | `scripts/probe-jev.mjs` `scripts/probe-bar.mjs` | 真实 API 冒烟（需 key，计费） |
 | `scripts/verify-deploy.mjs` | **部署后核验**：拉线上的 js/api，断言刚改的代码片段真的在边缘上（`npm test` 只证明磁盘对，不证明线上对）；退出码可接 CI。**每次 `wrangler deploy` 后必跑**。默认打生产自定义域 `https://jevpiano.logicc.top`，可传 URL 参数或 `VEV_BASE` 覆盖。**只对网络异常重试 3 次；HTTP 非 200 与片段缺失立即判失败**——把「可重试的噪声」与「确定性的信号」分开，退出码才有意义 |
 | `scripts/regression-gate.mjs` | **决策指标回归门**（`npm run gate`）：12 种子多样性均值 + 相邻重复硬不变量；门槛单一真相源 `GATE_CONFIG`，CI 每次推送执行 |
@@ -116,7 +116,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 2. 读 MEMORY.md 顶部 3 条 + 任务相关 memory 条目（最新在最上，先看有没有人踩过坑）
 3. 实现：先改/加测试，再改实现（本项目测试驱动传统，见 docs/adr/0004）
 4. 验证关卡（全部通过才算完成）：
-   a. npm test                        全绿（220 个，只增不减）
+   a. npm test                        全绿（223 个，只增不减）
    b. node --check 改动的新 .js        语法
    c. 涉及真实 API 的：scripts/probe-*.mjs 冒烟（可选，计费）
    d. 涉及听感/反重复的：analyze-repetition.mjs 对比指标不退化
@@ -183,7 +183,7 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 ## 6. 常用命令
 
 ```bash
-npm test                                  # 220 个单测（node --test）
+npm test                                  # 223 个单测（node --test）
 npm run gate                              # 12 种子决策指标回归门（CI 同步执行）
 python dev-proxy.py --port 8000           # 本地开发（或 npm run dev）→ http://127.0.0.1:8000
 node scripts/analyze-repetition.mjs 32 2026 random   # 重复度指标（结论至少 12 种子求均值）
