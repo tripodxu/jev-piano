@@ -5,6 +5,14 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-25 · 轮次 51–58 上线 + 核验：内容全过，真实渠道上游 451（迭代轮次 59 · 部署）
+
+- **做了什么**：核验清单先同步到轮次 58（6 个新文件/片段）→ `npx wrangler deploy`（Version `bb200a98`，10 资产含 3 个新文件）→ `node scripts/verify-deploy.mjs --no-api` **退出码 0：11/11 文件片段全命中 + probe 200**——边缘上就是轮次 58 的代码。详见 [docs/memory/2026-10-25-deploy-round59.md](docs/memory/2026-10-25-deploy-round59.md)。
+- **发现（已定性，非部署回归）**：`/api/jev` 502 `upstream 451`，复现两次——**上游策略性拒绝**。证据链：TYPESAFE_API_KEY 仍在（secret list）；worker.js 自轮次 43 未改；轮次 50 同端点同 key 是通的。**影响**：真实 Jev 决策暂不可用，前端自动落离线随机（兜底 toast 一次告知，播放永不中断），界面全部可用、台账如实显示 0 tok。**修复在仓库外**：换新 key 或上游解封；用户可即时在设置里配 OpenRouter key 绕开（无需重部署）。
+- **教训（老规矩再应验）**：「部署成功 ≠ 部署正确 ≠ 上游活着」是三件事——本次正是核验脚本把第三件从「内容正确」里分出来的：11/11 绿灯与 451 同时出现在同一次运行里。
+- **验证**：部署前 216/216 全绿；部署后内容核验 exit 0。浏览器端到端冒烟未做（无浏览器环境），新 UI 功能建议用户硬刷新 https://jevpiano.logicc.top/ 过一遍。
+- **任务板**：**[进行中] 真实 Jev 渠道 451**——等新 key / 上游解封 / 用户自配 OpenRouter；恢复后重跑 verify-deploy。
+
 ## [完成] 2026-10-25 · 新增蓝调曲风——候选词汇表扩容（迭代轮次 58 · 音乐内容）
 
 - **做了什么**（前端跟弹闭环后转音乐内容侧；领地 `music.js`/`index.html` 两处静态清单/`theory.test.mjs` + 文档）：详见 [docs/memory/2026-10-25-blues-style.md](docs/memory/2026-10-25-blues-style.md)。

@@ -24,12 +24,16 @@ const withApi = !process.argv.includes('--no-api');
 const CHECKS = [
   { file: '/js/player.js', needles: ['_decisionBudget', '_settleBudgets', 'barStartSec < this._now()'], why: '轮次 48：决策预算 + 迟到小节顺延' },
   { file: '/js/composer.js', needles: ['budgetMiss', 'deadlineMiss'], why: '轮次 48：预算赛跑 + 如实标记' },
-  { file: '/js/ui.js', needles: ['decisionGuards', '超预算', 'accumulateLedger', 'ledgerPills'], why: '轮次 48 归因标记 + 轮次 50 共享计费台账' },
+  { file: '/js/ui.js', needles: ['decisionGuards', '超预算', 'accumulateLedger', 'ledgerPills', 'keyEchoText', 'markDiff'], why: '轮次 48/50 台账与归因 + 55 跟弹回声 + 57 和弦键' },
+  { file: '/js/music.js', needles: ['chordRole', "'blues'", 'mixolydian'], why: '轮次 55 和弦角色 + 58 蓝调曲风' },
+  { file: '/js/cadence.js', needles: ['cadenceIntoBar', 'CADENCE_ZH'], why: '轮次 55：终止式识别' },
+  { file: '/js/canvas.js', needles: ['class Fall', 'user: !!user', 'PULSE_TICK_MS'], why: '轮次 52 canvas 三件套 + 56 跟弹用户音符' },
+  { file: '/js/studio-roll.js', needles: ['createRollView', 'cadenceIntoBar', '悬停'], why: '轮次 54 卷帘视图 + 55 hover 终止式 + 57 悬停音符角色' },
+  { file: '/js/studio.js', needles: ['accumulateLedger(ledger, bar.decision)', 'refreshLedger', 'syncKeyMarks'], why: '轮次 50 工作室逐小节记账 + 57 和弦键同步' },
+  { file: '/js/main.js', needles: ['user: true', 'CADENCE_ZH', 'kbEcho'], why: '轮次 55-57 跟弹接线（回声/终止式/下落音符）' },
   // 轮次 49：三个静默 bug 的现场——线上必须同时具备「布局常量」与「舞台灯光 DOM」
   { file: '/js/studio-core.js', needles: ['export const ZOOM', 'export const HEADER', 'H_TENSION'], why: '轮次 49：布局常量回填（此前卷帘整条绘制路径 ReferenceError）' },
-  { file: '/index.html', needles: ['stageWarm', 'stageCool'], why: '轮次 49：舞台灯光 DOM（此前 onBar 每小节抛异常，导致 0 tok）' },
-  // 轮次 50：工作室记账的现场——接线点在 studio.js，实现点在 ui.js
-  { file: '/js/studio.js', needles: ['accumulateLedger(ledger, bar.decision)', 'refreshLedger'], why: '轮次 50：工作室逐小节记账（此前完全不记账）' },
+  { file: '/index.html', needles: ['stageWarm', 'kbEcho', 'stKbEcho', 'data-style="blues"'], why: '轮次 49 舞台灯光 + 55 回声条 + 58 蓝调选项' },
 ];
 
 // 网络抖动会让 fetch 抛 TypeError（本沙箱对目标域时通时断），而内容不符是**确定信号**。
