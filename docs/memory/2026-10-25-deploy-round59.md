@@ -23,4 +23,4 @@
 
 ## 下一步（任务板）
 
-- **[进行中] 真实 Jev 渠道 451**：等新 key 或上游解封；用户也可在设置里配 OpenRouter key 自行绕开。上游恢复后重跑 `node scripts/verify-deploy.mjs` 确认。
+- **[进行中] 真实 Jev 渠道 451——根因升级：官方端点地区封锁**。用户提供了新 TypeSafe key（已 `wrangler secret put TYPESAFE_API_KEY`，留待解封日用），线上仍 451；**本机直连同端点同样 451**，响应体明说 `Typesafe is not available in your region`——**封锁的是地区（本机出口与 Workers 出口都在内），与 key 无关**。已探测 **OpenRouter 中继（openrouter.ai/api/v1/systemone）本地区可达**（无 key 探测得 401 = 到达鉴权层）。出路：(a) 用户提供 OpenRouter key → `wrangler secret put OPENROUTER_API_KEY` 即刻生效（链式降级自动走它）；(b) 用户在浏览器设置里直配 OpenRouter 渠道；(c) 等 TypeSafe 解封。上游恢复后重跑 `node scripts/verify-deploy.mjs` 确认。
