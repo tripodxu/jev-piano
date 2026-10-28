@@ -49,6 +49,17 @@ const CHECKS = [
   { file: '/js/keysync.js', needles: ['class KeySync', 'advance(now)', '_scheduleWake', 'ev.offAt <= now'], why: '轮次 71：琴键视觉的音频时钟驱动（含不补亮与按需唤醒）' },
   { file: '/js/audio.js', needles: ['return { midi, t0, offAt: stopAt, vel }', 'outputLatencySec'], why: '轮次 71：play 返回真实起止 + 输出延迟读数（视觉的单一真相源）' },
   { file: '/js/ui.js', needles: ['syncLit', 'keySync = new KeySync', 'kb.keySync = keySync'], why: '轮次 71：琴键按下改由时钟驱动；同一状态机两界面共用' },
+  // 轮次 72：界面现代化——CSS 是本轮唯一的大改动，必须逐层点名到边缘。
+  // 特别注意 base.css 的 `canvas { display: block; }`：卷帘位图宽度是数据，
+  // 归零层一旦给 canvas 加 max-width 就会缩扁并让指针换算（px/ZOOM）失准。
+  { file: '/styles/tokens.css', needles: ['--sel-bg', '--panel-inset', '--ring-focus', '--tension-actual'], why: '轮次 72：配方令牌（选中态/面板顶光/聚焦环/张力实线）' },
+  { file: '/styles/base.css', needles: ['canvas { display: block; }', 'prefers-reduced-transparency'], why: '轮次 72：canvas 尺寸纪律（不得 max-width）+ 减少透明度回退' },
+  { file: '/styles/components.css', needles: ['attr(data-label)', '--seg-c'], why: '轮次 72：读数胶囊 + 图例色板单通道' },
+  { file: '/styles/layout.css', needles: ['position: sticky', '--blur-bar'], why: '轮次 72：顶栏 sticky + 小面积模糊' },
+  { file: '/styles/stage.css', needles: ['var(--panel-shadow), var(--panel-inset)'], why: '轮次 72：舞台整份引用面板配方（只抄一半会丢顶光）' },
+  { file: '/styles/motion.css', needles: ['viewIn'], why: '轮次 72：视图切换交叉淡入' },
+  { file: '/index.html', needles: ['data-label="Tokens"', 'viewport-fit=cover', 'aria-keyshortcuts'], why: '轮次 72：读数胶囊结构 + 空格快捷键语义' },
+  { file: '/js/main.js', needles: ['isComposing', "els.viewStudio.classList.contains('active')"], why: '轮次 72：空格键（输入法放行 + 视图谓词与 attachKeyboard 同源）' },
 ];
 
 // 网络抖动会让 fetch 抛 TypeError（本沙箱对目标域时通时断），而内容不符是**确定信号**。
