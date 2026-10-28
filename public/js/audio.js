@@ -57,9 +57,16 @@ export class PianoAudio {
     return buf;
   }
 
-  /** 播放一个音（whenSec 为 ctx 时间轴）；复音上限 32，超出强释最旧 */
+  /**
+   * 播放一个音（whenSec 为 ctx 时间轴）；复音上限 32，超出强释最旧。
+   *
+   * **返回声音的真实起止** `{ midi, t0, offAt, vel }`，而不是请求的起止：
+   * 排程会被 `Math.max(whenSec, currentTime + 0.005)` 推迟（迟到/首音的场景），
+   * 而听感终点还含 release 尾巴——两者都与调用方传入的 whenSec/durSec 不同。
+   * 视觉层（琴键）必须用它，否则「按请求时刻亮、按真实时刻响」必然错开。
+   */
   play(midi, whenSec, durSec, vel) {
-    if (!this.ctx || this.muted) return;
+    if (!this.ctx || this.muted) return null;
     const t0 = Math.max(whenSec, this.ctx.currentTime + 0.005);
     const { peak, decay, cutoff, release } = envFor(midi, vel, 0.5);
     const f = 440 * Math.pow(2, (midi - 69) / 12);
@@ -103,6 +110,20 @@ export class PianoAudio {
       const i = this.voices.indexOf(voice);
       if (i >= 0) this.voices.splice(i, 1);
     };
+    return { midi, t0, offAt: stopAt, vel };
+  }
+
+  /**
+   * 声音离耳朵还有多远（秒）：`currentTime` 是音频线程的时钟，排程在 t 的音
+   * 实际出扬声器大约还要 baseLatency + outputLatency。视觉要与之对齐就得提前这么多。
+   * 读不到就给 0（老浏览器没 outputLatency）；异常值一律夹住，绝不让它把视觉推到未来。
+   */
+  outputLatencySec() {
+    const ctx = this.ctx;
+    if (!ctx) return 0;
+    const base = Number(ctx.baseLatency) || 0;
+    const out = Number(ctx.outputLatency) || 0;
+    return Math.min(0.25, Math.max(0, base + out));
   }
 
   setVolume(v) {

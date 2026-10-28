@@ -365,9 +365,12 @@ async function start() {
         chorusStartMel = seenMel.size; chorusStartLh = seenLh.size;
       }
     },
-    onNote(ev) {
-      const delay = Math.max(0, (ev.t - audio.ctx.currentTime) * 1000);
-      setTimeout(() => kb.flash(ev.midi, ev.dur * 1000), delay);
+    onNote(ev, voice) {
+      // 琴键（轮次 71）：以声音的**真实**起止排程，而非请求的 ev.t/ev.dur——
+      // 旧实现用 setTimeout(ev.t - currentTime) 把挂钟当成音频时钟，
+      // 事件循环一拥塞、标签页一被节流，键就与声音错开，连奏还会累积漂移。
+      const v = voice ?? { t0: ev.t, offAt: ev.t + ev.dur };
+      kb.keySync?.schedule(ev.midi, v.t0, v.offAt, ev.vel);
       fall.push({ midi: ev.midi, t: ev.t, dur: ev.dur, vel: ev.vel, hand: ev.hand });
     },
     onError(err) {
@@ -389,6 +392,7 @@ function stopAll() {
   fall.stop();
   tensionGraph.stop();
   motifCard.stop();
+  kb.keySync?.clear(); // 状态机里可能还压着提前排程的音：不清就等着它们在停止后亮起来
   kb.clear();
   kb.mark(null); // 和弦键熄灭（轮次 57）：演奏结束，键盘回到无和声上下文的常态
   els.stage.classList.add('idle'); // 回到空态：节目单式引导重新出现（轮次 66）

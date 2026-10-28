@@ -4,6 +4,7 @@ import { midiName, PREFERRED_NAME, chordRole } from './music.js';
 import { tempoMultAt } from './candidates.js';
 import { escapeHtml } from './dom.js';
 import { getAudio } from './audio.js';
+import { KeySync } from './keysync.js';
 import { attachKeyboard, hintsFor } from './kbd.js';
 
 import { LOW, HIGH, sectionLabel } from './canvas.js';
@@ -39,7 +40,6 @@ export function renderKeyboard(container, { low = LOW, high = HIGH, onKey = null
   const w = 100 / whites.length;
   const whiteIdx = new Map(whites.map((m, i) => [m, i]));
   const keyMap = new Map();
-  const timeouts = new Set();
   for (const m of whites) {
     const el = document.createElement('div');
     el.className = 'wk';
@@ -65,21 +65,31 @@ export function renderKeyboard(container, { low = LOW, high = HIGH, onKey = null
     container.addEventListener('pointerdown', (e) => {
       const key = e.target.closest('[data-midi]');
       if (!key) return;
-      const midi = Number(key.dataset.midi);
-      key.classList.add('on');
-      setTimeout(() => key.classList.remove('on'), 240);
-      onKey(midi);
+      // 不再在这里点亮/定时熄灭：琴键的按下与抬起由 KeySync 按音频时钟驱动，
+      // 与发声同一时刻（此处若抢先点亮，视觉就比声音早了一个"等待音频初始化"的量）
+      onKey(Number(key.dataset.midi));
     });
   }
   let marked = new Set();
   let hintEls = new Map(); // midi → 提示字母元素（轮次 65 电脑键盘弹奏的键位标注）
   return {
-    flash(midi, durSec) {
-      const el = keyMap.get(midi);
-      if (!el) return;
-      el.classList.add('on');
-      const t = setTimeout(() => { el.classList.remove('on'); timeouts.delete(t); }, Math.max(80, durSec * 1000));
-      timeouts.add(t);
+    /**
+     * 按音频时钟同步按下状态：changes = Map<midi, vel|null>，null 表示熄灭。
+     * 只动变化的键；力度写进 CSS 变量 --kvel，由样式表决定亮度——视觉的强弱与音量同源。
+     */
+    syncLit(changes) {
+      for (const [midi, vel] of changes) {
+        const el = keyMap.get(midi);
+        if (!el) continue;
+        if (vel == null) {
+          el.classList.remove('on');
+          el.style.removeProperty('--kvel');
+        } else {
+          el.classList.add('on');
+          const v = String(Math.min(1, Math.max(0, Number(vel) || 0)));
+          if (el.style.getPropertyValue('--kvel') !== v) el.style.setProperty('--kvel', v);
+        }
+      }
     },
     /** 和弦键亮起（轮次 57）：pcs = 当前和弦的音级类数组（null = 熄灭）。diff 更新，只动变化的键。 */
     mark(pcs) {
@@ -107,9 +117,7 @@ export function renderKeyboard(container, { low = LOW, high = HIGH, onKey = null
       }
     },
     clear() {
-      for (const t of timeouts) clearTimeout(t);
-      timeouts.clear();
-      for (const el of keyMap.values()) el.classList.remove('on');
+      for (const el of keyMap.values()) { el.classList.remove('on'); el.style.removeProperty('--kvel'); }
     },
   };
 }
@@ -541,19 +549,29 @@ export function refreshStatusPills(pills, { channel, ledger, suffix = '' }) {
  *   - chordOf  () => 当前和声上下文（用于 keyEchoText 的角色读数）
  *   - onNote   (midi) => void 额外副作用（实时页：把用户音符推进下落可视化）
  *   - enabled  () => boolean **必填**：该界面是否响应电脑键盘（防双触发）
- * @returns 键盘句柄 { flash, mark, setKeyHints, clear }
+ * @returns 键盘句柄 { syncLit, mark, setKeyHints, clear }
  */
 export function attachPlayableKeyboard(container, { echoEl = null, chordOf = () => null, onNote = null, enabled = null } = {}) {
   const audio = getAudio();
+  // 琴键视觉的时钟（轮次 71）：与发声共用 AudioContext.currentTime，
+  // 按下/抬起/力度全部由它驱动——用户手弹的音与 AI 弹的音走同一条时间轴。
+  const keySync = new KeySync({
+    clock: () => audio.ctx?.currentTime ?? 0,
+    latency: () => audio.outputLatencySec(),
+  });
+  const kb = renderKeyboard(container, { onKey: pressKey });
+  keySync.start((changes) => kb.syncLit(changes));
   // 弹一个音的共用路径：琴键点击与电脑键盘从这里进——回声、发声、跟弹一条路，不各有各的账
-  const pressKey = (midi) => {
+  function pressKey(midi) {
     if (echoEl) echoEl.textContent = keyEchoText(midi, chordOf());
     onNote?.(midi);
     audio.ensure()
-      .then(() => audio.play(midi, audio.ctx.currentTime + 0.01, 0.9, 0.7))
+      .then(() => {
+        const v = audio.play(midi, audio.ctx.currentTime + 0.01, 0.9, 0.7);
+        if (v) keySync.schedule(v.midi, v.t0, v.offAt, v.vel);
+      })
       .catch(() => { /* 音频不可用时静默——试听是增强 */ });
-  };
-  const kb = renderKeyboard(container, { onKey: pressKey });
+  }
   kb.setKeyHints(hintsFor(60));
   attachKeyboard({
     onKey: pressKey,
@@ -563,6 +581,9 @@ export function attachPlayableKeyboard(container, { echoEl = null, chordOf = () 
     },
     enabled,
   });
+  // keySync 一并返回：**AI 演奏的音与用户手弹的音共用同一个状态机**——
+  // 各自建一个会互相抢同一个键的熄灭时刻（一个刚灭另一个还亮着）。
+  kb.keySync = keySync;
   return kb;
 }
 

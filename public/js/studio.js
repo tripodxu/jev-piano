@@ -267,9 +267,10 @@ function tickPlay() {
     const t = rp.t0 + (n.startBeats + rp.iter * rp.totalBeats) * rp.beatDur;
     if (t > horizon) break;
     if (t > now - 0.05 && !muted[n.hand]) {
-      rp.audio.play(n.midi, t, Math.max(0.1, n.durBeats * rp.beatDur), n.vel);
-      const delay = Math.max(0, (t - rp.audio.ctx.currentTime) * 1000);
-      setTimeout(() => kb.flash(n.midi, Math.max(80, n.durBeats * rp.beatDur * 1000)), delay);
+      // 与实时页同纪律（轮次 71）：琴键按声音的**真实**起止走音频时钟，
+      // 旧实现用 setTimeout + flash 的 80ms 下限，短音的键会比声音早灭几百毫秒
+      const v = rp.audio.play(n.midi, t, Math.max(0.1, n.durBeats * rp.beatDur), n.vel);
+      if (v) kb.keySync?.schedule(v.midi, v.t0, v.offAt, n.vel);
     }
     rp.ptr++;
   }
@@ -299,6 +300,8 @@ function stopPlay() {
   if (playheadTimer) { clearInterval(playheadTimer); playheadTimer = null; }
   els.play.querySelector('span').textContent = '播放';
   els.playhead.classList.add('hidden');
+  // 回放停了，压在状态机里的提前排程要一并作废，否则键会在停止后自己亮起来
+  for (const [midi] of kb?.keySync?.clear() ?? []) kb.syncLit(new Map([[midi, null]]));
   rp = null;
   syncKeyMarks(); // 停下后和声上下文回落到最后一小节（轮次 57）
 }

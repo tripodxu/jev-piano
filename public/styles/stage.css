@@ -202,9 +202,11 @@
       inset 1.5px 0 2px rgba(255, 255, 255, 0.55);
     transition: transform var(--dur-instant), filter var(--dur-instant);
   }
+  /* --kvel 由 ui.js 的 syncLit 写入（0..1），与发声用的是同一个 vel——
+     力度看得见：轻弹的键只是被"摸"了一下，重弹的键明显压下去并提亮。 */
   .wk.on {
-    filter: brightness(0.93) saturate(1.05);
-    transform: translateY(2px);
+    filter: brightness(calc(0.82 + var(--kvel, 0.6) * 0.26)) saturate(1.05);
+    transform: translateY(calc(1px + var(--kvel, 0.6) * 1.6px));
     background:
       linear-gradient(180deg, rgba(216, 171, 92, 0.28), rgba(216, 171, 92, 0.06) 55%),
       linear-gradient(180deg, #b8b0a0 0, #f4efe2 4%, #f6f1e4 26%, #e9e1cd 86%, #d2c8ae 96%, #bfb49a);
@@ -226,8 +228,8 @@
     border-radius: 0 0 2px 2px;
   }
   .bk.on {
-    transform: translateY(2px); height: 60.4%;
-    filter: brightness(1.28) sepia(0.28) hue-rotate(-14deg) saturate(1.6);
+    transform: translateY(calc(1px + var(--kvel, 0.6) * 1.6px)); height: 60.4%;
+    filter: brightness(calc(1.05 + var(--kvel, 0.6) * 0.36)) sepia(0.28) hue-rotate(-14deg) saturate(1.6);
   }
   /* 和弦键亮起：当前小节和弦内的琴键底部亮一道金线——跟着亮键弹就在和声里。
      用 border 而非伪元素：.bk::after 已被黑键前斜面占用 */

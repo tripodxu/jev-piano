@@ -45,6 +45,10 @@ const CHECKS = [
   // 轮次 70：渠道不读取的 Key 字段必须在线上置灰——否则用户填了不生效的值却毫无提示
   { file: '/js/ui.js', needles: ['KEY_FIELD_RULES', '同源代理由服务端持有密钥'], why: '轮次 70：Key 字段置灰规则表（界面说不用填 = 请求真的不发凭据）' },
   { file: '/index.html', needles: ['keyFieldNote', 'role="status"'], why: '轮次 70：渠道说明行（常驻 live region，靠空内容塌高而非 display:none）' },
+  // 轮次 71：琴键与声音的同步——线上必须同时具备「音频时钟状态机」与「返回真实起止的 play」
+  { file: '/js/keysync.js', needles: ['class KeySync', 'advance(now)', '_scheduleWake', 'ev.offAt <= now'], why: '轮次 71：琴键视觉的音频时钟驱动（含不补亮与按需唤醒）' },
+  { file: '/js/audio.js', needles: ['return { midi, t0, offAt: stopAt, vel }', 'outputLatencySec'], why: '轮次 71：play 返回真实起止 + 输出延迟读数（视觉的单一真相源）' },
+  { file: '/js/ui.js', needles: ['syncLit', 'keySync = new KeySync', 'kb.keySync = keySync'], why: '轮次 71：琴键按下改由时钟驱动；同一状态机两界面共用' },
 ];
 
 // 网络抖动会让 fetch 抛 TypeError（本沙箱对目标域时通时断），而内容不符是**确定信号**。

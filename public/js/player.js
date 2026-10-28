@@ -124,10 +124,13 @@ export class Player {
     // 2) 到点的音符 → 音频（audio 内部按 t0 精确排程）。同上：音频节点异常也不得拖垮排程
     while (this.queue.length && this.queue[0].t <= horizon) {
       const ev = this.queue.shift();
-      try { this.audio?.play?.(ev.midi, ev.t, ev.dur, ev.vel); } catch (e) { console.error('[jev] audio.play 异常（跳过该音）', e); }
+      // voice = 声音的**真实**起止（排程可能被推迟、终点含 release 尾巴）。
+      // 必须传给展示层：琴键若按请求的 ev.t/ev.dur 亮灭，就会与真实发声错开一个排程余量 + 尾巴。
+      let voice = null;
+      try { voice = this.audio?.play?.(ev.midi, ev.t, ev.dur, ev.vel); } catch (e) { console.error('[jev] audio.play 异常（跳过该音）', e); }
       this.records.push({ midi: ev.midi, startBeats: ev.beat, durBeats: ev.dur / this.secPerBeat, vel: ev.vel, hand: ev.hand });
       if (this.records.length > RECORDS_CAP) this.records.splice(0, this.records.length - RECORDS_CAP);
-      try { this.onNoteCb(ev); } catch (e) { console.error('[jev] onNote 展示层异常（已跳过）', e); }
+      try { this.onNoteCb(ev, voice); } catch (e) { console.error('[jev] onNote 展示层异常（已跳过）', e); }
     }
     // 3) 决策管线：保持提前 AHEAD_BARS 个小节
     this._settleBudgets();   // 先结算音频时钟：到期的预算让本轮请求带上一道时间界
