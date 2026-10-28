@@ -5,6 +5,15 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-28 · 渠道不读取的 Key 字段置灰（迭代轮次 70 · 前端+部署）
+
+- **起因（用户原话）**：「为什么我瞎写 apikey 也可以」。根因是 `jev.js:105-111` 只在非 proxy 渠道才发 `Authorization`，而 proxy 是探测成功后的默认渠道 → 两个 Key 输入框**默认是死值**，填什么都没用，界面却毫无表示。第二层原因：即使手动选 TypeSafe 填错 key，401 也会被 `composer.js:210-213` catch 后降级为 fixture，**照常出声**——「能弹」从来不是 key 有效的证据。
+- **做了什么**：`ui.js` 新增 `KEY_FIELD_RULES`（渠道 → 哪个 Key 真被读 + 一句说明，与 `CHANNEL_LABEL` 同处）；`main.js` 新增 `syncKeyFields()`，在**渠道 change / 初始化 / 自动切 proxy** 三处调用（漏掉自动切那处界面会与新渠道不一致）；不参与的 input `disabled`、label 加 `.off`、说明行更新。`index.html` 两字段包进 `.field-group` + 新增 `#keyFieldNote`（`role="status"`）。
+- **两个 CSS 坑（都写进注释了）**：① 说明行**靠空内容塌成 0 高，绝不用 `display:none`**——`role="status"` 的实时区域一旦 `display:none`，文本变化就不会被屏幕阅读器播报；② `hover` 规则必须加 `:not(:disabled)`，否则禁用态遇上 hover 因多一个伪类（0,2,1 > 0,1,1）**盖掉置灰的边框**。
+- **测试 245 → 247**，且做了**变异验证**：新增的对账测试把「界面说不用填」与「请求真的不发凭据」绑成一条——逐渠道跑 `askJev`（假 fetch）比对规则表与 `Authorization` 头。把 `proxy.typesafe` 改成 `true` → **立即红 2 条**，报错直指「界面说需要 Key，请求却没发 Authorization」。只测规则表或只测网络行为都不够，两者对账才堵得住。
+- **部署**：commit `7804578` → Version ID **`ebaac9cf-313b-4eed-9f44-e8d974ad07b3`**；`verify-deploy` **18/18** 静态针全过（含新增 2 针）。唯一红灯仍是既有 451（非回归，见下条）。
+- **教训（值得单独记）**：**「填了不生效」是最坏的一类交互——它既不报错也不生效。** 轮次 49 那条「免疫机制会从安全网变成遮挡布」的反思在这里第二次应验：兜底红线（播放永不中断）成功到让用户以为 key 是对的。凡是**存在死值输入**的地方，都要有「这个字段当前不参与」的显式表达。
+
 ## [完成] 2026-10-28 · 轮次 69 上线 + 核验：内容 16/16 全过，451 系既有上游封锁非回归（迭代轮次 69 · 部署）
 
 - **部署**：commit `f7501ff`（17 文件，+1459/−840）→ push origin/main → `wrangler deploy`。上传 **13 个资产**（7 个 CSS 层 + `dom.js` + `index.html` + `ui.js`/`canvas.js`/`studio.js`/`main.js`），Total Upload 7.50 KiB / gzip 2.58 KiB。**Version ID `bc5264e4-62ca-4b06-bb38-a9decc07eae1`**（线上版本标识，下次核验对齐用）。
