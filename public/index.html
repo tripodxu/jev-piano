@@ -332,10 +332,16 @@
       <option value="typesafe">TypeSafe 官方直连</option>
       <option value="openrouter">OpenRouter 直连</option>
     </select>
-    <label class="lbl" for="typesafeKey">TypeSafe API Key（仅存本机）</label>
-    <input type="password" id="typesafeKey" placeholder="apikey_..." autocomplete="off">
-    <label class="lbl" for="openrouterKey">OpenRouter API Key（仅存本机）</label>
-    <input type="password" id="openrouterKey" placeholder="sk-or-..." autocomplete="off">
+    <div class="field-group">
+      <label class="lbl" for="typesafeKey">TypeSafe API Key（仅存本机）</label>
+      <input type="password" id="typesafeKey" placeholder="apikey_..." autocomplete="off">
+    </div>
+    <div class="field-group">
+      <label class="lbl" for="openrouterKey">OpenRouter API Key（仅存本机）</label>
+      <input type="password" id="openrouterKey" placeholder="sk-or-..." autocomplete="off">
+    </div>
+    <!-- 渠道决定哪个 Key 真正被读取；不参与的那个置灰，避免"填了没用"的静默困惑 -->
+    <p class="field-note" id="keyFieldNote" role="status"></p>
     <button id="testJevBtn" class="btn wfull" type="button">测试 Jev 渠道</button>
 
     <h3 class="drawer-sec">LLM 扩写（可选）</h3>

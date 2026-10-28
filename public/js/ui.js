@@ -434,6 +434,21 @@ export function renderPlan(el, plan) {
  */
 export const CHANNEL_LABEL = { fixture: '离线随机', proxy: '同源代理', typesafe: 'TypeSafe', openrouter: 'OpenRouter' };
 
+/**
+ * 每个渠道**真正会读取**的 Key 字段 —— 设置面板据此把不参与的输入框置灰。
+ *
+ * 为什么需要它：`jev.js` 只在非 proxy 渠道才发 `Authorization`（`jev.js:105-111`），
+ * 而 proxy 恰好是探测成功后的默认渠道。于是两个 Key 输入框在默认配置下是**死值**：
+ * 用户填什么都一样，界面却毫无表示——"我瞎写 key 也能用"的困惑正出于此。
+ * 规则表与 `jev.js` 的读取逻辑是一对，改渠道必须两边同时改（`style-contract.test.mjs` 守着）。
+ */
+export const KEY_FIELD_RULES = {
+  fixture: { typesafe: false, openrouter: false, note: '离线随机不联网，两个 Key 都不需要。' },
+  proxy: { typesafe: false, openrouter: false, note: '同源代理由服务端持有密钥，浏览器不需要填 Key。' },
+  typesafe: { typesafe: true, openrouter: false, note: '当前渠道只读取 TypeSafe Key，OpenRouter Key 不参与。' },
+  openrouter: { typesafe: false, openrouter: true, note: '当前渠道只读取 OpenRouter Key，TypeSafe Key 不参与。' },
+};
+
 export function emptyLedger() {
   return { tokens: 0, usd: 0, latencySum: 0, latencyN: 0 };
 }

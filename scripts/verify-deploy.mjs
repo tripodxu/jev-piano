@@ -42,6 +42,9 @@ const CHECKS = [
   { file: '/styles/tokens.css', needles: ['@layer tokens', '--brass-hi', '--surface-3'], why: '轮次 69：设计令牌层（层序 + 颜色变量真的上到边缘）' },
   { file: '/js/dom.js', needles: ['escapeHtml', 'downloadBlob'], why: '轮次 69：共享 DOM 原语（此前 main/studio 各存一份 download）' },
   { file: '/js/ui.js', needles: ['refreshStatusPills', 'attachPlayableKeyboard'], why: '轮次 69：共享台账刷新 + 键盘接线（enabled 守卫改必填）' },
+  // 轮次 70：渠道不读取的 Key 字段必须在线上置灰——否则用户填了不生效的值却毫无提示
+  { file: '/js/ui.js', needles: ['KEY_FIELD_RULES', '同源代理由服务端持有密钥'], why: '轮次 70：Key 字段置灰规则表（界面说不用填 = 请求真的不发凭据）' },
+  { file: '/index.html', needles: ['keyFieldNote', 'role="status"'], why: '轮次 70：渠道说明行（常驻 live region，靠空内容塌高而非 display:none）' },
 ];
 
 // 网络抖动会让 fetch 抛 TypeError（本沙箱对目标域时通时断），而内容不符是**确定信号**。

@@ -89,6 +89,15 @@
     font-size: var(--fs-sm); color: var(--text-faint); text-transform: none;
   }
   .field-group { margin-bottom: var(--sp-4); }
+  /* 字段说明：常驻 DOM（靠空内容塌成 0 高，而非 display:none）——
+     role="status" 的实时区域一旦 display:none，文本变化就不会被屏幕阅读器播报 */
+  .field-note {
+    margin: calc(-1 * var(--sp-1)) 0 var(--sp-4); padding-left: var(--sp-3);
+    border-left: 2px solid var(--brass-lo);
+    color: var(--text-faint); font-size: var(--fs-sm); line-height: var(--lh-snug);
+  }
+  .field-note:empty { margin: 0; padding: 0; border: 0; }
+  .lbl.off { opacity: 0.45; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 
   textarea, select, input[type="text"], input[type="password"], input[type="number"] {
@@ -100,10 +109,15 @@
                 box-shadow var(--dur-base) var(--ease-in-out);
   }
   textarea { resize: vertical; line-height: var(--lh-snug); }
-  textarea:hover, select:hover, input:hover { border-color: var(--hairline-hover); }
+  /* :not(:disabled) 是必需的——否则禁用态遇上 :hover 会因多一个伪类而盖掉置灰的边框 */
+  textarea:hover:not(:disabled), select:hover:not(:disabled), input:hover:not(:disabled) { border-color: var(--hairline-hover); }
   textarea:focus, select:focus, input:focus {
     border-color: var(--brass-lo);
     box-shadow: 0 0 0 3px rgba(216, 171, 92, 0.12);
+  }
+  /* 当前渠道不读取的 Key 字段：置灰 + 明确说明，而不是让用户填一个永远不会被读的值 */
+  textarea:disabled, select:disabled, input:disabled {
+    opacity: 0.4; cursor: default; border-color: var(--hairline);
   }
   textarea::placeholder, input::placeholder { color: var(--text-faint); }
   /* 原生下拉箭头换掉：appearance:none 后自绘，避免各平台控件形状不一致 */

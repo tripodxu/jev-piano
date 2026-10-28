@@ -6,7 +6,7 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle, CHANNEL_LABEL, emptyLedger, accumulateLedger, refreshStatusPills, attachPlayableKeyboard } from './ui.js';
+import { Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle, CHANNEL_LABEL, KEY_FIELD_RULES, emptyLedger, accumulateLedger, refreshStatusPills, attachPlayableKeyboard } from './ui.js';
 import { STYLE_BY_ID, chordPcs } from './music.js';
 import { downloadBlob } from './dom.js';
 import { GOAL_HINTS } from './composer.js';
@@ -32,6 +32,9 @@ const els = {
   legendBody: $('legendBody'), legendMore: $('legendMore'), legendNoHint: $('legendNoHint'),
   tabLive: $('tabLive'), tabStudio: $('tabStudio'), viewLive: $('viewLive'), viewStudio: $('viewStudio'),
   channelSel: $('channelSel'), typesafeKey: $('typesafeKey'), openrouterKey: $('openrouterKey'), testJevBtn: $('testJevBtn'),
+  keyFieldNote: $('keyFieldNote'),
+  typesafeKeyLbl: document.querySelector('label[for="typesafeKey"]'),
+  openrouterKeyLbl: document.querySelector('label[for="openrouterKey"]'),
   llmEnabled: $('llmEnabled'), llmBaseUrl: $('llmBaseUrl'), llmModel: $('llmModel'), llmKey: $('llmKey'), llmProxy: $('llmProxy'), testLlmBtn: $('testLlmBtn'),
   toast: $('toast'),
 };
@@ -56,6 +59,18 @@ const refreshStatus = (fallback) => { // fallback: null | 'down' | 'slow'
 };
 
 /* ---------------- 控件绑定 ---------------- */
+// 当前渠道不读取的 Key 字段置灰并说明原因（轮次 70）：填了不被读的值是最坏的一类交互——
+// 它既不报错也不生效。置灰 + 一行说明，把"为什么我瞎写 key 也能用"在发生前就回答掉。
+function syncKeyFields() {
+  const rule = KEY_FIELD_RULES[settings.channel] ?? KEY_FIELD_RULES.fixture;
+  for (const [input, lbl] of [[els.typesafeKey, els.typesafeKeyLbl], [els.openrouterKey, els.openrouterKeyLbl]]) {
+    const on = rule[input === els.typesafeKey ? 'typesafe' : 'openrouter'];
+    input.disabled = !on;
+    lbl?.classList.toggle('off', !on);
+  }
+  if (els.keyFieldNote) els.keyFieldNote.textContent = rule.note;
+}
+
 const storeKeyOf = (id) => (id === 'channelSel' ? 'channel' : id === 'keySelect' ? 'keySel' : id);
 for (const input of [els.channelSel, els.keySelect, els.typesafeKey, els.openrouterKey, els.llmEnabled, els.llmBaseUrl, els.llmModel, els.llmKey, els.llmProxy]) {
   const prop = input.type === 'checkbox' ? 'checked' : 'value';
@@ -66,10 +81,12 @@ for (const input of [els.channelSel, els.keySelect, els.typesafeKey, els.openrou
     settings[storeKeyOf(input.id)] = input[prop];
     settings.touched = true;
     saveSettings();
+    if (input === els.channelSel) syncKeyFields(); // 换渠道 = 换哪个 Key 生效
     refreshStatus();
   });
 }
 els.channelSel.value = settings.channel;
+syncKeyFields();
 
 // 抽屉的焦点管理：打开移入关闭钮、Esc 关闭、关闭后焦点回到触发钮——键盘用户不被丢在页首
 function wireDrawer({ btn, drawer, close }) {
@@ -475,6 +492,7 @@ window.__jevDebug = () => ({
     if (!settings.touched && settings.channel === 'fixture' && (probe.jev || probe.llm)) {
       settings.channel = 'proxy';
       els.channelSel.value = 'proxy';
+      syncKeyFields(); // 自动切的渠道同样要让 Key 字段跟着变，否则新渠道与界面状态不一致
       saveSettings();
     }
     refreshStatus();

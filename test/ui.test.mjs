@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, keyEchoText, keyMarks, markDiff, Fall, TensionGraph, MotifCard, MOTIF_PULSE_MS, pulseActive } from '../public/js/ui.js';
+import { fnLabel, fnSegClass, RIBBON_MAX, sectionLabel, sectionMarkerAt, planLine, motifShape, DEVELOP_ZH, LEGEND_ITEMS, renderLegend, planTempoLine, hoverBarAt, uniquenessLine, stageLightFor, probabilityStrip, chorusSummary, chorusView, styleChipTitle, goalTitle, decisionGuards, CHANNEL_LABEL, KEY_FIELD_RULES, emptyLedger, accumulateLedger, ledgerPills, keyEchoText, keyMarks, markDiff, Fall, TensionGraph, MotifCard, MOTIF_PULSE_MS, pulseActive } from '../public/js/ui.js';
+import { askJev } from '../public/js/jev.js';
 import { deriveSections } from '../public/js/candidates.js';
 
 const bar = (over = {}) => ({
@@ -644,4 +645,46 @@ test('TensionGraph 空态整块留白：不画刻度残影（0.0/0.5/1.0 像渲�
     tg.push(0.5);
     assert.ok(ctx.__calls.fillText > 0, '有数据后刻度恢复');
   });
+});
+
+/* ---------------- Key 字段置灰规则（轮次 70） ---------------- */
+
+// 界面说"这个 Key 不用填"与"这个渠道真的不发送凭据"必须是同一件事的两种说法。
+// 若只测前者，规则表写错了用户照样填了白填；若只测后者，界面仍在骗人。
+// 所以把两张表对账：规则表 × 真实请求头。
+test('KEY_FIELD_RULES 与 jev.js 实际发送的凭据逐渠道对账', async () => {
+  assert.deepEqual(
+    Object.keys(KEY_FIELD_RULES).sort(), Object.keys(CHANNEL_LABEL).sort(),
+    'KEY_FIELD_RULES 必须覆盖 CHANNEL_LABEL 的每一个渠道（新增渠道而规则表没跟上 = 静默失守）',
+  );
+  for (const [ch, rule] of Object.entries(KEY_FIELD_RULES)) {
+    assert.ok(rule.note && rule.note.length >= 8, `渠道 ${ch} 的说明过短，等于没说明`);
+  }
+
+  for (const [ch, rule] of Object.entries(KEY_FIELD_RULES)) {
+    if (ch === 'fixture') continue; // 离线随机不发网络请求，无从对账
+    let headers = null;
+    const fakeFetch = async (_url, init) => {
+      headers = init?.headers ?? {};
+      return { ok: true, status: 200, json: async () => ({ answers: {} }) };
+    };
+    await askJev(
+      { state: {}, questions: { ok: { type: 'noul', instructions: 'x', criteria: { true: 'y', false: 'n' } } } },
+      { channel: ch, apiKey: 'FAKE-KEY-FOR-CONTRACT', sleep: async () => {} },
+      fakeFetch,
+    );
+    const sent = headers.Authorization != null;
+    const expectsKey = rule.typesafe || rule.openrouter;
+    assert.equal(
+      sent, expectsKey,
+      `渠道 ${ch}：界面说${expectsKey ? '需要' : '不需要'} Key，请求却${sent ? '发了' : '没发'} Authorization`,
+    );
+  }
+});
+
+test('proxy 与 fixture 两个 Key 都不参与（默认渠道下填 key 是死值，必须显式置灰）', () => {
+  assert.equal(KEY_FIELD_RULES.proxy.typesafe, false);
+  assert.equal(KEY_FIELD_RULES.proxy.openrouter, false);
+  assert.equal(KEY_FIELD_RULES.fixture.typesafe, false);
+  assert.equal(KEY_FIELD_RULES.fixture.openrouter, false);
 });
