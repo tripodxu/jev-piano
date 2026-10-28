@@ -1,21 +1,40 @@
 /* ==========================================================================
-   components.css — 通用控件：按钮 / 标签页 / 胶囊 / 表单 / 抽屉 / toast / 图例
-   形状制度：按钮与胶囊 = 全圆角；面板与输入 = --r-md；小件 = --r-sm。禁止第四种。
+   components.css — 通用控件：按钮 / 分段标签页 / 筹码 / 读数胶囊 / 表单 / 抽屉 / toast / 图例
+   形状制度（三档，不许第四种）：按钮·筹码·分段控件 = --r-pill；面板与输入 = --r-md；
+   读数胶囊与内嵌块 = --r-sm。
+   术语（收口时统一，别让「筹码」指两样东西）：`.chip` = 筹码（可选项，可点）；
+   `.pill` = 读数胶囊（只读统计，不可点）。
+   轮次 72：
+   · tab 升级为分段控件（容器内缩 + 选中态走配方令牌）；
+   · 状态 pill 升级为读数胶囊（data-label → ::before，JS 只写数值）；
+   · 选中态 / 幽灵悬停两套配方全站单一出处，消灭三处重复；
+   · 图例色板一族用 --seg-c 收敛；跟弹三色收进 tokens（--you/--fall-r/--fall-l）。
    ========================================================================== */
 
 @layer components {
   /* ============================ 顶栏小件 ============================ */
   .pill {
-    display: inline-flex; align-items: center;
-    border: 1px solid var(--hairline); border-radius: var(--r-pill);
-    padding: 3px 13px; font-size: var(--fs-base-sm); color: var(--text-dim);
+    display: inline-flex; align-items: baseline; gap: 6px;
+    border: 1px solid var(--hairline); border-radius: var(--r-sm);
+    padding: 3px 12px; font-size: var(--fs-base-sm); color: var(--text-dim);
     font-family: var(--mono); letter-spacing: 0.03em;
     background: rgba(20, 16, 12, 0.55);
+    white-space: nowrap;
   }
-  /* 渠道 pill 是"短标签"，宽字距在这里合法 */
+  /* 渠道 pill 是"短标签"，宽字距与无衬线在这里合法 */
   .pill:first-child {
     font-family: var(--sans); letter-spacing: var(--track-label);
     color: var(--brass); border-color: var(--hairline-strong);
+  }
+  /* 读数胶囊：小标签在上、数值在下（标签来自 data-label，JS 写数值不动标签） */
+  .pill[data-label] {
+    flex-direction: column; align-items: flex-start; gap: 0;
+    padding: 3px 12px 4px; line-height: 1.45;
+  }
+  .pill[data-label]::before {
+    content: attr(data-label);
+    font-family: var(--sans); font-size: var(--fs-2xs);
+    letter-spacing: var(--track-label); color: var(--text-faint);
   }
 
   .iconbtn {
@@ -24,28 +43,34 @@
     background: transparent; border: 1px solid var(--hairline); color: var(--text-dim);
     transition: color var(--dur-base) var(--ease-in-out),
                 border-color var(--dur-base) var(--ease-in-out),
+                background-color var(--dur-base) var(--ease-in-out),
                 transform var(--dur-fast) var(--ease-in-out);
   }
-  .iconbtn:hover { color: var(--brass-hi); border-color: var(--hairline-strong); }
+  .iconbtn:hover { color: var(--brass-hi); border-color: var(--hairline-strong); background: var(--ghost-hover-bg); }
   .iconbtn:active { transform: scale(0.94); }
 
-  /* ============================ 标签页 ============================ */
-  .tabs { display: flex; gap: var(--sp-1); margin-left: var(--sp-1); }
+  /* ============================ 标签页（分段控件） ============================ */
+  .tabs {
+    display: flex; gap: 2px; padding: 3px;
+    border: 1px solid var(--hairline); border-radius: var(--r-pill);
+    background: rgba(12, 10, 8, 0.5);
+  }
   .tab {
-    background: transparent; border: 1px solid var(--hairline); color: var(--text-dim);
-    border-radius: var(--r-pill); padding: 6px 18px; cursor: pointer;
-    font: 600 var(--fs-md) / 1 var(--sans); letter-spacing: var(--track-label);
-    transition: all var(--dur-base) var(--ease-in-out);
+    background: transparent; border: 1px solid transparent; color: var(--text-dim);
+    border-radius: var(--r-pill); padding: 5px 16px; cursor: pointer;
+    font: 600 var(--fs-base) / 1 var(--sans); letter-spacing: var(--track-label);
+    transition: color var(--dur-base) var(--ease-in-out),
+                background-color var(--dur-base) var(--ease-in-out),
+                border-color var(--dur-base) var(--ease-in-out);
   }
-  .tab:hover { color: var(--text); border-color: var(--hairline-strong); }
-  .tab.sel {
-    color: var(--brass-hi); border-color: var(--brass-lo);
-    background: var(--brass-tint);
+  .tab:hover { color: var(--text); }
+  /* 选中态配方（与 chip / 切换按钮同源） */
+  .tab.sel, .tab[aria-selected="true"] {
+    color: var(--sel-fg); border-color: var(--sel-bd); background: var(--sel-bg);
   }
-  .tab[aria-selected="true"] { color: var(--brass-hi); border-color: var(--brass-lo); background: var(--brass-tint); }
 
   /* ============================ 按钮 ============================ */
-  .transport { display: flex; gap: 9px; flex-wrap: wrap; margin-top: var(--sp-1); }
+  .transport { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-1); }
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 7px;
     min-height: var(--tap-min);
@@ -53,11 +78,15 @@
     font: 600 13.5px / 1 var(--sans); letter-spacing: 0.12em;
     color: var(--text); background: transparent;
     border: 1px solid var(--hairline);
-    transition: all var(--dur-base) var(--ease-in-out);
+    transition: color var(--dur-base) var(--ease-in-out),
+                border-color var(--dur-base) var(--ease-in-out),
+                background-color var(--dur-base) var(--ease-in-out),
+                box-shadow var(--dur-base) var(--ease-in-out),
+                transform var(--dur-fast) var(--ease-in-out);
   }
   .btn:hover:not(:disabled) {
-    border-color: var(--hairline-strong); color: var(--brass-hi);
-    background: rgba(216, 171, 92, 0.06);
+    border-color: var(--ghost-hover-bd); color: var(--brass-hi);
+    background: var(--ghost-hover-bg);
   }
   .btn:active:not(:disabled) { transform: translateY(1px) scale(0.985); }
   .btn:disabled { opacity: 0.32; cursor: default; }
@@ -70,13 +99,13 @@
     color: var(--on-brass);
     background: linear-gradient(180deg, #f6d695, var(--brass-hi) 52%, var(--brass));
     box-shadow: 0 8px 28px rgba(216, 171, 92, 0.3), inset 0 1px 0 rgba(255, 244, 214, 0.7);
+    transform: translateY(-1px);
   }
-  /* 切换态按钮（循环等）：用 aria-pressed 而不是只有颜色 —— 状态要有语义通道 */
-  .btn[aria-pressed="true"] {
-    color: var(--brass-hi); border-color: var(--brass-lo);
-    background: var(--brass-tint);
+  .btn.primary:active:not(:disabled) { transform: translateY(0) scale(0.985); }
+  /* 切换态按钮（循环等）：aria-pressed 是语义通道，选中态配方与 tab/chip 同源 */
+  .btn[aria-pressed="true"], .btn.sel {
+    color: var(--sel-fg); border-color: var(--sel-bd); background: var(--sel-bg);
   }
-  .btn.sel { color: var(--brass-hi); border-color: var(--brass-lo); background: var(--brass-tint); }
   .btn.wfull { width: 100%; margin-top: var(--sp-2); }
 
   /* ============================ 表单 ============================ */
@@ -102,18 +131,19 @@
 
   textarea, select, input[type="text"], input[type="password"], input[type="number"] {
     width: 100%; color: var(--text); font: inherit;
-    background: rgba(12, 10, 8, 0.6);
+    background: rgba(10, 8, 7, 0.6);
     border: 1px solid var(--hairline); border-radius: var(--r-md);
     padding: 9px var(--sp-3); outline: none;
     transition: border-color var(--dur-base) var(--ease-in-out),
-                box-shadow var(--dur-base) var(--ease-in-out);
+                box-shadow var(--dur-base) var(--ease-in-out),
+                background-color var(--dur-base) var(--ease-in-out);
   }
   textarea { resize: vertical; line-height: var(--lh-snug); }
   /* :not(:disabled) 是必需的——否则禁用态遇上 :hover 会因多一个伪类而盖掉置灰的边框 */
   textarea:hover:not(:disabled), select:hover:not(:disabled), input:hover:not(:disabled) { border-color: var(--hairline-hover); }
   textarea:focus, select:focus, input:focus {
     border-color: var(--brass-lo);
-    box-shadow: 0 0 0 3px rgba(216, 171, 92, 0.12);
+    box-shadow: var(--ring-focus);
   }
   /* 当前渠道不读取的 Key 字段：置灰 + 明确说明，而不是让用户填一个永远不会被读的值 */
   textarea:disabled, select:disabled, input:disabled {
@@ -147,13 +177,12 @@
     border: 1px solid var(--hairline); border-radius: var(--r-pill);
     padding: var(--sp-1) 15px; font: var(--fs-md) / 1.7 var(--sans);
     letter-spacing: 0.08em; cursor: pointer;
-    transition: all var(--dur-base) var(--ease-in-out);
+    transition: color var(--dur-base) var(--ease-in-out),
+                border-color var(--dur-base) var(--ease-in-out),
+                background-color var(--dur-base) var(--ease-in-out);
   }
   .chip:hover { color: var(--text); border-color: var(--hairline-strong); }
-  .chip.sel {
-    color: var(--brass-hi); border-color: var(--brass-lo);
-    background: linear-gradient(180deg, rgba(216, 171, 92, 0.16), rgba(216, 171, 92, 0.07));
-  }
+  .chip.sel { color: var(--sel-fg); border-color: var(--sel-bd); background: var(--sel-bg); }
 
   /* ============================ 徽章 / 提示 ============================ */
   .badge {
@@ -171,7 +200,7 @@
   /* ============================ 进度条 ============================ */
   .progress {
     position: relative; height: var(--sp-2); margin-top: var(--sp-3);
-    border-radius: var(--r-pill); background: rgba(12, 10, 8, 0.6);
+    border-radius: var(--r-pill); background: rgba(10, 8, 7, 0.6);
     border: 1px solid var(--hairline); overflow: hidden;
   }
   .progress-bar {
@@ -189,13 +218,24 @@
   .drawer {
     position: fixed; top: 0; right: 0; bottom: 0; z-index: var(--z-drawer);
     width: min(410px, 94vw);
-    background: linear-gradient(180deg, rgba(27, 22, 17, 0.97), rgba(14, 11, 9, 0.97));
+    background: linear-gradient(180deg, rgba(29, 25, 21, 0.97), rgba(14, 12, 10, 0.97));
     border-left: 1px solid var(--hairline-strong);
     box-shadow: var(--elev-drawer);
-    padding: var(--sp-5) var(--sp-6); overflow-y: auto;
-    backdrop-filter: blur(14px);
+    padding: var(--sp-5) var(--sp-6);
+    overflow-y: auto;
+    backdrop-filter: blur(var(--blur-veil));
+    -webkit-backdrop-filter: blur(var(--blur-veil));
   }
-  .drawer-head { display: flex; align-items: center; justify-content: space-between; }
+  /* 抽屉头不跟着滚：长设置列表里「你在哪个抽屉」始终可见 */
+  .drawer-head {
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: calc(-1 * var(--sp-5)); z-index: 1;
+    margin: calc(-1 * var(--sp-5)) calc(-1 * var(--sp-6)) 0;
+    padding: var(--sp-5) var(--sp-6) var(--sp-3);
+    background: linear-gradient(180deg, rgba(29, 25, 21, 0.97), rgba(29, 25, 21, 0.88));
+    backdrop-filter: blur(var(--blur-veil));
+    -webkit-backdrop-filter: blur(var(--blur-veil));
+  }
   .drawer-head h2 {
     margin: 0; font-family: var(--serif); font-style: italic;
     font-size: var(--fs-4xl); font-weight: 600; color: var(--brass-hi);
@@ -210,7 +250,7 @@
   .drawer .lbl { margin-top: var(--sp-2); }
 
   /* ============================ 图例 ============================ */
-  .legend-body { margin-top: 14px; }
+  .legend-body { margin-top: var(--sp-4); }
   .lg-group { margin-bottom: var(--sp-5); }
   .lg-group h3 {
     margin: 0 0 var(--sp-2); font-size: var(--fs-sm); letter-spacing: var(--track-wide);
@@ -225,15 +265,17 @@
   }
   .lg-group li b { color: var(--text); font-weight: 600; font-size: var(--fs-md); }
   .lg-group li span { color: var(--text-dim); line-height: var(--lh-snug); }
+  /* 色板基类：一族标记共用形状，颜色走 --seg-c 局部通道（与功能轨同一机制） */
   .lg-sw {
     width: 14px; height: var(--sp-2); border-radius: 2px;
-    background: var(--surface-3); align-self: center;
+    background: var(--seg-c, var(--surface-3)); align-self: center; flex: none;
   }
   .lg-sw.lg-blank { background: transparent; }
-  .lg-sw.fn-T { background: var(--fn-T); }
-  .lg-sw.fn-S { background: var(--fn-S); }
-  .lg-sw.fn-D { background: var(--fn-D); }
-  .lg-sw.fn-Tp { background: var(--fn-Tp); }
+  .lg-sw.fn-T, .lg-sw.fn-S, .lg-sw.fn-D, .lg-sw.fn-Tp { background: var(--seg-c); }
+  .lg-sw.fn-T { --seg-c: var(--fn-T); }
+  .lg-sw.fn-S { --seg-c: var(--fn-S); }
+  .lg-sw.fn-D { --seg-c: var(--fn-D); }
+  .lg-sw.fn-Tp { --seg-c: var(--fn-Tp); }
   .lg-sw.theme { background: var(--brass-hi); box-shadow: 0 0 0 1px var(--brass-hi); }
   .lg-sw.lock { background: var(--brass-hi); }
   .lg-sw.qa { background: transparent; border-bottom: 1px dotted var(--brass-hi); height: 6px; }
@@ -244,10 +286,11 @@
   .lg-sw.fit { background: rgba(216, 171, 92, 0.5); }
   .lg-sw.nct { background: var(--brass); box-shadow: 0 0 0 1.5px var(--brass-hi); }
   .lg-sw.slow { background: none; border: 1px dashed var(--text-faint); height: 6px; }
-  /* 跟弹（轮次 56）：你的音符（紫+近白描边）/ AI 右手（琥珀）/ AI 左手（青绿） */
-  .lg-sw.you { background: #cbbafa; box-shadow: 0 0 0 1.5px rgba(246, 243, 255, 0.85); }
-  .lg-sw.fallR { background: #ebc574; }
-  .lg-sw.fallL { background: #93c7bd; }
+  /* 跟弹（轮次 56）：你的音符（紫+近白描边）/ AI 右手（琥珀）/ AI 左手（青绿）。
+     三色收在 tokens.css——canvas 下落块、琴键金线、图例共用同一出处。 */
+  .lg-sw.you { background: var(--you); box-shadow: 0 0 0 1.5px var(--you-edge); }
+  .lg-sw.fallR { background: var(--fall-r); }
+  .lg-sw.fallL { background: var(--fall-l); }
   /* 和弦键：琴键底部一道金线 */
   .lg-sw.mk { background: none; border-bottom: 3px solid var(--brass); height: 0; border-radius: 0; }
   .lg-nodismiss { margin-top: 6px; }
@@ -268,6 +311,7 @@
     padding: 11px var(--sp-5); font-size: var(--fs-md);
     box-shadow: 0 16px 50px rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 }
 
@@ -282,6 +326,5 @@
   /* 极窄屏：双列会挤成两条缝，退成单列 */
   @media (max-width: 520px) {
     .grid-2 { grid-template-columns: 1fr; }
-    .pill { padding: 2px 9px; font-size: var(--fs-sm); }
   }
 }

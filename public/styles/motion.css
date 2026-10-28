@@ -4,17 +4,26 @@
    ① 入场用 --ease-out（快起慢收），状态过渡用 --ease-in-out；
    ② display 切换无法 transition，用 animation 在出现瞬间播放 —— 退场保持即时
       （「消失不该让人等」），故只有入场动画、没有退场动画；
-   ③ 静止的东西不许在背后持续画（能耗契约），动画亦同——一次性播完即止。
+   ③ 静止的东西不许在背后持续画（能耗契约），动画亦同——一次性播完即止；
+   ④ 轮次 72：一次编排式入场（错落 + 轻微缩放，像幕布升起），视图切换交叉淡入，
+      按压微交互统一 scale 反馈。全部只碰 transform/opacity（GPU 合成，不触发重排）。
    ========================================================================== */
 
 @layer motion {
-  /* 入场：一次性的错落浮现（--d 由 HTML 内联给出） */
+  /* 入场：一次性的错落浮现（--d 由 HTML 内联给出）。缩放只有 1%，是「深度」不是「弹跳」 */
   .reveal {
-    opacity: 0; transform: translateY(14px);
-    animation: reveal 0.7s var(--ease-out) forwards;
+    opacity: 0; transform: translateY(14px) scale(0.995);
+    animation: reveal var(--dur-load) var(--ease-out) forwards;
     animation-delay: var(--d, 0s);
   }
   @keyframes reveal { to { opacity: 1; transform: none; } }
+
+  /* 视图切换：display:none → grid 的瞬间淡入并轻微上浮（「翻到另一页」的空间感） */
+  .view.active { animation: viewIn var(--dur-slow) var(--ease-out); }
+  @keyframes viewIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
 
   /* 功能轨新格：从下方浮起，暗示"最新一格在左边" */
   .fnseg { animation: segIn var(--dur-slow) var(--ease-out); }
@@ -36,6 +45,12 @@
   /* 图例首用轻提示：呼吸两下即止，不是常驻召唤 */
   .lg-more.nudge { animation: lgNudge 2.2s var(--ease-in-out) 2; }
   @keyframes lgNudge { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+  /* ---------- 按压微交互：所有可点处都有「按下去」的触感（只动 transform） ---------- */
+  .chip:active { transform: scale(0.97); }
+  .tab:active { transform: scale(0.97); }
+  .iconbtn:active { transform: scale(0.92); }
+  .lg-more:active { transform: scale(0.97); }
 }
 
 /* ============================ 动效豁免 ============================ */
@@ -50,8 +65,10 @@
     scroll-behavior: auto !important;
   }
   .reveal { animation: none; opacity: 1; transform: none; }
-  .dlog li, .fnseg, .toast, .drawer { animation: none; }
+  .view.active, .dlog li, .fnseg, .toast, .drawer { animation: none; }
   .lg-more.nudge { animation: none; opacity: 1; }
   /* 琴键的触感反馈是功能性的（按下必须有回应），保留极短过渡 */
   .wk, .bk { transition-duration: 0.01ms !important; }
+  /* 按压缩放同归零：reduce 模式下不任何位移 */
+  .chip:active, .tab:active, .iconbtn:active, .lg-more:active { transform: none; }
 }

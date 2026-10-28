@@ -109,6 +109,21 @@ test('dom.js: escapeHtml 转义五个注入字符（唯一的 HTML 注入面）'
   assert.equal(escapeHtml(42), '42');
 });
 
+// 归零层的「媒体元素不溢出」是个好纪律，但 canvas 是例外：
+// studio-roll.js 把位图按 ZOOM 算成显式像素宽（style.width = W px）交给 .rollwrap
+// 自己横向滚动，一旦被 max-width:100% 夹到容器宽，位图会被缩扁，而指针换算仍是
+// px / ZOOM（pick / rollPos）→ 点哪儿都点不到那个音。这条静默失败很难在冒烟里发现
+// （画面「还能看」，只是窄了一点、点不中），所以用测试钉住。
+test('归零层不得给 canvas 施加 max-width（卷帘位图会被缩扁、指针换算失准）', () => {
+  const css = cssOf('base.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  const offenders = [];
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const [, selector, body] = m;
+    if (/\bcanvas\b/.test(selector) && /max-width\s*:/.test(body)) offenders.push(selector.trim());
+  }
+  assert.deepEqual(offenders, [], `这些规则用 max-width 约束了 canvas，卷帘/指针会错位：\n${offenders.join('\n')}`);
+});
+
 test('可访问性基座：跳转链接、sr-only、reduced-motion 三件事都在 CSS 里', () => {
   assert.match(allCss, /\.skip-link/, '缺少跳转链接样式（键盘用户跳不过顶栏）');
   assert.match(allCss, /\.sr-only/, '缺少屏幕阅读器专用文本类');

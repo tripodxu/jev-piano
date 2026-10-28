@@ -1,14 +1,22 @@
 /* ==========================================================================
    layout.css — 应用外壳：顶栏 / 视图栅格 / 页脚 / 响应式
+   轮次 72：顶栏 sticky + 小面积模糊（滚动时不丢渠道/台账读数）；
+   状态 pill 升级为「读数胶囊」（data-label 走 CSS ::before，JS 只写数值，
+   不碰标签——静态结构由 HTML 持有）；面板表面统一走配方令牌。
    ========================================================================== */
 
 @layer layout {
   /* ============================ 顶栏 ============================ */
   .top {
+    position: sticky; top: 0; z-index: var(--z-sticky);
     display: flex; align-items: center; gap: var(--sp-5); flex-wrap: wrap;
-    padding: var(--sp-4) var(--sp-6) 14px;
+    padding: var(--sp-3) var(--sp-6);
     border-bottom: 1px solid var(--hairline);
-    background: linear-gradient(180deg, rgba(216, 171, 92, 0.05), transparent);
+    background:
+      linear-gradient(180deg, rgba(216, 171, 92, 0.05), transparent),
+      var(--topbar-bg);
+    backdrop-filter: blur(var(--blur-bar));
+    -webkit-backdrop-filter: blur(var(--blur-bar));
   }
   .brand { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
   .brand-mark {
@@ -25,6 +33,8 @@
     letter-spacing: var(--track-tight); margin-left: var(--sp-1);
   }
 
+  /* 状态筹码：上行小标签（CSS ::before，来自 data-label）下行数值。
+     数值由 JS 写、标签由 HTML 持——两不相干，也不会被 textContent 抹掉。 */
   .statusbar { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-left: auto; }
 
   /* ============================ 视图栅格 ============================ */
@@ -33,23 +43,23 @@
     display: grid;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--sp-6) var(--sp-8);
-    grid-template-columns: minmax(320px, 400px) 1fr;
+    grid-template-columns: minmax(320px, 380px) 1fr;
     max-width: 1560px;
     margin: 0 auto;
     align-items: start;
   }
   .right-col { display: flex; flex-direction: column; gap: var(--sp-5); min-width: 0; }
 
-  /* 面板：控制台与节目单共用一套表面（渐变 + 发丝线 + 内高光） */
+  /* 面板：控制台与节目单共用一套表面（配方令牌：渐变 + 发丝线 + 顶光 + 抬升） */
   .console, .programme, .stage {
-    background: linear-gradient(180deg, rgba(27, 22, 17, 0.72), rgba(20, 16, 12, 0.85));
+    background: var(--panel-bg);
     border: 1px solid var(--hairline);
     border-radius: var(--r-md);
-    box-shadow: var(--elev-3);
+    box-shadow: var(--panel-shadow), var(--panel-inset);
   }
-  .console { padding: var(--sp-5) 22px; align-self: start; }
+  .console { padding: var(--sp-5) var(--sp-6); align-self: start; }
   .programme {
-    padding: var(--sp-4) 22px var(--sp-2);
+    padding: var(--sp-4) var(--sp-6) var(--sp-2);
     min-height: 220px; max-height: 460px;
     display: flex; flex-direction: column;
   }
@@ -75,11 +85,11 @@
       padding: var(--sp-4) var(--sp-4) var(--sp-6);
     }
     .right-col { order: -1; }   /* 舞台与节目单上移：先看见音乐，再操作 */
-    .top { padding: 13px var(--sp-4) 11px; gap: var(--sp-3); }
+    .top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
     .brand-tag { display: none; }
     .statusbar { margin-left: 0; }
     .console { padding: var(--sp-4); }
-    .programme { padding: 14px var(--sp-4) var(--sp-2); max-height: 400px; }
+    .programme { padding: var(--sp-4) var(--sp-4) var(--sp-2); max-height: 400px; }
   }
 
   @media (max-width: 720px) {
@@ -92,6 +102,9 @@
   @media (max-width: 520px) {
     .view.active { padding: var(--sp-3) var(--sp-3) var(--sp-5); }
     .statusbar { gap: var(--sp-1); }
+    /* 极窄屏：数值自己会说话，标签退场（读数不裁切、不换行） */
+    .pill[data-label]::before { display: none; }
+    .pill[data-label] { padding: 2px 9px; }
     .foot { padding-bottom: var(--sp-5); }
   }
 }

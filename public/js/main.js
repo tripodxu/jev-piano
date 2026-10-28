@@ -411,6 +411,29 @@ els.pauseBtn.addEventListener('click', () => {
   player.pause(on);
   els.pauseBtn.querySelector('span').textContent = on ? '继续' : '暂停';
 });
+/* 空格 = 播放/暂停（轮次 72：简单操作直达核心体验）。
+   守卫与 kbd.js 同宗——表单焦点/组合键/重触/输入法组合中不拦截；焦点落在按钮等
+   交互元素上时交给浏览器原生的 click（否则会双触发）。
+   三条边界（收口时补的，都是「看起来能用、实际会咬人」的地方）：
+   ① 抽屉打开时不接管——用户正在读图例/改设置，按键不该让背后的乐曲起落；
+   ② 输入法组合态（`isComposing`）一律放行，中文输入里空格是选词键；
+   ③ 路由谓词与 `attachKeyboard` 的 `enabled` 同一条（`viewStudio.active`），
+      别在这里另造一套「哪个界面在前台」的判据（轮次 68 的教训）。 */
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || e.repeat || e.isComposing) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!els.legendDrawer.classList.contains('hidden')) return;
+  if (!els.settingsDrawer.classList.contains('hidden')) return;
+  const t = e.target;
+  if (t && t !== document.body && t.closest?.('input, textarea, select, button, a, [role="button"], [contenteditable="true"]')) return;
+  e.preventDefault();
+  if (els.viewStudio.classList.contains('active')) {
+    document.getElementById('stPlay')?.click();
+    return;
+  }
+  if (player?.running) els.pauseBtn.click();
+  else els.playBtn.click();
+});
 els.directorNote.addEventListener('input', () => {
   if (player?.composer) player.composer.directorNote = els.directorNote.value.trim();
 });

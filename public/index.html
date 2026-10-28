@@ -2,10 +2,11 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Jev 即兴钢琴 · 实时谱曲演奏</title>
   <meta name="description" content="Jev 每小节实时决策，边作曲边演奏的钢琴。可接 TypeSafe/OpenRouter/Workers AI，也可离线随机。">
-  <meta name="theme-color" content="#0c0a08">
+  <meta name="theme-color" content="#0d0b09">
+  <meta name="color-scheme" content="dark">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet">
@@ -33,9 +34,9 @@
     </div>
     <div id="statusBar" class="statusbar" title="Jev 渠道 / 累计 tokens / 累计费用 / 平均延迟">
       <span class="pill" id="stChannel" title="决策来源；「·兜底」= 真实渠道本次请求失败，由离线随机接管，播放不中断、后续小节自动重试">离线随机</span>
-      <span class="pill" id="stTokens">0 tok</span>
-      <span class="pill" id="stCost">$0.000000</span>
-      <span class="pill" id="stLatency">— ms</span>
+      <span class="pill" id="stTokens" data-label="Tokens">0 tok</span>
+      <span class="pill" id="stCost" data-label="费用">$0.000000</span>
+      <span class="pill" id="stLatency" data-label="延迟">— ms</span>
     </div>
     <button id="legendBtn" class="iconbtn" type="button" aria-label="标记图例" aria-expanded="false" aria-controls="legendDrawer">
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.6 5.6a3.2 3.2 0 1 1 4.5 4.5c-.7.6-1.1 1.1-1.1 1.9"/><circle cx="8" cy="13.6" r="0.9" fill="currentColor" stroke="none"/></g></svg>
@@ -125,7 +126,7 @@
       </div>
 
       <div class="transport">
-        <button id="playBtn" class="btn primary" type="button">
+        <button id="playBtn" class="btn primary" type="button" aria-keyshortcuts="Space">
           <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M4.5 2.8v10.4L13 8Z" fill="currentColor"/></svg>
           <span>开始演奏</span>
         </button>
@@ -163,7 +164,7 @@
         <!-- 空态覆盖层（轮次 66）：下落区中央的节目单式引导，开演时由 main.js 摘掉 -->
         <div class="stage-idle" aria-hidden="true">
           <p class="si-title">今夜的节目尚未开始</p>
-          <p class="si-sub">写下一句灵感 · 按下「开始演奏」<br>每一小节都由 Jev 现场决策，逐小节长出整首曲子</p>
+          <p class="si-sub">写下一句灵感 · 按下「开始演奏」或按空格<br>每一小节都由 Jev 现场决策，逐小节长出整首曲子</p>
         </div>
         <div class="chordbox">
           <div class="now-chord" id="nowChord">—</div>
@@ -190,7 +191,7 @@
           <div class="felt"></div>
           <div id="keyboard" class="keyboard" aria-hidden="true"></div>
           <div class="piano-base"></div>
-          <div id="kbEcho" class="kb-echo" aria-live="polite">键盘 A–; 可弹奏 · Z/X 换八度</div>
+          <div id="kbEcho" class="kb-echo" aria-live="polite">键盘 A–; 可弹奏 · Z/X 换八度 · 空格 播放/暂停</div>
         </div>
       </div>
 

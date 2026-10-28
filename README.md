@@ -79,7 +79,7 @@ Worker 安全边界：`/api/llm` 只转发服务端 env 配置的端点（忽略
 ## 测试
 
 ```bash
-npm test          # 236 个单测：乐理内核 / 候选集构造 / 曲式 / Jev 客户端 / 决策器 / 调度器 / SMF 导出 / 张力分析 / 非和声音分析 / 终止式识别 / 界面层 / 工作室编辑 / 卷帘视图接线 / Worker 边界 / 回归门 / 决策预算与迟到小节 / 归因标记 / 模块行数上限（ADR-0004）
+npm test          # 261 个单测：乐理内核 / 候选集构造 / 曲式 / Jev 客户端 / 决策器 / 调度器 / SMF 导出 / 张力分析 / 非和声音分析 / 终止式识别 / 界面层 / 工作室编辑 / 卷帘视图接线 / 琴键同步（音频时钟）/ 设计系统契约 / Worker 边界 / 回归门 / 决策预算与迟到小节 / 归因标记 / 模块行数上限（ADR-0004）
 node scripts/probe-jev.mjs   # 真实 API 冒烟（需 TYPESAFE_API_KEY，单次 ~$0.00002）
 node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 ```
@@ -102,7 +102,7 @@ node scripts/probe-bar.mjs   # 真实 API 跑 3 个小节的生产路径决策
 ## 目录
 
 ```
-public/            纯静态前端（index.html + 19 个 ES Module，零构建、零依赖）
+public/            纯静态前端（index.html + 21 个 ES Module，零构建、零依赖）
   js/music.js      乐理内核：罗马数字解析、和弦声位、9 种曲风预设、和声功能分类、调式全色板
   js/candidates.js 候选集构造 + 曲式：反重复断路器、声部进行加权、功能转移矩阵、A–B–A'–Coda 段落模板
   js/jev.js        Jev 四渠道客户端（归一化/重试/超时）+ fixture 采样 + LLM 扩写
@@ -118,7 +118,8 @@ public/            纯静态前端（index.html + 19 个 ES Module，零构建�
   js/tension.js     分析层：张力（只读已生成的小节，不参与决策）
   js/nct.js         分析层：非和声音分类（只读，不参与决策）
   js/cadence.js     分析层：终止式识别（只读，不参与决策）
-  js/kbd.js          电脑键盘弹奏（A–L 白键 + W/E/T/Y/U/O/P 黑键 + Z/X 换八度，两界面共用）
+  js/kbd.js          电脑键盘弹奏（A–L 白键 + W/E/T/Y/U/O/P 黑键 + Z/X 换八度 + 空格 播放/暂停，两界面共用）
+  js/keysync.js     琴键视觉的音频时钟状态机（KeySync：亮/灭以声音的真实起止为准，不用挂钟 setTimeout）
 src/worker.js      CF Worker：静态资产 + /api/probe|jev|llm
 dev-proxy.py       本地开发：静态服务 + 模拟/真实转发
 docs/superpowers/plans/   实施计划（本项目的完整设计文档）
@@ -139,7 +140,8 @@ docs/superpowers/plans/   实施计划（本项目的完整设计文档）
 ## 演奏中的控制（jevthoven 功能对齐）
 
 - **演奏指示**（自然语言，实时生效）：输入框写"下一句左手更密集""结尾渐弱"，下一小节起 Jev 在 `director_note` 里读到并遵守；离线随机渠道用关键词近似响应。
-- **暂停 / 继续**：挂起 AudioContext 冻结时钟，恢复后调度自动对齐，决策管线同步暂停。
+- **暂停 / 继续**：挂起 AudioContext 冻结时钟，恢复后调度自动对齐，决策管线同步暂停。**空格**同效（抽屉打开、输入框聚焦或输入法组合中不接管）。
+- **电脑键盘弹奏**：A–L 白键、W/E/T/Y/U/O/P 黑键、`;` 跨三半音、Z/X 换八度——两个界面共用同一套键位，你弹的音在下落区是紫色，琴键按力度亮起。
 - **移调**：开演前指定 12 个调性之一，否则由计划自动决定。
 - **导出**：MIDI（SMF 双轨）与 WebM 录音随时可用。
 

@@ -1,6 +1,10 @@
 /* ==========================================================================
    stage.css — 实时舞台：舞台/灯光/和弦区/动机卡/功能轨/钢琴/计划卡/决策日志
    不变量：颜色归和声功能、形态归发展手法；每个标记都有**不依赖颜色**的第二通道。
+   轮次 72：聚光更干净（一层顶光 + 一层地板反光，去掉中间冗余渐变）；
+   白键加一道釉光高光；下落区底部一枚击键线辉光；决策日志行有 hover；
+   功能轨段顶圆角、当前段辉光。材质（琴键/琴毡）仍在本文件——它们是画出来的，
+   不是设计语言，豁免于裸值禁令。
    ========================================================================== */
 
 @layer stage {
@@ -13,7 +17,9 @@
       /* 地板反光：底缘一抹极淡暖光，让下落区像有聚光灯打在地面上 */
       radial-gradient(70% 42% at 50% 103%, rgba(216, 171, 92, 0.06), transparent 70%),
       linear-gradient(180deg, #0e0b09, var(--surface-0));
-    box-shadow: var(--elev-3);
+    /* 面板配方（与 .console/.programme 同源）：本文件在 layout.css 之后加载，
+       单独写 var(--elev-3) 会盖掉 layout 的配方，顶光内高光就此消失 —— 必须整份引用 */
+    box-shadow: var(--panel-shadow), var(--panel-inset);
     display: flex; flex-direction: column;
     /* 舞台一屏内完整可见：和弦区 + 下落区 + 钢琴 */
     height: clamp(430px, calc(100dvh - 210px), 640px);
@@ -153,7 +159,11 @@
   .fn-legend .k-Tp::before { background: var(--fn-Tp); }
   .fn-legend .k-d { color: var(--brass-hi); font-weight: 600; }
 
-  #fallCanvas { width: 100%; flex: 1; display: block; min-height: 120px; }
+  /* 下落区：底部一枚击键线辉光（canvas 透明，CSS 底色从背后透出来） */
+  #fallCanvas {
+    width: 100%; flex: 1; display: block; min-height: 120px;
+    background: radial-gradient(78% 26% at 50% 100%, rgba(216, 171, 92, 0.055), transparent 72%);
+  }
 
   /* ============================ 写实钢琴 ============================ */
   .piano { position: relative; padding: 0 var(--sp-2); flex: none; }
@@ -192,11 +202,13 @@
     user-select: none; touch-action: manipulation;
     box-shadow: inset 0 6px 9px rgba(0, 0, 0, 0.55);   /* 琴毡投下的阴影 */
   }
+  /* 白键：顶缘一道釉光高光（材质细节，让键帽像抛过光） */
   .wk {
     position: absolute; top: 0; bottom: 0; z-index: 1;
     background: linear-gradient(180deg, #b8b0a0 0, #f4efe2 4%, #fbf7ec 26%, #efe8d5 86%, #d9d0b9 96%, #c7bda3);
     border-radius: 0 0 3.5px 3.5px;
     box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
       inset 0 -5px 7px rgba(96, 84, 60, 0.28),
       inset -1.5px 0 2px rgba(80, 70, 50, 0.22),
       inset 1.5px 0 2px rgba(255, 255, 255, 0.55);
@@ -295,7 +307,10 @@
     display: flex; flex-wrap: wrap; align-items: baseline; gap: 13px;
     padding: var(--sp-2) var(--sp-2) var(--sp-2) 14px; position: relative;
     border-left: 2px solid transparent;
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    transition: background-color var(--dur-fast) var(--ease-in-out);
   }
+  .dlog li:hover { background: rgba(216, 171, 92, 0.04); }
   .dlog li.fresh {
     border-left-color: var(--brass);
     background: linear-gradient(90deg, rgba(216, 171, 92, 0.07), transparent 70%);
@@ -387,7 +402,7 @@
   .tension-legend .k { display: inline-flex; align-items: center; gap: 5px; }
   .tension-legend .k-actual::before,
   .tension-legend .k-target::before { content: ""; width: 14px; height: 2px; border-radius: 2px; }
-  .tension-legend .k-actual::before { background: #e8c57c; }
+  .tension-legend .k-actual::before { background: var(--tension-actual); }
   .tension-legend .k-target::before { background: rgba(214, 178, 110, 0.5); }
   .tension-stat {
     margin-left: auto; font-family: var(--mono); letter-spacing: 0.02em; color: var(--text-dim);
