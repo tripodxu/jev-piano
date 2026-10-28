@@ -5,6 +5,15 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-28 · 轮次 69 上线 + 核验：内容 16/16 全过，451 系既有上游封锁非回归（迭代轮次 69 · 部署）
+
+- **部署**：commit `f7501ff`（17 文件，+1459/−840）→ push origin/main → `wrangler deploy`。上传 **13 个资产**（7 个 CSS 层 + `dom.js` + `index.html` + `ui.js`/`canvas.js`/`studio.js`/`main.js`），Total Upload 7.50 KiB / gzip 2.58 KiB。**Version ID `bc5264e4-62ca-4b06-bb38-a9decc07eae1`**（线上版本标识，下次核验对齐用）。
+- **核验结果**：`verify-deploy` **16/16 静态针全命中**（含本次新增 4 针）；12 个线上资产全 200；`/` 的 7 个 `<link>` 顺序正确（`tokens.css` 首位——层序依赖它先声明）；`/api/probe` 200 `{"ok":true,"jev":"workers-ai","llm":false}`；同源防护 text/plain → **415**（新 Worker 在线的行为证明）。
+- **唯一红灯 `/api/jev` 502 `upstream 451`——已定性，非本次回归**：三次稳定复现。证据链：① 本次 `git show --stat HEAD` **未触及 `src/worker.js`**（上次改动是轮次 63）；② 错误串 `upstream 451` 只可能来自 `jevViaHTTP`，而 `wrangler secret list` 只有 `TYPESAFE_API_KEY` → 后端链 `[workers-ai, typesafe]`，两个都失败；③ **空凭据直打 `api.typesafe.ai` 也是 451** → 与 key 无关，是端点地区封锁，与轮次 59 结案结论一致。**复验**：经本机代理（127.0.0.1:10808）打生产 → **HTTP 200，`jev-1.14.0` 正常八问输出**（3.3s，backend typesafe）。真实渠道活着，无代理时前端自动落离线随机（兜底 toast + 0 tok，播放不中断）。
+- **教训（三件事再次分开）**：「部署成功 ≠ 部署正确 ≠ 上游活着」——本次 16/16 内容绿灯与 451 同时出现。另外 `/api/probe` 的 `ok:true` **只证明绑定存在、不证明可用**（probe 不实发请求），别拿它当渠道健康证据；真渠道要打 `/api/jev`。
+- **verify-deploy 补针 4 条**（拆层后必须双向对账）：`/index.html` 需含 `styles/tokens.css`+`styles/motion.css`+`skip-link`+`sr-only`；`/styles/tokens.css` 需含 `@layer tokens`+`--brass-hi`+`--surface-3`；`/js/dom.js` 需含 `escapeHtml`+`downloadBlob`；`/js/ui.js` 需含 `refreshStatusPills`+`attachPlayableKeyboard`。**坑**：补针的 needle 必须先在磁盘上对账再写——`--ebony` 这个变量名是我凭印象写的，本地一跑就缺，实际叫 `--surface-N`。
+- **任务板**：无需新建。451 沿用轮次 59 结论——仓库外问题（换 key / 上游解封 / 用户开代理），**保持渠道 = 同源代理（默认自动探测即选它）**。
+
 ## [完成] 2026-10-28 · 前端现代化重构：设计令牌化 + 分层样式 + 去重（迭代轮次 69 · 前端）
 
 - **做了什么**（领地 新增 `public/styles/`（7 个文件）/`public/js/dom.js`/`test/style-contract.test.mjs` + `index.html`/`ui.js`/`main.js`/`studio.js`/`AGENTS.md`；**删除** `public/styles.css`）：① **单体 740 行 styles.css → 7 个 @layer 分层文件**（tokens/base/layout/components/stage/studio/motion），层序只在 tokens.css 声明一次；② **完整设计令牌**（6 级表面、3 级文字、4 级间距节奏…共 ~60 个变量），组件层的裸色值/裸字号全部收编；③ 消除重复定义（`.stage` 背景写了两遍、`.toast` 的 z-index 与 max-width 各两遍、`.keyboard` 的 user-select 两遍、`.khint` 两遍）；④ 响应式断点从 2 档扩到 4 档（1200/980/720/520），`vh`→`dvh`，`.grid-2` 在 520 以下退单列；⑤ 可访问性：跳转链接、`.sr-only`、`prefers-contrast: more`、tab 的 `aria-selected` 与 `.sel` 同源、循环按钮 `aria-pressed`、**曲风 chips 的方向键导航 + roving tabindex**（10 个 chip 不该吃掉 10 次 Tab）；⑥ JS 去重：新增 `dom.js`（`escapeHtml`/`byId`/`downloadBlob`——`download()` 此前在 main/studio **逐字节重复两份**）、`ui.js` 新增 `refreshStatusPills`（两个界面共用同一份 pill DOM 与口径）与 `attachPlayableKeyboard`（`enabled` 守卫变必填参数，杜绝轮次 68 的双触发复发）。
