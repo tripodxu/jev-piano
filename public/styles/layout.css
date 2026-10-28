@@ -1,0 +1,97 @@
+/* ==========================================================================
+   layout.css — 应用外壳：顶栏 / 视图栅格 / 页脚 / 响应式
+   ========================================================================== */
+
+@layer layout {
+  /* ============================ 顶栏 ============================ */
+  .top {
+    display: flex; align-items: center; gap: var(--sp-5); flex-wrap: wrap;
+    padding: var(--sp-4) var(--sp-6) 14px;
+    border-bottom: 1px solid var(--hairline);
+    background: linear-gradient(180deg, rgba(216, 171, 92, 0.05), transparent);
+  }
+  .brand { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+  .brand-mark {
+    font-family: var(--serif); font-style: italic; font-weight: 600;
+    font-size: var(--fs-brand); line-height: 1; color: var(--brass-hi);
+    letter-spacing: 0.01em;
+  }
+  .brand-cn {
+    font-family: var(--serif); font-weight: 600; font-size: var(--fs-2xl);
+    letter-spacing: var(--track-xwide);
+  }
+  .brand-tag {
+    color: var(--text-faint); font-size: var(--fs-base-sm);
+    letter-spacing: var(--track-tight); margin-left: var(--sp-1);
+  }
+
+  .statusbar { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-left: auto; }
+
+  /* ============================ 视图栅格 ============================ */
+  .view { display: none; }
+  .view.active {
+    display: grid;
+    gap: var(--sp-5);
+    padding: var(--sp-5) var(--sp-6) var(--sp-8);
+    grid-template-columns: minmax(320px, 400px) 1fr;
+    max-width: 1560px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  .right-col { display: flex; flex-direction: column; gap: var(--sp-5); min-width: 0; }
+
+  /* 面板：控制台与节目单共用一套表面（渐变 + 发丝线 + 内高光） */
+  .console, .programme, .stage {
+    background: linear-gradient(180deg, rgba(27, 22, 17, 0.72), rgba(20, 16, 12, 0.85));
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-md);
+    box-shadow: var(--elev-3);
+  }
+  .console { padding: var(--sp-5) 22px; align-self: start; }
+  .programme {
+    padding: var(--sp-4) 22px var(--sp-2);
+    min-height: 220px; max-height: 460px;
+    display: flex; flex-direction: column;
+  }
+
+  /* ============================ 页脚 ============================ */
+  .foot {
+    display: flex; justify-content: center; gap: var(--sp-5); flex-wrap: wrap;
+    padding: var(--sp-2) 0 var(--sp-8);
+    font-size: var(--fs-base-sm); color: var(--text-faint); letter-spacing: var(--track-tight);
+  }
+  .foot-dim { opacity: 0.65; }
+
+  /* ============================ 响应式 ============================ */
+  /* 断点层级：1200（侧栏收窄）→ 980（单列，舞台优先）→ 720（紧凑）→ 520（极窄） */
+
+  @media (max-width: 1200px) {
+    .view.active { grid-template-columns: minmax(280px, 340px) 1fr; }
+  }
+
+  @media (max-width: 980px) {
+    .view.active {
+      grid-template-columns: 1fr;
+      padding: var(--sp-4) var(--sp-4) var(--sp-6);
+    }
+    .right-col { order: -1; }   /* 舞台与节目单上移：先看见音乐，再操作 */
+    .top { padding: 13px var(--sp-4) 11px; gap: var(--sp-3); }
+    .brand-tag { display: none; }
+    .statusbar { margin-left: 0; }
+    .console { padding: var(--sp-4); }
+    .programme { padding: 14px var(--sp-4) var(--sp-2); max-height: 400px; }
+  }
+
+  @media (max-width: 720px) {
+    .view.active { gap: var(--sp-4); }
+    .right-col { gap: var(--sp-4); }
+    .brand-cn { font-size: var(--fs-md); letter-spacing: var(--track-wide); }
+    .foot { font-size: var(--fs-sm); gap: var(--sp-3); }
+  }
+
+  @media (max-width: 520px) {
+    .view.active { padding: var(--sp-3) var(--sp-3) var(--sp-5); }
+    .statusbar { gap: var(--sp-1); }
+    .foot { padding-bottom: var(--sp-5); }
+  }
+}

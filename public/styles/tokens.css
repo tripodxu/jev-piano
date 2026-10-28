@@ -1,0 +1,130 @@
+/* ==========================================================================
+   tokens.css — 设计令牌（唯一真相源）
+   世界观：舞台顶光下的乌木三角钢琴。黄铜是唯一强调色，猩红只属于琴毡。
+   本文件只声明变量与层序，**不写任何选择器规则**（除 :root 与 @layer 声明）。
+   改视觉先改这里：任何组件文件里出现裸色值/裸像素节奏，都是令牌缺位的信号。
+   ========================================================================== */
+
+/* 层序（全局唯一声明，后续文件按名归入）：
+   tokens  → reset     浏览器归零
+   base    → 排版/浏览器表面/无障碍基座
+   layout  → 外壳与栅格
+   components → 通用控件
+   stage   → 实时舞台（舞台/功能轨/钢琴/决策日志）
+   studio  → 工作室
+   utilities → 工具类（最后，故 .hidden 无需 !important）
+   motion  → 动画与动效豁免（含 prefers-reduced-motion） */
+@layer tokens, reset, base, layout, components, stage, studio, utilities, motion;
+
+:root {
+  /* ---------- 乌木基底（暖黑，非纯黑）：五级表面 + 一条发丝线 ---------- */
+  --surface-0: #080605;   /* 最深：舞台内壁、卷帘底 */
+  --surface-1: #0c0a08;   /* 页面底 */
+  --surface-2: #14100c;   /* 面板底 */
+  --surface-3: #1b1611;   /* 面板顶（渐变起） */
+  --surface-4: #241d16;   /* 抬起：滚动条、输入框 hover */
+  --surface-5: #2c2419;
+
+  --hairline: rgba(214, 178, 110, 0.16);          /* 默认分隔线 */
+  --hairline-strong: rgba(214, 178, 110, 0.34);   /* 强调分隔线 */
+  --hairline-hover: rgba(214, 178, 110, 0.28);
+
+  /* ---------- 文字：象牙与旧纸（三级，末级对 --surface-3 ≥ 5.8:1） ---------- */
+  --text: #ece4d4;        /* 主文 */
+  --text-dim: #b3a892;    /* 次要 */
+  --text-faint: #9a9078;  /* 三级：标签、图例（原 #8b8168 仅 ~4.3:1，已提亮） */
+
+  /* ---------- 黄铜：唯一强调色 ---------- */
+  --brass: #d8ab5c;
+  --brass-hi: #f0cd8a;
+  --brass-lo: #a8813c;
+  --brass-tint: rgba(216, 171, 92, 0.12);
+  --brass-glow: rgba(216, 171, 92, 0.45);
+  --on-brass: #241a06;    /* 压在黄铜上的字色（4.5:1+ 已核） */
+
+  /* ---------- 功能色 ---------- */
+  --lh: #85b8ae;          /* 左手声部（冷青） */
+  --crimson: #9e2f28;     /* 琴毡 */
+  --crimson-hi: #d4614f;  /* 驳回标记 */
+  --signal-warn: #f0b9a8; /* 警示文字（toast）：猩红族的最亮档，压在暗底上够读 */
+
+  /* 和声功能四色：功能轨 / 日志徽章 / 图例共用同一份 */
+  --fn-T: #d8ab5c;        /* 主：稳定归宿 */
+  --fn-S: #85b8ae;        /* 下属：向外打开 */
+  --fn-D: #cf6a58;        /* 属：施力拉回（须够亮，深字压其上才够 4.5:1） */
+  --fn-Tp: #a8936f;       /* 色彩：离调（降饱和，不与前三者争） */
+
+  /* ---------- 字体 ---------- */
+  --serif: "Cormorant Garamond", "Noto Serif SC", "STSong", Georgia, serif;
+  --sans: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "JetBrains Mono", Consolas, monospace, monospace;
+
+  /* 字号：正文 15px 为轴，其余成比例（不引入第二套无来源的字号） */
+  --fs-2xs: 9px;
+  --fs-xs: 10px;
+  --fs-sm: 11px;
+  --fs-base-sm: 12px;
+  --fs-base: 12.5px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 17px;
+  --fs-2xl: 19px;
+  --fs-3xl: 21px;
+  --fs-4xl: 26px;
+  --fs-brand: clamp(24px, 4vw, 30px);    /* 品牌字：随视口收放，省掉一条断点覆盖 */
+  --fs-display: clamp(40px, 7vw, 58px);  /* 当前和弦：随视口收放 */
+
+  --lh-tight: 1.25;
+  --lh-snug: 1.5;
+  --lh-normal: 1.7;
+  --lh-loose: 1.9;
+
+  /* 字距：宽字距只留给短标签（impeccable 规则），长读数行用 tight */
+  --track-label: 0.14em;
+  --track-wide: 0.2em;
+  --track-xwide: 0.32em;
+  --track-tight: 0.04em;
+  --track-none: 0;
+
+  /* ---------- 间距：4px 基准，8px 节奏 ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 28px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+
+  /* ---------- 圆角制度：胶囊 / 面板 / 小件，禁止混用第四种 ---------- */
+  --r-pill: 999px;
+  --r-md: 12px;      /* 面板与输入 */
+  --r-sm: 8px;       /* 内嵌块、钢琴木壳 */
+  --r-xs: 4px;       /* 色板、铭牌 */
+
+  /* ---------- 阴影：三级抬升 + 黄铜光晕 ---------- */
+  --elev-1: 0 2px 6px rgba(0, 0, 0, 0.45);
+  --elev-2: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --elev-3: 0 18px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(240, 205, 138, 0.06);
+  --elev-drawer: -30px 0 80px rgba(0, 0, 0, 0.6);
+  --glow-brass: 0 6px 22px rgba(216, 171, 92, 0.22);
+
+  /* ---------- 动效：一条曲线、四档时长（motion 层统一豁免） ---------- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* 出场：快起慢收 */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1); /* 状态过渡 */
+  --dur-instant: 0.06s;  /* 琴键（触感反馈，不能慢） */
+  --dur-fast: 0.15s;
+  --dur-base: 0.2s;
+  --dur-slow: 0.35s;
+
+  /* ---------- 层级 ---------- */
+  --z-veil: 1;      /* 暗角与颗粒（fixed 覆盖层） */
+  --z-content: 2;   /* 页面内容 */
+  --z-drawer: 50;
+  --z-toast: 60;
+
+  /* ---------- 触控目标（桌面 24px / 触屏 44px，分上下文对待） ---------- */
+  --tap-min: 24px;
+  --tap-touch: 44px;
+}

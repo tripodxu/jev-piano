@@ -2,6 +2,9 @@
 // canvas 可视化三件套自轮次 52 起住在 canvas.js（本模块只转出，对外契约不变）。
 import { midiName, PREFERRED_NAME, chordRole } from './music.js';
 import { tempoMultAt } from './candidates.js';
+import { escapeHtml } from './dom.js';
+import { getAudio } from './audio.js';
+import { attachKeyboard, hintsFor } from './kbd.js';
 
 import { LOW, HIGH, sectionLabel } from './canvas.js';
 
@@ -489,8 +492,63 @@ export function toast(el, msg, ms = 4000) {
   el._t = setTimeout(() => el.classList.add('hidden'), ms);
 }
 
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/**
+ * 顶栏台账 pill 的一次性刷新（轮次 50 的口径，轮次 69 抽成共享实现）。
+ *
+ * 为什么要有它：`ledgerPills()` + `setStatus()` 这对调用此前在 main.js 与 studio.js
+ * 里各写了一遍——**共用的显示 + 各写各的账 = 一半界面永远在说谎**（工作室此前整条生成
+ * 循环从不记账）。口径必须只有一个地方，两个界面都从这里取。
+ *
+ * @param {{channel:Element,tokens:Element,cost:Element,latency:Element}} pills
+ * @param {{channel:string, ledger:object, suffix?:string}} opts  suffix 用于兜底告知（' ·兜底' / ' ·跟不上'）
+ */
+export function refreshStatusPills(pills, { channel, ledger, suffix = '' }) {
+  if (!pills?.channel) return;
+  const p = ledgerPills(ledger);
+  setStatus(pills, {
+    channel: `${channel ?? ''}${suffix}`,
+    tokens: p.tokens,
+    cost: p.cost,
+    latency: p.latency,
+  });
+}
+
+/**
+ * 接好一面「可弹奏的键盘」（轮次 65 的键位 + 轮次 55 的跟弹回声 + 轮次 57 的和弦键）。
+ *
+ * 为什么抽出来：两个界面此前各写一份，而两份里的 `enabled` 守卫是**同一个 bug 的两半**
+ * （轮次 68：两边监听器都常驻 window，不查视图会让实时页每次按键双触发、双发声）。
+ * 把守卫变成一个必须显式传入的参数，就不会再有人漏写。
+ *
+ * @param {Element} container 键盘容器
+ * @param {object} opts
+ *   - echoEl   回声行元素（可选）
+ *   - chordOf  () => 当前和声上下文（用于 keyEchoText 的角色读数）
+ *   - onNote   (midi) => void 额外副作用（实时页：把用户音符推进下落可视化）
+ *   - enabled  () => boolean **必填**：该界面是否响应电脑键盘（防双触发）
+ * @returns 键盘句柄 { flash, mark, setKeyHints, clear }
+ */
+export function attachPlayableKeyboard(container, { echoEl = null, chordOf = () => null, onNote = null, enabled = null } = {}) {
+  const audio = getAudio();
+  // 弹一个音的共用路径：琴键点击与电脑键盘从这里进——回声、发声、跟弹一条路，不各有各的账
+  const pressKey = (midi) => {
+    if (echoEl) echoEl.textContent = keyEchoText(midi, chordOf());
+    onNote?.(midi);
+    audio.ensure()
+      .then(() => audio.play(midi, audio.ctx.currentTime + 0.01, 0.9, 0.7))
+      .catch(() => { /* 音频不可用时静默——试听是增强 */ });
+  };
+  const kb = renderKeyboard(container, { onKey: pressKey });
+  kb.setKeyHints(hintsFor(60));
+  attachKeyboard({
+    onKey: pressKey,
+    onOctave: (base) => {
+      kb.setKeyHints(hintsFor(base));
+      if (echoEl) echoEl.textContent = `八度 → ${midiName(base)} 起（Z/X 切换）`;
+    },
+    enabled,
+  });
+  return kb;
 }
 
 /** 键盘试听回声（轮次 55）：点击的琴键在当前和弦里的角色——「C4 · Cm的根音（和弦音）」。

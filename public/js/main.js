@@ -6,9 +6,9 @@ import { loadSettings, saveSettings as persistSettings } from './settings.js';
 import { ensureStudio, stopStudio } from './studio.js';
 import { exportMidi } from './midi.js';
 import { askJev, expandPlan, probeProxy } from './jev.js';
-import { renderKeyboard, Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, setStatus, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle, CHANNEL_LABEL, emptyLedger, accumulateLedger, ledgerPills, keyEchoText } from './ui.js';
-import { STYLE_BY_ID, chordPcs, midiName } from './music.js';
-import { attachKeyboard, hintsFor } from './kbd.js';
+import { Fall, TensionGraph, MotifCard, addDecision, pushFnSegment, renderPlan, toast, LEGEND_ITEMS, renderLegend, uniquenessLine, stageLightFor, chorusSummary, styleChipTitle, goalTitle, CHANNEL_LABEL, emptyLedger, accumulateLedger, refreshStatusPills, attachPlayableKeyboard } from './ui.js';
+import { STYLE_BY_ID, chordPcs } from './music.js';
+import { downloadBlob } from './dom.js';
 import { GOAL_HINTS } from './composer.js';
 import { barTension, smooth, tensionStats } from './tension.js';
 import { barHarmonyFit, NCT_ZH } from './nct.js';
@@ -48,14 +48,11 @@ let stats = emptyLedger();
 // 前者是故障（轮次 41），后者是设计在主动保住节奏（轮次 48）。
 let fallbackAnnounced = false;   // 渠道不可用（429/502/断网/CORS/无 key）
 let slowAnnounced = false;       // 渠道跟不上：决策超过本小节的音频预算
+const statusPills = () => ({ channel: els.stChannel, tokens: els.stTokens, cost: els.stCost, latency: els.stLatency });
 const refreshStatus = (fallback) => { // fallback: null | 'down' | 'slow'
   const label = CHANNEL_LABEL[settings.channel] ?? settings.channel;
   const suffix = fallback === 'slow' ? ' ·跟不上' : fallback ? ' ·兜底' : '';
-  const p = ledgerPills(stats);
-  setStatus({ channel: els.stChannel, tokens: els.stTokens, cost: els.stCost, latency: els.stLatency }, {
-    channel: label + suffix,
-    tokens: p.tokens, cost: p.cost, latency: p.latency,
-  });
+  refreshStatusPills(statusPills(), { channel: label, ledger: stats, suffix });
 };
 
 /* ---------------- 控件绑定 ---------------- */
@@ -117,19 +114,44 @@ wireDrawer({ btn: els.settingsBtn, drawer: els.settingsDrawer, close: els.settin
   }
 })();
 els.settingsClose.addEventListener('click', () => els.settingsDrawer.classList.add('hidden'));
-els.styleChips.addEventListener('click', (e) => {
-  const chip = e.target.closest('.chip');
-  if (!chip) return;
+/** 选中某个曲风 chip：视觉态、aria-checked、roving tabindex 三件事必须一起动——
+ *  少同步任何一个，屏幕阅读器与键盘用户看到的就是另一个界面。 */
+function selectChip(chip) {
   for (const c of els.styleChips.children) {
-    c.classList.toggle('sel', c === chip);
-    c.setAttribute('aria-checked', c === chip ? 'true' : 'false'); // radiogroup 的 radio 语义要与视觉选中态同步
+    const on = c === chip;
+    c.classList.toggle('sel', on);
+    c.setAttribute('aria-checked', on ? 'true' : 'false'); // radiogroup 的 radio 语义要与视觉选中态同步
+    c.tabIndex = on ? 0 : -1;                              // 单个 Tab 停点
   }
   settings.styleId = chip.dataset.style;
   settings.touched = true;
   saveSettings();
+}
+els.styleChips.addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (chip) selectChip(chip);
+});
+/* 曲风 chips 的键盘导航（补齐 role="radiogroup" 的应有行为）：
+   方向键在组内移动并选中、Home/End 跳首尾。默认每个按钮都能 Tab，
+   而正确的 radiogroup 是**一个 Tab 停点 + 方向键切换**——10 个 chip 不该吃掉 10 次 Tab。 */
+els.styleChips.addEventListener('keydown', (e) => {
+  const chips = [...els.styleChips.children];
+  const i = chips.indexOf(document.activeElement);
+  if (i < 0) return;
+  const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
+    : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+  const next = step ? (i + step + chips.length) % chips.length
+    : e.key === 'Home' ? 0
+      : e.key === 'End' ? chips.length - 1 : -1;
+  if (next < 0) return;
+  e.preventDefault();
+  selectChip(chips[next]);
+  chips[next].focus();
 });
 for (const c of els.styleChips.children) {
-  c.classList.toggle('sel', c.dataset.style === settings.styleId);
+  const on = c.dataset.style === settings.styleId;
+  c.classList.toggle('sel', on);
+  c.tabIndex = on ? 0 : -1;
   // 信息前置（轮次 44）：领域描述与速度区间在选择那一刻可见
   const st = STYLE_BY_ID[c.dataset.style];
   if (st) c.title = styleChipTitle(st);
@@ -147,28 +169,17 @@ const audio = getAudio();
 // 点击琴键试听：点击本身是用户手势，ensure() 合法；未开演也能摸一摸这件乐器。
 // 跟弹回声（轮次 55）：演奏中有和声上下文时，告诉用户这个音在当前和弦里是什么角色——
 // 键盘从「试听」变成「跟弹学习乐器」，弹错音也能听见偏了多远。
-// 弹一个音的共用路径（轮次 65）：琴键点击与电脑键盘（kbd.js）从这里进——
-// 回声、跟弹下落、发声一条路，两个入口不各有各的账
-const pressKey = (midi) => {
-  els.kbEcho.textContent = keyEchoText(midi, lastChord);
-  // 跟弹可视化（轮次 56）：演奏中你弹的音以紫色亮边落在击键线上——AI 的音符向下落，你的音符原地亮起
-  if (player?.running && audio.ctx) fall.push({ midi, t: audio.ctx.currentTime + 0.01, dur: 0.45, vel: 0.8, user: true });
-  audio.ensure()
-    .then(() => audio.play(midi, audio.ctx.currentTime + 0.01, 0.9, 0.7))
-    .catch(() => { /* 音频不可用时静默——试听是增强 */ });
-};
-const kb = renderKeyboard(els.keyboard, { onKey: pressKey });
-// 电脑键盘弹奏（轮次 65）：A–L 一行白键、W/E/T/Y/U/O/P 黑键、; 再跨三半音；Z/X 上下换八度。
-// enabled：仅实时视图激活时响应——工作室开过一次后它的监听器也常驻 window，
-// 两边不查视图会让实时页的每次按键双触发（双发声，轮次 68 修复）
-kb.setKeyHints(hintsFor(60));
-attachKeyboard({
-  onKey: pressKey,
-  onOctave: (base) => {
-    kb.setKeyHints(hintsFor(base));
-    els.kbEcho.textContent = `八度 → ${midiName(base)} 起（Z/X 切换）`;
+// 可弹奏键盘（轮次 69 抽成 ui.js 的共享实现）：琴键点击与电脑键盘同路——
+// 回声、跟弹下落、发声一条路，两个入口不各有各的账。
+// enabled 是**必填**守卫：两个界面的监听器都常驻 window，不查视图会双触发（双发声，轮次 68）
+const kb = attachPlayableKeyboard(els.keyboard, {
+  echoEl: els.kbEcho,
+  chordOf: () => lastChord,
+  onNote: (midi) => {
+    // 跟弹可视化（轮次 56）：演奏中你弹的音以紫色亮边落在击键线上——AI 的音符向下落，你的音符原地亮起
+    if (player?.running && audio.ctx) fall.push({ midi, t: audio.ctx.currentTime + 0.01, dur: 0.45, vel: 0.8, user: true });
   },
-  enabled: () => !document.getElementById('viewStudio').classList.contains('active'),
+  enabled: () => !els.viewStudio.classList.contains('active'),
 });
 const fall = new Fall(els.fallCanvas, () => audio.ctx?.currentTime ?? 0);
 const tensionGraph = new TensionGraph(els.tensionCanvas);
@@ -368,13 +379,7 @@ function stopAll() {
   setButtons(false); // player 保留引用：已演奏的 records 仍可导出 MIDI
 }
 
-function download(blob, name) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-}
+const download = downloadBlob; // 导出路径与工作室共用同一份实现（dom.js）
 
 els.playBtn.addEventListener('click', start);
 els.stopBtn.addEventListener('click', stopAll);
@@ -441,6 +446,10 @@ function showView(v) {
   els.viewStudio.classList.toggle('hidden', v !== 'studio');
   els.tabLive.classList.toggle('sel', v === 'live');
   els.tabStudio.classList.toggle('sel', v === 'studio');
+  // 视觉选中态与 aria-selected 必须同源：tabpanel 的语义由 aria-selected 承载，
+  // 只切 class 会让屏幕阅读器永远停在「实时即兴」上。
+  els.tabLive.setAttribute('aria-selected', v === 'live' ? 'true' : 'false');
+  els.tabStudio.setAttribute('aria-selected', v === 'studio' ? 'true' : 'false');
   if (v === 'studio') { stopAll(); ensureStudio(); }
   else stopStudio();
 }

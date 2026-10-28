@@ -1,0 +1,57 @@
+/* ==========================================================================
+   motion.css — 关键帧与动效豁免（唯一允许写 @keyframes 的文件）
+   动效原则：
+   ① 入场用 --ease-out（快起慢收），状态过渡用 --ease-in-out；
+   ② display 切换无法 transition，用 animation 在出现瞬间播放 —— 退场保持即时
+      （「消失不该让人等」），故只有入场动画、没有退场动画；
+   ③ 静止的东西不许在背后持续画（能耗契约），动画亦同——一次性播完即止。
+   ========================================================================== */
+
+@layer motion {
+  /* 入场：一次性的错落浮现（--d 由 HTML 内联给出） */
+  .reveal {
+    opacity: 0; transform: translateY(14px);
+    animation: reveal 0.7s var(--ease-out) forwards;
+    animation-delay: var(--d, 0s);
+  }
+  @keyframes reveal { to { opacity: 1; transform: none; } }
+
+  /* 功能轨新格：从下方浮起，暗示"最新一格在左边" */
+  .fnseg { animation: segIn var(--dur-slow) var(--ease-out); }
+  @keyframes segIn { from { opacity: 0; transform: translateY(5px); } }
+
+  /* 决策日志新行 */
+  .dlog li { animation: logIn 0.4s var(--ease-out); }
+  @keyframes logIn { from { opacity: 0; transform: translateY(-5px); } }
+
+  /* toast / 抽屉：只在出现时播放（轮次 67） */
+  .toast { animation: toastIn var(--dur-slow) var(--ease-out); }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translate(-50%, 10px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+  }
+  .drawer { animation: drawerIn var(--dur-slow) var(--ease-out); }
+  @keyframes drawerIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+
+  /* 图例首用轻提示：呼吸两下即止，不是常驻召唤 */
+  .lg-more.nudge { animation: lgNudge 2.2s var(--ease-in-out) 2; }
+  @keyframes lgNudge { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+}
+
+/* ============================ 动效豁免 ============================ */
+/* 前庭敏感用户：所有位移/淡入退成「直接出现」，过渡压到不可感知。
+   注意用 `* { transition-duration }` 兜底而非逐个类——漏一个就前功尽弃，
+   而这类用户宁可界面"生硬"，也不要眩晕。 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { animation: none; opacity: 1; transform: none; }
+  .dlog li, .fnseg, .toast, .drawer { animation: none; }
+  .lg-more.nudge { animation: none; opacity: 1; }
+  /* 琴键的触感反馈是功能性的（按下必须有回应），保留极短过渡 */
+  .wk, .bk { transition-duration: 0.01ms !important; }
+}

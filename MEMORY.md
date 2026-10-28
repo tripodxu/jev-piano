@@ -5,6 +5,15 @@
 > 详细版在 [`docs/memory/`](docs/memory/)（同日文件名，格式相同）；本文件只放压缩条目 + 任务板。
 > 写入规范见 [AGENTS.md §4](AGENTS.md)；本文件由每个完成任务的 agent 维护——**完成任务不写记忆 = 未完成**。
 
+## [完成] 2026-10-28 · 前端现代化重构：设计令牌化 + 分层样式 + 去重（迭代轮次 69 · 前端）
+
+- **做了什么**（领地 新增 `public/styles/`（7 个文件）/`public/js/dom.js`/`test/style-contract.test.mjs` + `index.html`/`ui.js`/`main.js`/`studio.js`/`AGENTS.md`；**删除** `public/styles.css`）：① **单体 740 行 styles.css → 7 个 @layer 分层文件**（tokens/base/layout/components/stage/studio/motion），层序只在 tokens.css 声明一次；② **完整设计令牌**（6 级表面、3 级文字、4 级间距节奏…共 ~60 个变量），组件层的裸色值/裸字号全部收编；③ 消除重复定义（`.stage` 背景写了两遍、`.toast` 的 z-index 与 max-width 各两遍、`.keyboard` 的 user-select 两遍、`.khint` 两遍）；④ 响应式断点从 2 档扩到 4 档（1200/980/720/520），`vh`→`dvh`，`.grid-2` 在 520 以下退单列；⑤ 可访问性：跳转链接、`.sr-only`、`prefers-contrast: more`、tab 的 `aria-selected` 与 `.sel` 同源、循环按钮 `aria-pressed`、**曲风 chips 的方向键导航 + roving tabindex**（10 个 chip 不该吃掉 10 次 Tab）；⑥ JS 去重：新增 `dom.js`（`escapeHtml`/`byId`/`downloadBlob`——`download()` 此前在 main/studio **逐字节重复两份**）、`ui.js` 新增 `refreshStatusPills`（两个界面共用同一份 pill DOM 与口径）与 `attachPlayableKeyboard`（`enabled` 守卫变必填参数，杜绝轮次 68 的双触发复发）。
+- **为什么**：用户要求「统一设计语言与视觉规范 / 精简冗余样式与重复代码 / 提升响应式与可访问性 / 改善可维护性」。视觉世界（午夜音乐厅：乌木+黄铜）**不推翻**——沿用轮次 2 `frontend-design` 的 `SCOPED_EXISTING_ALLOWED` 判据：既有体系内精修，不重做。
+- **新增契约测试**（`test/style-contract.test.mjs`，9 条，与轮次 49 的 DOM id 契约同类）：拆分的失败模式是**静默的**——少 link 一个文件整层消失、变量名打错 var() 静默回退、裸值回流设计语言漂移。四道红灯：样式表存在性双向对账、层序唯一、var() 变量必须已定义、组件层禁止裸色值/裸字号。**它当场抓出 2 个真问题**：brand-mark 的 30px/24px 与 toast 的 #f0b9a8 是漏网的裸值（已收进 `--fs-brand: clamp(24px,4vw,30px)` 与 `--signal-warn`）。
+- **坑**：① 契约测试第一版正则 `[a-z0-9-]` 漏了大写，把 `--fn-T` 截成 `--fn-` 误报——**CSS 变量名含大写，正则必须 `[A-Za-z0-9-]`**；② 删 `styles.css` 前要确认 worker 用 `env.ASSETS.fetch` 按目录服务（不白名单），子目录才安全；③ `.hidden` 去掉 `!important` 靠的是 utilities 层在最后——**换层即破**，别把它移出 utilities。
+- **验证**：npm test **245 全绿**（原 236 + 新增 9）；`npm run gate` 12 种子均值 **9.08 / 2.54 / 32.00 / 31.58 —— 与重构前逐位一致**（业务零改动）；行数上限最大 563（`ui.js`，≤800 ✓）；静态服务 11 个资源全 200。
+- **下一步**：task 板不变。下一个动样式的 agent 请先读 AGENTS.md §2.1（新增的样式架构小节），**改视觉先改 tokens.css**。
+
 ## [完成] 2026-10-25 · 第三轮全量审计：双键盘监听器等 4 项修复（迭代轮次 68 · 审计+修复）
 
 - **方法**：距轮次 61 审计已隔 7 轮，本轮重点用新鲜眼睛审**自己轮次 62–67 写的代码**（自查集成 bug）+ 补读 index.html 全文。轮次 62–67 其余改动逐文件复查通过。

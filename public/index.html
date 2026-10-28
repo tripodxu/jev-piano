@@ -5,22 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Jev 即兴钢琴 · 实时谱曲演奏</title>
   <meta name="description" content="Jev 每小节实时决策，边作曲边演奏的钢琴。可接 TypeSafe/OpenRouter/Workers AI，也可离线随机。">
+  <meta name="theme-color" content="#0c0a08">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <!-- 分层样式表：层序由 tokens.css 的 @layer 声明统一裁决，加载顺序即层序 -->
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/components.css">
+  <link rel="stylesheet" href="styles/stage.css">
+  <link rel="stylesheet" href="styles/studio.css">
+  <link rel="stylesheet" href="styles/motion.css">
 </head>
 <body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+
   <header class="top">
-    <div class="brand">
+    <h1 class="brand">
       <span class="brand-mark">Jev</span>
       <span class="brand-cn">即兴钢琴</span>
       <span class="brand-tag">每小节实时决策，边作曲边演奏</span>
+    </h1>
+    <div class="tabs" role="tablist" aria-label="视图">
+      <button id="tabLive" class="tab sel" type="button" role="tab" aria-selected="true" aria-controls="viewLive">实时即兴</button>
+      <button id="tabStudio" class="tab" type="button" role="tab" aria-selected="false" aria-controls="viewStudio">工作室</button>
     </div>
-    <nav class="tabs" aria-label="视图">
-      <button id="tabLive" class="tab sel" type="button">实时即兴</button>
-      <button id="tabStudio" class="tab" type="button">工作室</button>
-    </nav>
     <div id="statusBar" class="statusbar" title="Jev 渠道 / 累计 tokens / 累计费用 / 平均延迟">
       <span class="pill" id="stChannel" title="决策来源；「·兜底」= 真实渠道本次请求失败，由离线随机接管，播放不中断、后续小节自动重试">离线随机</span>
       <span class="pill" id="stTokens">0 tok</span>
@@ -35,9 +45,11 @@
     </button>
   </header>
 
-  <main>
-    <div id="viewLive" class="view active">
-    <section class="console reveal" style="--d:.05s">
+  <main id="main">
+    <div id="viewLive" class="view active" role="tabpanel" aria-labelledby="tabLive">
+    <section class="console reveal" style="--d:.05s" aria-labelledby="liveConsoleTitle">
+      <h2 id="liveConsoleTitle" class="sr-only">演奏控制台</h2>
+
       <div class="field-group">
         <label class="lbl" for="prompt">你的灵感</label>
         <textarea id="prompt" rows="3" placeholder="例：雨夜的城市，一个人走在霓虹下"></textarea>
@@ -49,8 +61,8 @@
       </div>
 
       <div class="field-group">
-        <label class="lbl">风格</label>
-        <div id="styleChips" class="chips" role="radiogroup">
+        <label class="lbl" id="styleLabel">风格</label>
+        <div id="styleChips" class="chips" role="radiogroup" aria-labelledby="styleLabel">
           <button class="chip sel" role="radio" aria-checked="true" data-style="random" type="button">随机</button>
           <button class="chip" role="radio" aria-checked="false" data-style="classical" type="button">古典</button>
           <button class="chip" role="radio" aria-checked="false" data-style="romantic" type="button">浪漫</button>
@@ -182,8 +194,8 @@
         </div>
       </div>
 
-      <section class="programme reveal" style="--d:.25s">
-        <h2 class="programme-title">演奏记录 <span class="programme-sub">每小节一次 Jev 决策，八问并行</span><span id="repStat" class="rep-stat" aria-live="off"></span></h2>
+      <section class="programme reveal" style="--d:.25s" aria-labelledby="programmeTitle">
+        <h2 class="programme-title" id="programmeTitle">演奏记录 <span class="programme-sub">每小节一次 Jev 决策，八问并行</span><span id="repStat" class="rep-stat" aria-live="off"></span></h2>
         <p id="logEmpty" class="log-empty">尚未开演——写下灵感，按下「开始演奏」，这里会逐小节目录 Jev 的每一个决定。</p>
         <div class="tension-box">
           <canvas id="tensionCanvas" height="72" role="img" aria-label="张力对照带：实线为已演奏小节的张力，虚线为乐章计划的张力弧线"></canvas>
@@ -197,8 +209,9 @@
     </section>
     </div>
 
-    <div id="viewStudio" class="view hidden">
-      <section class="console">
+    <div id="viewStudio" class="view hidden" role="tabpanel" aria-labelledby="tabStudio">
+      <section class="console" aria-labelledby="studioConsoleTitle">
+        <h2 id="studioConsoleTitle" class="sr-only">编曲控制台</h2>
         <div class="field-group">
           <label class="lbl" for="stPrompt">灵感</label>
           <textarea id="stPrompt" rows="3" placeholder="例：午后的咖啡馆，慵懒的摇摆"></textarea>
@@ -265,7 +278,7 @@
           </div>
           <div class="rolltransport">
             <button id="stPlay" class="btn primary" type="button" disabled><span>播放</span></button>
-            <button id="stLoop" class="btn sel" type="button" disabled>循环</button>
+            <button id="stLoop" class="btn sel" type="button" disabled aria-pressed="true">循环</button>
             <label class="mini">右手 <input type="checkbox" id="stMuteR"></label>
             <label class="mini">左手 <input type="checkbox" id="stMuteL"></label>
             <label class="mini">BPM <input type="number" id="stBpm" class="bpmnum" min="40" max="200" value="90" disabled></label>
@@ -303,7 +316,7 @@
     <label class="mini lg-nodismiss"><input type="checkbox" id="legendNoHint"> 不再自动提示（按钮始终在顶栏）</label>
   </aside>
 
-  <aside id="settingsDrawer" class="drawer hidden" aria-label="设置">
+  <aside id="settingsDrawer" class="drawer hidden" aria-label="设置" role="region">
     <div class="drawer-head">
       <h2>设置</h2>
       <button id="settingsClose" class="iconbtn" type="button" aria-label="关闭">

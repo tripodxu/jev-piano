@@ -1,0 +1,35 @@
+/* ==========================================================================
+   studio.css — 工作室：钢琴卷帘、力度轨、播放头、走带控制
+   卷帘的两条轨共用「像素/拍」刻度，横轴天然对齐；播放头 top:0/bottom:0 自动覆盖两条轨。
+   ========================================================================== */
+
+@layer studio {
+  .rollwrap {
+    position: relative; overflow-x: auto; overflow-y: hidden;
+    background: var(--surface-0); user-select: none;
+  }
+  #stRoll { display: block; cursor: crosshair; touch-action: none; }
+  #stVel {
+    display: block; cursor: ns-resize; touch-action: none;
+    background: #0d0a08; border-top: 1px solid var(--hairline);
+  }
+  .playhead {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: var(--brass-hi); box-shadow: 0 0 10px var(--brass-glow);
+    pointer-events: none;
+  }
+  .rolltransport {
+    display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+    padding: var(--sp-2) 14px; border-top: 1px solid var(--hairline);
+    flex: none;
+  }
+  .vel-group { gap: 5px; }
+  .vel-group .bpmnum { width: 62px; padding: 3px 6px; }
+  .bpmnum { width: 62px; padding: var(--sp-1) var(--sp-2); font-family: var(--mono); }
+
+  @media (max-width: 980px) {
+    /* 触屏上卷帘控制条容易误触，行距拉开一点 */
+    .rolltransport { gap: var(--sp-3); padding: var(--sp-3) 14px; }
+    .bpmnum { min-height: var(--tap-min); }
+  }
+}

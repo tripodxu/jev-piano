@@ -43,7 +43,8 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | 改 Jev 客户端/渠道 | `public/js/jev.js`、`test/jev.test.mjs`、`src/worker.js` | `docs/research/jevthoven-调研.md` |
 | 改实时播放/调度 | `public/js/player.js`、`test/player.test.mjs` | — |
 | 改音频/音色 | `public/js/audio.js`、`test/audio.test.mjs` | — |
-| 改实时界面 | `public/js/ui.js`、`public/js/main.js`、`public/index.html` | `public/js/canvas.js`（下落音符/张力带/动机卡）、`test/ui.test.mjs`（canvas 能耗契约与转出契约都在这里）、`public/styles.css`、`candidates.js`（`planTargetSeries`/段落）、`composer.js`（`plan.sections`） |
+| 改实时界面 | `public/js/ui.js`、`public/js/main.js`、`public/index.html` | `public/js/canvas.js`（下落音符/张力带/动机卡）、`test/ui.test.mjs`（canvas 能耗契约与转出契约都在这里）、`public/styles/`（分层样式，见 §2.1）、`test/style-contract.test.mjs`（设计系统契约）、`candidates.js`（`planTargetSeries`/段落）、`composer.js`（`plan.sections`） |
+| 改样式 / 设计语言 | **`public/styles/tokens.css`（先改这里）**，再动对应层文件 | `test/style-contract.test.mjs`（变量定义、层序、裸值、类名四道红灯）、`public/js/*.js`（类名来源） |
 | 改工作室界面 | `public/js/studio.js`（状态与工作流）、`public/js/studio-roll.js`（卷帘视图）、`public/js/studio-core.js`、`test/studio.test.mjs`、`test/studio-roll.test.mjs`、`docs/memory/2026-09-28-studio-view.md` | `public/js/tension.js`（张力）、`public/js/nct.js`（非和声音 id）、`public/js/music.js`（`functionOfPc`） |
 | 改 Worker/部署 | `src/worker.js`、`wrangler.toml`、`.dev.vars.example` | README「部署」 |
 | 修重复/听感问题 | `public/js/candidates.js`、`scripts/analyze-repetition.mjs`、`docs/memory/2026-09-28-anti-repetition-overhaul.md` | `composer.js` 渲染内核 |
@@ -68,13 +69,33 @@ src/worker.js            生产 Worker（静态资产 + /api/probe|jev|llm）
 | `audio.js` | 136 | 合成钢琴（三角波+泛音+包络+低通+生成式混响）、录音 | `envFor` 纯函数有单测；voices 由主振荡器 `onended` 事件驱动清理（不靠 setTimeout） |
 | `player.js` | 186 | lookahead 调度器（提前 2 小节），`now/setIntervalFn` 可注入 | 时钟注入契约被测试锁定；**展示层异常不得炸调度循环**（轮次 47）；**决策预算由本文件的音频时钟给出**（`_decisionBudget`/`_settleBudgets`，只用注入的 `now()`，不起新定时器；暂停/停止时结算掉未兑现预算）；**迟到小节必须顺延到现在**——Web Audio 对排程在过去乐曲是立即发声，整小节会炸成一声；`stop()` 后不得再排程；`records` 封顶 `RECORDS_CAP`=20000 丢最旧（轮次 64——连续即兴数小时的内存护栏） |
 | `midi.js` | 88 | SMF Type-1 双轨导出 | 字节格式有单测 |
-| `ui.js` | 505 | 界面原语：键盘 DOM（含**和弦键亮起** `mark`/`keyMarks`/`markDiff`，轮次 57：diff 更新只动变化的键）、**和声功能轨** + 段落标注、决策日志（`addDecision`/`decisionGuards`）、**图例**（`LEGEND_ITEMS`/`renderLegend`）、**计费台账**（`emptyLedger`/`accumulateLedger`/`ledgerPills`/`CHANNEL_LABEL`）、**键盘试听回声**（`keyEchoText`，轮次 55）、计划卡、toast | 功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；**颜色归功能、形态归手法**；段落/手法标注都必须有文字通道；**`LEGEND_ITEMS` 必须与真实标记同源**（标记改了图例没改，比没图例更糟，有测试守）；**归因标记一律走 `decisionGuards()` 纯函数**（断路/驳回/复读/超预算四类，返回描述符而非 HTML）——加标记必须同时加图例条目与关键词断言；canvas 三件套的能耗契约见 `canvas.js` 行；**台账是 tokens/费用/延迟的唯一口径**，两个界面共用（工作室此前完全不记账）；`setStatus` 同时接受裸数值与已格式化字符串——**格式化只做一遍** |
+| `ui.js` | 563 | 界面原语：键盘 DOM（含**和弦键亮起** `mark`/`keyMarks`/`markDiff`，轮次 57：diff 更新只动变化的键）、**可弹奏键盘接线**（`attachPlayableKeyboard`，轮次 69）、**和声功能轨** + 段落标注、决策日志（`addDecision`/`decisionGuards`）、**图例**（`LEGEND_ITEMS`/`renderLegend`）、**计费台账**（`emptyLedger`/`accumulateLedger`/`ledgerPills`/`refreshStatusPills`/`CHANNEL_LABEL`）、**键盘试听回声**（`keyEchoText`，轮次 55）、计划卡、toast | **`attachPlayableKeyboard` 的 `enabled` 是必填守卫**——两个界面的监听器都常驻 window，不查视图会双触发（双发声，轮次 68）；刷新顶栏 pill 一律走 `refreshStatusPills`（两个界面共用同一份 DOM 与同一套口径）；功能轨的类名映射有单测锁住；`chordFn` 缺失/非法必须降级为主功能；**颜色归功能、形态归手法**；段落/手法标注都必须有文字通道；**`LEGEND_ITEMS` 必须与真实标记同源**（标记改了图例没改，比没图例更糟，有测试守）；**归因标记一律走 `decisionGuards()` 纯函数**（断路/驳回/复读/超预算四类，返回描述符而非 HTML）——加标记必须同时加图例条目与关键词断言；canvas 三件套的能耗契约见 `canvas.js` 行；**台账是 tokens/费用/延迟的唯一口径**，两个界面共用（工作室此前完全不记账）；`setStatus` 同时接受裸数值与已格式化字符串——**格式化只做一遍** |
 | `canvas.js` | 419 | **canvas 可视化三件套**（轮次 52 从 `ui.js` 拆出）：下落音符 `Fall`（含**跟弹用户音符**：紫色 + 近白描边，轮次 56）、张力对照带 `TensionGraph`、动机卡 `MotifCard`，外加它们专用的纯辅助（`motifShape`/`pulseActive`/`sectionLabel`/`chorusView`/`hoverBarAt`/`LOW`·`HIGH`）。**零 import** | **能耗契约**：动画类（`Fall`）用 setInterval 而非 rAF（标签页遮挡时 rAF 会暂停）；**静止类（`TensionGraph`/`MotifCard`）只在数据变化与强调窗口内重绘，`start()` 不得起常驻定时器**；三者尺寸一律由 `ResizeObserver` 缓存，**`draw()` 里禁止读 `clientWidth`**（每帧读 = 每帧强制同步布局），全部有单测守；**`.font` 赋值禁止 CSS 变量**——canvas 不解析 `var()`，赋值被静默忽略（轮次 56 修复三处并加契约测试）；`ui.js` 对它**只做转出**，调用方 import 路径不变（有单测锁同一绑定）；`LOW`/`HIGH` 是键盘与键跨度的共同真相源 |
-| `main.js` | 474 | 实时即兴接线：设置持久化、渠道探测、开始/停止/导出、张力/功能轨/动机卡喂数、**图例抽屉开合与「不再提示」记忆**、**两种兜底的分别告知**、**跟弹回声与乐句末终止式读数**（轮次 55）、**跟弹音符进下落可视化**（轮次 56）、**和弦键亮起**（轮次 57） | 元素 id 契约见 `index.html`；**兜底必须分因**：`deadlineMiss`（渠道跟不上，设计在保节奏）与渠道故障（429/断网/CORS/无 key）是两件事，toast 文案与状态栏后缀都不同（`·跟不上` vs `·兜底`），各自一次性告知、恢复即复位 |
-| `studio.js` | 517 | 工作室界面的**状态与工作流层**（轮次 54 拆出卷帘视图）：批量生成 job、回放（lookahead 调度 + 播放头 + 循环）、撤销/重做/自动保存、量化、Jev 路由的自然语言修改、JSON/MIDI 导入导出、键盘跟弹回声与**和弦键亮起**（`chordCtx`/`syncKeyMarks`，轮次 55/57）；持有 piece/撤销栈/回放/台账等状态，经 deps 闭包喂给卷帘视图（studio-roll.js） | **`drawPlayhead()` 跑在 30Hz 上：必须「先读完布局再写」，写后再读会让浏览器每帧强制一次 reflow；和弦文本只在真的换和弦时才写 DOM**（和弦键亮起挂在同一分支）；张力与 `nonChordIds` 两份缓存的**作废入口**仍是本文件的 `invalidateTension()`（缓存本体住在 studio-roll.js）；**布局常量（`ZOOM`/`ROW`/`VEL_H`/`HEADER` 等）住在 studio-core.js**——轮次 38 拆分时漏了导出，让卷帘整条绘制路径死了 10 轮，见 MEMORY 轮次 49；**生成循环必须逐小节 `accumulateLedger`**——顶栏 pill 与实时界面共用同一份 DOM，不记账用户就看不到一次生成花了多少钱 |
+| `dom.js` | 24 | **与业务无关的 DOM 原语**（零 import，两个界面共用）：`escapeHtml`（唯一的 HTML 注入面）、`byId`、`downloadBlob`（导出路径，此前在 main/studio 逐字节重复两份） | 任何拼进 `innerHTML` 的动态文本必须过 `escapeHtml`；别在界面层再写一份 `download()` |
+| `main.js` | 483 | 实时即兴接线：设置持久化、渠道探测、开始/停止/导出、张力/功能轨/动机卡喂数、**图例抽屉开合与「不再提示」记忆**、**两种兜底的分别告知**、**跟弹回声与乐句末终止式读数**（轮次 55）、**跟弹音符进下落可视化**（轮次 56）、**和弦键亮起**（轮次 57）、**曲风 chips 的方向键导航 + tab 的 aria-selected 同步**（轮次 69） | 元素 id 契约见 `index.html`；**兜底必须分因**：`deadlineMiss`（渠道跟不上，设计在保节奏）与渠道故障（429/断网/CORS/无 key）是两件事，toast 文案与状态栏后缀都不同（`·跟不上` vs `·兜底`），各自一次性告知、恢复即复位 |
+| `studio.js` | 506 | 工作室界面的**状态与工作流层**（轮次 54 拆出卷帘视图）：批量生成 job、回放（lookahead 调度 + 播放头 + 循环）、撤销/重做/自动保存、量化、Jev 路由的自然语言修改、JSON/MIDI 导入导出、键盘跟弹回声与**和弦键亮起**（`chordCtx`/`syncKeyMarks`，轮次 55/57）；持有 piece/撤销栈/回放/台账等状态，经 deps 闭包喂给卷帘视图（studio-roll.js） | **`drawPlayhead()` 跑在 30Hz 上：必须「先读完布局再写」，写后再读会让浏览器每帧强制一次 reflow；和弦文本只在真的换和弦时才写 DOM**（和弦键亮起挂在同一分支）；张力与 `nonChordIds` 两份缓存的**作废入口**仍是本文件的 `invalidateTension()`（缓存本体住在 studio-roll.js）；**布局常量（`ZOOM`/`ROW`/`VEL_H`/`HEADER` 等）住在 studio-core.js**——轮次 38 拆分时漏了导出，让卷帘整条绘制路径死了 10 轮，见 MEMORY 轮次 49；**生成循环必须逐小节 `accumulateLedger`**——顶栏 pill 与实时界面共用同一份 DOM，不记账用户就看不到一次生成花了多少钱 |
 | `studio-roll.js` | 409 | **工作室钢琴卷帘视图**（轮次 54 从 studio.js 拆出）：卷帘与力度轨的绘制、指针交互（移动/缩放/双击删音/拖力度）、hover 逐小节读数（含乐句末终止式（轮次 55）与**悬停音符角色**（轮次 57））、时间轴头部（张力面积/功能带/段落界/契合度带）、张力/非和声音/契合度三份分析缓存（契合度带缓存：轮次 64——逐小节 fit 是 O(bars×notes)，hover 重绘不该反复付）；**空态也要画**（轮次 66：ensureStudio 无存档时不调 drawRoll/drawVelLane，canvas 停在默认 300×150，力度轨 CSS 底色显出浅斑）。**只画不决策**：piece 单一真相源在 studio.js，经 `createRollView(deps)` 闭包读取 | **与 studio.js 的 deps 契约（`els`/`getPiece`/`playing`/`pushUndo`/`onCommit`/`muted`）——少传一个，那条交互路径就静默失效**（studio-roll.test.mjs 守接线与绘制路径）；**力度轨与卷帘同在 `.rollwrap` 内，播放头 `top:0/bottom:0` 自动覆盖两条轨——不要另建同步**；卷帘头部四段与音符区**共用 `ZOOM`**（常量住在 studio-core.js） |
 | `settings.js` | 21 | localStorage 设置读写（含 `legendHintOff`：图例提示记不记） | — |
 | `kbd.js` | 72 | **电脑键盘弹奏**（轮次 65）：`e.code` 物理键位 → 钢琴键（A–L 白键、W/E/T/Y/U/O/P 黑键、`;` 跨三半音、Z/X 换八度）；`shouldHandle` 守卫（重触/组合键/表单焦点不弹）；两界面经 `attachKeyboard` 共用，`renderKeyboard.setKeyHints` 画键位字母 | **base 只落在 C 上**（`OCTAVE_BASES`=36/48/60——17 键跨度与键盘音域 LOW..HIGH 共同决定，72 作 base 会让 `;` 顶到 88）；与琴键点击同走 pressKey 一条路——新入口不得另开回声/下落的账；**两界面监听器都常驻 window，`enabled` 谓词按激活视图路由**（轮次 68 修复双触发：开过工作室后实时页每次按键双发声） |
+
+### 2.1 样式架构（轮次 69：单体 styles.css → public/styles/ 分层）
+
+七个文件，由 `index.html` 按序 `<link>`；**层序只在 `tokens.css` 里用 `@layer` 声明一次**，其余文件按名归入：
+
+| 文件 | 行数 | 内容 |
+|---|---|---|
+| `tokens.css` | 130 | **唯一的设计令牌真相源**（颜色/文字/字号/字距/间距/圆角/阴影/动效/z-index）+ `@layer` 层序声明 |
+| `base.css` | 107 | 归零、排版、浏览器表面（选中/光标/滚动条/焦点环）、`.sr-only`/`.skip-link`/`.hidden`、高对比度偏好 |
+| `layout.css` | 97 | 顶栏、视图栅格、页脚、断点（1200/980/720/520） |
+| `components.css` | 273 | 按钮/tab/chip/pill/表单/抽屉/toast/图例/进度条 |
+| `stage.css` | 413 | 舞台、灯光、和弦区、动机卡、功能轨、写实钢琴、计划卡、决策日志、张力带 |
+| `studio.css` | 35 | 卷帘、力度轨、播放头、走带条 |
+| `motion.css` | 57 | **唯一允许写 `@keyframes` 的文件** + `prefers-reduced-motion` 豁免 |
+
+**三条硬规则（由 `test/style-contract.test.mjs` 守成红灯）**：
+1. 改视觉**先改 `tokens.css`**；组件层出现裸十六进制色值或裸 `font-size: Npx` 即红（琴键/琴毡的写实渐变在 `stage.css`，属允许的"画出来的材质"）。
+2. `var(--x)` 引用的变量必须在 `tokens.css` 有定义——打错变量名会**静默回退到初始值，不报错**。
+3. 层序只在 `tokens.css` 声明；新增文件必须把自己写进已声明的层，且必须被 `index.html` 引用（少 link 一个 = 整层静默消失）。
 
 ### 分析层
 

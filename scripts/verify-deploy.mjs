@@ -35,6 +35,13 @@ const CHECKS = [
   { file: '/js/studio-core.js', needles: ['export const ZOOM', 'export const HEADER', 'H_TENSION'], why: '轮次 49：布局常量回填（此前卷帘整条绘制路径 ReferenceError）' },
   { file: '/js/kbd.js', needles: ['KEY_SEMITONES', 'attachKeyboard', 'enabled'], why: '轮次 65/68：电脑键盘弹奏 + 视图路由（防双触发）' },
   { file: '/index.html', needles: ['stageWarm', 'kbEcho', 'stKbEcho', 'data-style="blues"', 'stage-idle'], why: '轮次 49 舞台灯光 + 55 回声条 + 58 蓝调选项 + 66 空态覆盖层' },
+  // 轮次 69：样式表拆层 + 前端去重的线上核验
+  // 拆分的失败模式是静默的（少 link 一个文件整层消失），所以线上必须同时看到
+  // 「index.html 引了分层样式表」与「tokens.css 内容真的上了」，二者缺一即为半吊子部署。
+  { file: '/index.html', needles: ['styles/tokens.css', 'styles/motion.css', 'skip-link', 'sr-only'], why: '轮次 69：七层样式表引用 + 跳转链接/屏读文本' },
+  { file: '/styles/tokens.css', needles: ['@layer tokens', '--brass-hi', '--surface-3'], why: '轮次 69：设计令牌层（层序 + 颜色变量真的上到边缘）' },
+  { file: '/js/dom.js', needles: ['escapeHtml', 'downloadBlob'], why: '轮次 69：共享 DOM 原语（此前 main/studio 各存一份 download）' },
+  { file: '/js/ui.js', needles: ['refreshStatusPills', 'attachPlayableKeyboard'], why: '轮次 69：共享台账刷新 + 键盘接线（enabled 守卫改必填）' },
 ];
 
 // 网络抖动会让 fetch 抛 TypeError（本沙箱对目标域时通时断），而内容不符是**确定信号**。

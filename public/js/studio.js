@@ -7,10 +7,10 @@ import { buildPlan, Composer } from './composer.js';
 import { askJev } from './jev.js';
 import { getAudio } from './audio.js';
 import { exportMidi } from './midi.js';
-import { renderKeyboard, toast, setStatus, emptyLedger, accumulateLedger, ledgerPills, CHANNEL_LABEL, keyEchoText } from './ui.js';
+import { toast, emptyLedger, accumulateLedger, CHANNEL_LABEL, refreshStatusPills, attachPlayableKeyboard } from './ui.js';
 import { loadSettings } from './settings.js';
-import { NOTE_NAMES, chordPcs, midiName } from './music.js';
-import { attachKeyboard, hintsFor } from './kbd.js';
+import { NOTE_NAMES, chordPcs } from './music.js';
+import { downloadBlob } from './dom.js';
 import { tempoMultAt } from './candidates.js';
 import { createRollView } from './studio-roll.js';
 import {
@@ -33,15 +33,16 @@ export {
 /** 计费台账（轮次 50）：与实时界面共用 accumulateLedger 口径，生成过程的每一小节都记账 */
 let ledger = emptyLedger();
 
-/** 把台账刷到顶栏 pill。渠道名从当前设置读——工作室与实时界面看的是同一个渠道。 */
+/** 把台账刷到顶栏 pill。渠道名从当前设置读——工作室与实时界面看的是同一个渠道。
+ *  口径走 ui.js 的共享实现（轮次 50 定、轮次 69 抽出）：两个界面共用同一份 pill DOM，
+ *  若各写各的账，工作室整条生成循环的花费对用户完全不可见。 */
 function refreshLedger() {
   if (!els?.tokens) return;
   const s = loadSettings();
-  const p = ledgerPills(ledger);
-  setStatus({ channel: els.channel, tokens: els.tokens, cost: els.cost, latency: els.latency }, {
-    channel: CHANNEL_LABEL[s.channel] ?? s.channel,
-    tokens: p.tokens, cost: p.cost, latency: p.latency,
-  });
+  refreshStatusPills(
+    { channel: els.channel, tokens: els.tokens, cost: els.cost, latency: els.latency },
+    { channel: CHANNEL_LABEL[s.channel] ?? s.channel, ledger },
+  );
 }
 
 function resetLedger() { ledger = emptyLedger(); }
@@ -105,24 +106,13 @@ export function ensureStudio() {
     // 花费对用户完全不可见（轮次 50 修复）
     channel: $('stChannel'), tokens: $('stTokens'), cost: $('stCost'), latency: $('stLatency'),
   };
-  // 弹一个音的共用路径（轮次 65）：琴键点击与电脑键盘同路——回声用当前和声上下文
-  const pressKey = (midi) => {
-    els.kbEcho.textContent = keyEchoText(midi, chordCtx()); // 跟弹回声（轮次 55）：同实时页
-    getAudio().ensure()
-      .then(() => getAudio().play(midi, getAudio().ctx.currentTime + 0.01, 0.9, 0.7))
-      .catch(() => { /* 同实时页：试听是增强 */ });
-  };
-  kb = renderKeyboard(els.keyboard, { onKey: pressKey });
-  // 电脑键盘弹奏（轮次 65）：与实时页同一套键位；工作室的回放中上下文跟随播放头所在小节。
-  // enabled：仅工作室视图激活时响应（与下方 ctrl+z 守卫同一判据）——两个界面的监听器都
-  // 常驻 window，不查视图会在实时页双触发（双发声，轮次 68 修复）
-  kb.setKeyHints(hintsFor(60));
-  attachKeyboard({
-    onKey: pressKey,
-    onOctave: (base) => {
-      kb.setKeyHints(hintsFor(base));
-      els.kbEcho.textContent = `八度 → ${midiName(base)} 起（Z/X 切换）`;
-    },
+  // 可弹奏键盘（轮次 69 抽成 ui.js 的共享实现）：与实时页同一套键位；
+  // 回放中和声上下文跟随播放头所在小节（chordCtx）。
+  // enabled 是**必填**守卫：两个界面的监听器都常驻 window，不查视图会在实时页双触发
+  // （双发声，轮次 68 修复）——与下方 ctrl+z 守卫同一判据。
+  kb = attachPlayableKeyboard(els.keyboard, {
+    echoEl: els.kbEcho,
+    chordOf: chordCtx,
     enabled: () => document.getElementById('viewStudio').classList.contains('active'),
   });
   roll = createRollView({
@@ -444,7 +434,12 @@ function bindControls() {
     try { await getAudio().ensure(); } catch (e) { toastify('无法启动音频：' + e.message); return; }
     startPlay();
   });
-  els.loopBtn.addEventListener('click', () => { loop = !loop; els.loopBtn.classList.toggle('sel', loop); });
+  // 循环是切换态：颜色之外还要有语义通道（aria-pressed），否则屏幕阅读器读不出开/关
+  els.loopBtn.addEventListener('click', () => {
+    loop = !loop;
+    els.loopBtn.classList.toggle('sel', loop);
+    els.loopBtn.setAttribute('aria-pressed', String(loop));
+  });
   els.muteR.addEventListener('change', () => { muted.R = els.muteR.checked; drawRoll(); drawVelLane(); });
   els.muteL.addEventListener('change', () => { muted.L = els.muteL.checked; drawRoll(); drawVelLane(); });
   els.undo.addEventListener('click', doUndo);
@@ -502,13 +497,7 @@ function bindControls() {
   });
 }
 
-function download(blob, name) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-}
+const download = downloadBlob; // 导出路径与实时界面共用同一份实现（dom.js）
 
 /** 切回实时即兴时由 main 调用：停掉工作室回放 */
 export function stopStudio() {
